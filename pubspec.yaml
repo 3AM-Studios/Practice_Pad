@@ -51,6 +51,7 @@ dependencies:
   xml: any
   simple_sheet_music:
     path: packages/simple_sheet_music
+  liquid_glass_renderer: ^0.1.1-dev.10
 
 
 

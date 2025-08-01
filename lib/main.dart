@@ -1,4 +1,7 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+import 'dart:ui';
+import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:practice_pad/features/edit_items/presentation/viewmodels/edit_items_viewmodel.dart';
 import 'package:practice_pad/features/practice/presentation/viewmodels/today_viewmodel.dart';
 import 'package:practice_pad/features/practice/presentation/pages/today_screen.dart';
@@ -53,22 +56,24 @@ class PracticeLoverApp extends StatelessWidget {
               previous ?? TodayViewModel(routinesViewModel: routinesViewModel),
         ),
       ],
-      child: const CupertinoApp(
+      child: MaterialApp(
         title: 'PracticeLover',
         debugShowCheckedModeBanner: false,
-        theme: CupertinoThemeData(
-          brightness: Brightness.dark,
-          primaryColor: CupertinoColors.systemRed,
+        theme: ThemeData.from(
+          colorScheme: ColorScheme.fromSeed(
+            brightness: Brightness.dark,
+            seedColor: const Color(0xFF287390),
+          ),
         ),
-        localizationsDelegates: <LocalizationsDelegate<dynamic>>[
+        localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
           GlobalMaterialLocalizations.delegate,
           GlobalWidgetsLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
         ],
-        supportedLocales: [
+        supportedLocales: const [
           Locale('en', ''),
         ],
-        home: MainAppScaffold(),
+        home: const MainAppScaffold(),
       ),
     );
   }
@@ -82,6 +87,8 @@ class MainAppScaffold extends StatefulWidget {
 }
 
 class MainAppScaffoldState extends State<MainAppScaffold> {
+  int _currentIndex = 0;
+
   final List<Widget> _tabs = [
     ChangeNotifierProxyProvider<RoutinesViewModel, TodayViewModel>(
       create: (context) => TodayViewModel(
@@ -97,41 +104,217 @@ class MainAppScaffoldState extends State<MainAppScaffold> {
     const SettingsScreen(),
   ];
 
+  final List<TabItem> _tabItems = const [
+    TabItem(
+      icon: CupertinoIcons.house_fill,
+      label: 'Practice',
+    ),
+    TabItem(
+      icon: CupertinoIcons.list_bullet,
+      label: 'Routines',
+    ),
+    TabItem(
+      icon: CupertinoIcons.pencil_ellipsis_rectangle,
+      label: 'Items',
+    ),
+    TabItem(
+      icon: CupertinoIcons.chart_bar_square,
+      label: 'Stats',
+    ),
+    TabItem(
+      icon: CupertinoIcons.settings,
+      label: 'Settings',
+    ),
+  ];
+
   @override
   Widget build(BuildContext context) {
-    return CupertinoTabScaffold(
-      tabBar: CupertinoTabBar(
-        items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(
-            icon: Icon(CupertinoIcons.house_fill),
-            label: 'Practice',
+    return Scaffold(
+      extendBody: true,
+      body: Stack(
+        children: [
+          // Background content that will be visible through the glass
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Theme.of(context).colorScheme.surface,
+                    Theme.of(context).colorScheme.surface.withOpacity(0.8),
+                  ],
+                ),
+              ),
+            ),
           ),
-          BottomNavigationBarItem(
-            icon: Icon(CupertinoIcons.list_bullet),
-            label: 'Routines',
+          // Main content
+          Positioned.fill(
+            child: IndexedStack(
+              index: _currentIndex,
+              children: _tabs,
+            ),
           ),
-          BottomNavigationBarItem(
-            icon: Icon(CupertinoIcons.pencil_ellipsis_rectangle),
-            label: 'Items',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(CupertinoIcons.chart_bar_square),
-            label: 'Stats',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(CupertinoIcons.settings),
-            label: 'Settings',
+          // Liquid glass navigation bar positioned at the bottom
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: LiquidGlassNavigationBar(
+              items: _tabItems,
+              currentIndex: _currentIndex,
+              onTap: (index) {
+                setState(() {
+                  _currentIndex = index;
+                });
+              },
+            ),
           ),
         ],
-        activeColor: CupertinoColors.systemRed,
       ),
-      tabBuilder: (BuildContext context, int index) {
-        return CupertinoTabView(
-          builder: (BuildContext context) {
-            return _tabs[index];
-          },
-        );
-      },
+    );
+  }
+}
+
+class TabItem {
+  final IconData icon;
+  final String label;
+
+  const TabItem({
+    required this.icon,
+    required this.label,
+  });
+}
+
+class LiquidGlassNavigationBar extends StatelessWidget {
+  final List<TabItem> items;
+  final int currentIndex;
+  final ValueChanged<int> onTap;
+
+  const LiquidGlassNavigationBar({
+    super.key,
+    required this.items,
+    required this.currentIndex,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    
+    return Container(
+      margin: const EdgeInsets.all(16),
+      height: 80,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(25),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface.withOpacity(0),
+              borderRadius: BorderRadius.circular(25),
+              border: Border.all(
+                color: theme.colorScheme.outline.withOpacity(0.2),
+                width: 1,
+              ),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.white.withOpacity(0.1),
+                  Colors.white.withOpacity(0.05),
+                ],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 10,
+                  spreadRadius: 2,
+                ),
+                BoxShadow(
+                  color: Colors.white.withOpacity(0.1),
+                  blurRadius: 10,
+                  spreadRadius: 1,
+                  offset: const Offset(-1, -1),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: List.generate(items.length, (index) {
+                final isSelected = index == currentIndex;
+                final item = items[index];
+                
+                return Expanded(
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () => onTap(index),
+                      borderRadius: BorderRadius.circular(25),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: isSelected 
+                                    ? theme.colorScheme.primary.withOpacity(0.3)
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(12),
+                                gradient: isSelected 
+                                    ? LinearGradient(
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                        colors: [
+                                          theme.colorScheme.primary.withOpacity(0.3),
+                                          theme.colorScheme.primary.withOpacity(0.1),
+                                        ],
+                                      )
+                                    : null,
+                                boxShadow: isSelected 
+                                    ? [
+                                        BoxShadow(
+                                          color: theme.colorScheme.primary.withOpacity(0.3),
+                                          blurRadius: 8,
+                                          spreadRadius: 1,
+                                        ),
+                                      ]
+                                    : null,
+                              ),
+                              child: Icon(
+                                item.icon,
+                                color: isSelected 
+                                    ? theme.colorScheme.primary
+                                    : theme.colorScheme.onSurface.withOpacity(0.6),
+                                size: 24,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              item.label,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                                color: isSelected 
+                                    ? theme.colorScheme.primary
+                                    : theme.colorScheme.onSurface.withOpacity(0.6),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
