@@ -1,0 +1,570 @@
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+import 'package:practice_pad/features/edit_items/presentation/viewmodels/edit_items_viewmodel.dart';
+import 'package:practice_pad/features/practice/presentation/viewmodels/today_viewmodel.dart';
+import 'package:practice_pad/features/routines/presentation/viewmodels/routines_viewmodel.dart';
+import 'package:provider/provider.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+
+import 'package:practice_pad/services/cloud_kit_service.dart'; // ADDED
+import 'package:practice_pad/features/edit_items/presentation/pages/edit_items_screen.dart'; // ADDED
+import 'package:practice_pad/features/routines/presentation/pages/edit_routines_screen.dart'; // ADDED
+import 'package:practice_pad/features/practice/presentation/pages/circle_of_fifths_screen.dart'; // ADDED
+import 'package:practice_pad/features/practice/presentation/pages/practice_item_selection_screen.dart';
+import 'package:practice_pad/models/practice_area.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  const String icloudContainerId = "iCloud.com.practicepad";
+
+  try {
+    await CloudKitService.initialize(icloudContainerId);
+    print(
+        "CloudKitService initialized successfully with container: $icloudContainerId");
+  } catch (e) {
+    print("FATAL: CloudKitService initialization failed: $e");
+    // Depending on the app's requirements, you might want to show an error UI
+    // or prevent the app from starting if CloudKit is essential.
+  }
+
+  runApp(const PracticeLoverApp());
+}
+
+class PracticeLoverApp extends StatelessWidget {
+  const PracticeLoverApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    // MODIFIED: Wrapped with MultiProvider to provide EditItemsViewModel globally
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider<EditItemsViewModel>(
+          create: (_) => EditItemsViewModel()..fetchPracticeAreas(),
+        ),
+        // Potentially other global providers can be added here
+        ChangeNotifierProxyProvider<EditItemsViewModel, RoutinesViewModel>(
+          create: (context) => RoutinesViewModel(
+              editItemsViewModel:
+                  Provider.of<EditItemsViewModel>(context, listen: false)),
+          update: (context, editItemsViewModel, previousRoutinesViewModel) =>
+              RoutinesViewModel(editItemsViewModel: editItemsViewModel),
+        ),
+      ],
+      child: const CupertinoApp(
+        title: 'PracticeLover',
+        debugShowCheckedModeBanner: false,
+        theme: const CupertinoThemeData(
+          brightness: Brightness.dark,
+          primaryColor: CupertinoColors.systemRed,
+        ),
+        localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: const [
+          Locale('en', ''), // English, no country code
+          // Add other locales your app supports here
+        ],
+        home: const MainAppScaffold(),
+      ),
+    );
+  }
+}
+
+// class AuthWrapper extends StatelessWidget { // COMMENTED OUT
+//   const AuthWrapper({super.key}); // COMMENTED OUT
+//   @override // COMMENTED OUT
+//   Widget build(BuildContext context) { // COMMENTED OUT
+//     return BlocBuilder<AuthBloc, AuthState>( // COMMENTED OUT
+//       builder: (context, state) { // COMMENTED OUT
+//         if (state is AuthAuthenticated) { // COMMENTED OUT
+//           // User is authenticated (e.g. via Anonymous or Sign In With Apple)
+//           // You can pass state.user to MainAppScaffold if needed
+//           return const MainAppScaffold(); // COMMENTED OUT
+//         }
+//         if (state is AuthUnauthenticated || state is AuthLoading) { // COMMENTED OUT
+//           // Show loading indicator or a sign-in screen if you had one
+//           // For anonymous auth, it should quickly move to authenticated
+//           return const CupertinoPageScaffold( // COMMENTED OUT
+//             child: Center(child: CupertinoActivityIndicator()), // COMMENTED OUT
+//           ); // COMMENTED OUT
+//         }
+//         // Handle other states or return a fallback
+//         return const CupertinoPageScaffold( // COMMENTED OUT
+//           child: Center(child: Text('Auth Error')), // COMMENTED OUT
+//         ); // COMMENTED OUT
+//       }, // COMMENTED OUT
+//     ); // COMMENTED OUT
+//   } // COMMENTED OUT
+
+class MainAppScaffold extends StatefulWidget {
+  const MainAppScaffold({super.key});
+
+  @override
+  MainAppScaffoldState createState() => MainAppScaffoldState();
+}
+
+class MainAppScaffoldState extends State<MainAppScaffold> {
+  final List<Widget> _tabs = [
+    ChangeNotifierProxyProvider<RoutinesViewModel, TodayViewModel>(
+      create: (context) => TodayViewModel(
+          routinesViewModel:
+              Provider.of<RoutinesViewModel>(context, listen: false)),
+      update: (context, routinesViewModel, previousTodayViewModel) =>
+          TodayViewModel(routinesViewModel: routinesViewModel),
+      child: const TodayScreen(),
+    ),
+    const EditRoutinesScreen(),
+    const EditItemsScreen(),
+    const StatsScreen(),
+    const SettingsScreen(),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return CupertinoTabScaffold(
+      tabBar: CupertinoTabBar(
+        items: const <BottomNavigationBarItem>[
+          BottomNavigationBarItem(
+            icon: Icon(CupertinoIcons.house_fill),
+            label: 'Practice',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(CupertinoIcons.list_bullet),
+            label: 'Routines',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(CupertinoIcons.pencil_ellipsis_rectangle),
+            label: 'Items',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(CupertinoIcons.chart_bar_square),
+            label: 'Stats',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(CupertinoIcons.settings),
+            label: 'Settings',
+          ),
+        ],
+        activeColor: CupertinoColors.systemRed, // Or your preferred accent
+      ),
+      tabBuilder: (BuildContext context, int index) {
+        return CupertinoTabView(
+          // builder: (BuildContext context) {
+          //   return _tabs[index];
+          // },
+          // To enable per-tab navigation history:
+          // Provide a navigatorKey for each tab if you want independent navigation stacks
+          // navigatorKey: GlobalKey<NavigatorState>(), // Example
+          builder: (BuildContext context) {
+            // Each tab gets its own navigator, wrapped in a CupertinoPageScaffold
+            // This ensures that the CupertinoNavigationBar is correctly placed within each tab's view.
+            return _tabs[index];
+          },
+        );
+      },
+    );
+  }
+}
+
+// Placeholder for Authentication BLoC (auth_bloc.dart, auth_event.dart, auth_state.dart)
+// This will be created in separate files. For now, main.dart needs references.
+
+// Basic Auth BLoC structure (to be moved to separate files)
+// This is a simplified version for now.
+
+// // Event (auth_event.dart) // COMMENTED OUT
+// abstract class AuthEvent extends Equatable { // COMMENTED OUT
+//   const AuthEvent(); // COMMENTED OUT
+//   @override // COMMENTED OUT
+//   List<Object> get props => []; // COMMENTED OUT
+// } // COMMENTED OUT
+// // ... AppStarted, LoggedIn, LoggedOut ... // COMMENTED OUT
+// class AppStarted extends AuthEvent {} // COMMENTED OUT
+// class LoggedIn extends AuthEvent { // COMMENTED OUT
+//   final User user; // Firebase User // COMMENTED OUT
+//   const LoggedIn({required this.user}); // COMMENTED OUT
+//   @override // COMMENTED OUT
+//   List<Object> get props => [user]; // COMMENTED OUT
+// } // COMMENTED OUT
+// class LoggedOut extends AuthEvent {} // COMMENTED OUT
+
+// // State (auth_state.dart) // COMMENTED OUT
+// abstract class AuthState extends Equatable { // COMMENTED OUT
+//   const AuthState(); // COMMENTED OUT
+//   @override // COMMENTED OUT
+//   List<Object> get props => []; // COMMENTED OUT
+// } // COMMENTED OUT
+// // ... AuthInitial, AuthLoading, AuthAuthenticated, AuthUnauthenticated ... // COMMENTED OUT
+// class AuthInitial extends AuthState {} // COMMENTED OUT
+// class AuthLoading extends AuthState {} // COMMENTED OUT
+// class AuthAuthenticated extends AuthState { // COMMENTED OUT
+//   final User user; // COMMENTED OUT
+//   const AuthAuthenticated({required this.user}); // COMMENTED OUT
+//   @override // COMMENTED OUT
+//   List<Object> get props => [user]; // COMMENTED OUT
+// } // COMMENTED OUT
+// class AuthUnauthenticated extends AuthState {} // COMMENTED OUT
+
+// // BLoC (auth_bloc.dart) // COMMENTED OUT
+// class AuthBloc extends Bloc<AuthEvent, AuthState> { // COMMENTED OUT
+//   final FirebaseAuth _firebaseAuth = FirebaseAuth.instance; // COMMENTED OUT
+// // ... entire AuthBloc class ... // COMMENTED OUT
+// } // COMMENTED OUT
+
+// Placeholder screens (to be created in their respective feature directories)
+// These are just to make main.dart compile.
+
+class TodayScreen extends StatelessWidget {
+  const TodayScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<TodayViewModel>(
+      builder: (context, viewModel, child) {
+        return CupertinoPageScaffold(
+          navigationBar:
+              const CupertinoNavigationBar(middle: Text('Today\'s Practice')),
+          child: _buildBody(context, viewModel),
+        );
+      },
+    );
+  }
+
+  Widget _buildBody(BuildContext context, TodayViewModel viewModel) {
+    if (viewModel.isLoading) {
+      return const Center(child: CupertinoActivityIndicator());
+    }
+    
+    if (viewModel.todaysAreas.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(20.0),
+          child: Text(
+            'No practice areas scheduled for today.\nAdd areas to today\'s routine in the \"Routines\" tab.',
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        // Practice Areas section
+        Expanded(
+          flex: 2,
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Today\'s Practice Areas',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    if (viewModel.selectedPracticeItems.isNotEmpty)
+                      CupertinoButton(
+                        padding: EdgeInsets.zero,
+                        child: const Text('Clear Selection'),
+                        onPressed: () => viewModel.clearSelectedPracticeItems(),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: viewModel.todaysAreas.length,
+                    itemBuilder: (context, index) {
+                      final area = viewModel.todaysAreas[index];
+                      final selectedItemsFromArea = viewModel.selectedPracticeItems
+                          .where((item) => area.practiceItems.contains(item))
+                          .length;
+                      
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: CupertinoListTile.notched(
+                          title: Text(area.name),
+                          subtitle: Text(
+                            '${area.type == PracticeAreaType.song ? 'Song' : 'Exercise'} • '
+                            '${area.practiceItems.length} items • '
+                            '$selectedItemsFromArea selected',
+                          ),
+                          leading: Icon(
+                            area.type == PracticeAreaType.song 
+                                ? CupertinoIcons.music_note_2 
+                                : CupertinoIcons.chart_bar_square,
+                            color: area.type == PracticeAreaType.song 
+                                ? CupertinoColors.systemBlue 
+                                : CupertinoColors.systemOrange,
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              CupertinoButton(
+                                padding: EdgeInsets.zero,
+                                child: Text(
+                                  selectedItemsFromArea == area.practiceItems.length
+                                      ? 'Deselect All'
+                                      : 'Select All',
+                                  style: const TextStyle(fontSize: 14),
+                                ),
+                                onPressed: () {
+                                  if (selectedItemsFromArea == area.practiceItems.length) {
+                                    viewModel.deselectAllItemsFromArea(area);
+                                  } else {
+                                    viewModel.selectAllItemsFromArea(area);
+                                  }
+                                },
+                              ),
+                              const Icon(CupertinoIcons.chevron_right),
+                            ],
+                          ),
+                          onTap: () async {
+                            // Navigate to practice area items management
+                            await Navigator.of(context).push(
+                              CupertinoPageRoute(
+                                builder: (_) => PracticeItemSelectionScreen(
+                                  area: area,
+                                  viewModel: viewModel,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        // Divider
+        Container(
+          height: 1,
+          color: CupertinoColors.separator,
+        ),
+        // Selected Practice Items section
+        Expanded(
+          flex: 3,
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Selected Items (${viewModel.selectedPracticeItems.length})',
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: viewModel.selectedPracticeItems.isEmpty
+                      ? const Center(
+                          child: Text(
+                            'Select practice items from the areas above to start practicing.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: CupertinoColors.systemGrey,
+                              fontSize: 16,
+                            ),
+                          ),
+                        )
+                      : ListView.builder(
+                          itemCount: viewModel.selectedPracticeItems.length,
+                          itemBuilder: (context, index) {
+                            final item = viewModel.selectedPracticeItems[index];
+                            final bool isCompleted = viewModel.isItemCompleted(item.id);
+                            final int targetCycles = viewModel.getItemTargetCycleCount(item.id);
+                            final int completedCycles = viewModel.getItemCompletedCycleCount(item.id);
+
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4.0),
+                              child: CupertinoListTile.notched(
+                                title: Text(
+                                  item.name,
+                                  style: TextStyle(
+                                    decoration: isCompleted
+                                        ? TextDecoration.lineThrough
+                                        : TextDecoration.none,
+                                    color: isCompleted ? CupertinoColors.inactiveGray : null,
+                                  ),
+                                ),
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (item.description.isNotEmpty)
+                                      Text(item.description,
+                                          style: TextStyle(
+                                              decoration: isCompleted
+                                                  ? TextDecoration.lineThrough
+                                                  : TextDecoration.none)),
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        CupertinoButton(
+                                          padding: const EdgeInsets.all(4.0),
+                                          minSize: 0,
+                                          child: const Icon(CupertinoIcons.minus_circled,
+                                              size: 22, color: CupertinoColors.systemGrey2),
+                                          onPressed: () =>
+                                              viewModel.decrementItemTargetCycleCount(item.id),
+                                        ),
+                                        Padding(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6.0),
+                                          child: Text('$completedCycles / $targetCycles',
+                                              style: const TextStyle(
+                                                  fontSize: 15, fontWeight: FontWeight.w500)),
+                                        ),
+                                        CupertinoButton(
+                                          padding: const EdgeInsets.all(4.0),
+                                          minSize: 0,
+                                          child: const Icon(CupertinoIcons.add_circled,
+                                              size: 22, color: CupertinoColors.systemGrey2),
+                                          onPressed: () =>
+                                              viewModel.incrementItemTargetCycleCount(item.id),
+                                        ),
+                                      ],
+                                    )
+                                  ],
+                                ),
+                                leading: CupertinoButton(
+                                  padding: EdgeInsets.zero,
+                                  child: Icon(
+                                    isCompleted
+                                        ? CupertinoIcons.check_mark_circled_solid
+                                        : (completedCycles > 0
+                                            ? CupertinoIcons.check_mark_circled
+                                            : CupertinoIcons.circle),
+                                    color: isCompleted
+                                        ? CupertinoColors.activeGreen
+                                        : (completedCycles > 0
+                                            ? CupertinoColors.systemYellow
+                                            : CupertinoColors.systemGrey),
+                                    size: 28,
+                                  ),
+                                  onPressed: () => viewModel.toggleItemCompletion(item.id),
+                                ),
+                                trailing: CupertinoButton(
+                                  padding: EdgeInsets.zero,
+                                  child: const Icon(CupertinoIcons.tuningfork,
+                                      color: CupertinoColors
+                                          .systemRed), // Placeholder for Circle of Fifths icon
+                                  onPressed: () async {
+                                    final int cyclesDone = await Navigator.of(context).push(
+                                          CupertinoPageRoute(
+                                            builder: (_) => CircleOfFifthsScreen(
+                                              practiceItem: item,
+                                              numberOfCycles:
+                                                  viewModel.getItemTargetCycleCount(item.id),
+                                            ),
+                                          ),
+                                        ) ??
+                                        0;
+
+                                    if (cyclesDone > 0) {
+                                      viewModel.addCompletedCycles(item.id, cyclesDone);
+                                    }
+                                  },
+                                ),
+                                onTap: () => viewModel.incrementCompletedCyclesManual(item.id),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+                          size: 22, color: CupertinoColors.systemGrey2),
+                      onPressed: () =>
+                          viewModel.incrementItemTargetCycleCount(item.id),
+                    ),
+                  ],
+                )
+              ],
+            ),
+            leading: CupertinoButton(
+              padding: EdgeInsets.zero,
+              child: Icon(
+                isCompleted
+                    ? CupertinoIcons.check_mark_circled_solid
+                    : (completedCycles > 0
+                        ? CupertinoIcons.check_mark_circled
+                        : CupertinoIcons.circle),
+                color: isCompleted
+                    ? CupertinoColors.activeGreen
+                    : (completedCycles > 0
+                        ? CupertinoColors.systemYellow
+                        : CupertinoColors.systemGrey),
+                size: 28,
+              ),
+              onPressed: () => viewModel.toggleItemCompletion(item.id),
+            ),
+            trailing: CupertinoButton(
+              padding: EdgeInsets.zero,
+              child: const Icon(CupertinoIcons.tuningfork,
+                  color: CupertinoColors
+                      .systemRed), // Placeholder for Circle of Fifths icon
+              onPressed: () async {
+                final int cyclesDone = await Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) => CircleOfFifthsScreen(
+                          practiceItem: item,
+                          numberOfCycles:
+                              viewModel.getItemTargetCycleCount(item.id),
+                        ),
+                      ),
+                    ) ??
+                    0;
+
+                if (cyclesDone > 0) {
+                  viewModel.addCompletedCycles(item.id, cyclesDone);
+                }
+              },
+            ),
+            onTap: () => viewModel.incrementCompletedCyclesManual(item.id),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class StatsScreen extends StatelessWidget {
+  const StatsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const CupertinoPageScaffold(
+      navigationBar: CupertinoNavigationBar(middle: Text('Practice Stats')),
+      child: Center(child: Text('Stats Screen - Placeholder')),
+    );
+  }
+}
+
+class SettingsScreen extends StatelessWidget {
+  const SettingsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const CupertinoPageScaffold(
+      navigationBar: CupertinoNavigationBar(middle: Text('Settings')),
+      child: Center(child: Text('Settings Screen - Placeholder')),
+    );
+  }
+}

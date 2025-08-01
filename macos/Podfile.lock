@@ -1,0 +1,36 @@
+PODS:
+  - flutter_midi_pro (0.0.1):
+    - FlutterMacOS
+  - FlutterMacOS (1.0.0)
+  - metronome (2.0.6):
+    - Flutter
+    - FlutterMacOS
+  - path_provider_foundation (0.0.1):
+    - Flutter
+    - FlutterMacOS
+
+DEPENDENCIES:
+  - flutter_midi_pro (from `Flutter/ephemeral/.symlinks/plugins/flutter_midi_pro/macos`)
+  - FlutterMacOS (from `Flutter/ephemeral`)
+  - metronome (from `Flutter/ephemeral/.symlinks/plugins/metronome/darwin`)
+  - path_provider_foundation (from `Flutter/ephemeral/.symlinks/plugins/path_provider_foundation/darwin`)
+
+EXTERNAL SOURCES:
+  flutter_midi_pro:
+    :path: Flutter/ephemeral/.symlinks/plugins/flutter_midi_pro/macos
+  FlutterMacOS:
+    :path: Flutter/ephemeral
+  metronome:
+    :path: Flutter/ephemeral/.symlinks/plugins/metronome/darwin
+  path_provider_foundation:
+    :path: Flutter/ephemeral/.symlinks/plugins/path_provider_foundation/darwin
+
+SPEC CHECKSUMS:
+  flutter_midi_pro: 23138839daf6b42ade074fdb6b7e744950ae661e
+  FlutterMacOS: 8f6f14fa908a6fb3fba0cd85dbd81ec4b251fb24
+  metronome: 63f129014e447078d6f4bc5e6ae1186cf1a90f59
+  path_provider_foundation: 2b6b4c569c0fb62ec74538f866245ac84301af46
+
+PODFILE CHECKSUM: 9ebaf0ce3d369aaa26a9ea0e159195ed94724cf3
+
+COCOAPODS: 1.16.2
