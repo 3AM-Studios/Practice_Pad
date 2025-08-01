@@ -11,8 +11,9 @@ class StatsScreen extends StatelessWidget {
         .copyWith(fontSize: 12, color: CupertinoColors.secondaryLabel);
 
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(
+      navigationBar: CupertinoNavigationBar(
         middle: Text('Practice Stats'),
+        transitionBetweenRoutes: false,
       ),
       child: ListView(
         children: <Widget>[

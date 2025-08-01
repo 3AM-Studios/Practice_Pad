@@ -17,8 +17,9 @@ class _EditItemsScreenState extends State<EditItemsScreen> {
     return Consumer<EditItemsViewModel>(
       builder: (context, itemsViewModel, child) {
         return CupertinoPageScaffold(
-          navigationBar: const CupertinoNavigationBar(
+          navigationBar: CupertinoNavigationBar(
             middle: Text('Practice Items'),
+            transitionBetweenRoutes: false,
           ),
           child: _buildSplitScreenBody(context, itemsViewModel),
         );

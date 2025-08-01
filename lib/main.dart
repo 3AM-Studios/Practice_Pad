@@ -1,7 +1,8 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'dart:ui';
-import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:clay_containers/clay_containers.dart';
+import 'package:flex_color_scheme/flex_color_scheme.dart';
 import 'package:practice_pad/features/edit_items/presentation/viewmodels/edit_items_viewmodel.dart';
 import 'package:practice_pad/features/practice/presentation/viewmodels/today_viewmodel.dart';
 import 'package:practice_pad/features/practice/presentation/pages/today_screen.dart';
@@ -59,12 +60,34 @@ class PracticeLoverApp extends StatelessWidget {
       child: MaterialApp(
         title: 'PracticeLover',
         debugShowCheckedModeBanner: false,
-        theme: ThemeData.from(
-          colorScheme: ColorScheme.fromSeed(
-            brightness: Brightness.dark,
-            seedColor: const Color(0xFF287390),
+        theme: FlexThemeData.light(
+          scheme: FlexScheme.indigo,
+          surfaceMode: FlexSurfaceMode.levelSurfacesLowScaffold,
+          blendLevel: 7,
+          subThemesData: const FlexSubThemesData(
+            blendOnLevel: 10,
+            blendOnColors: false,
+            useTextTheme: true,
+            useM2StyleDividerInM3: true,
           ),
+          visualDensity: FlexColorScheme.comfortablePlatformDensity,
+          useMaterial3: true,
+          swapLegacyOnMaterial3: true,
         ),
+        darkTheme: FlexThemeData.dark(
+          scheme: FlexScheme.indigo,
+          surfaceMode: FlexSurfaceMode.levelSurfacesLowScaffold,
+          blendLevel: 13,
+          subThemesData: const FlexSubThemesData(
+            blendOnLevel: 20,
+            useTextTheme: true,
+            useM2StyleDividerInM3: true,
+          ),
+          visualDensity: FlexColorScheme.comfortablePlatformDensity,
+          useMaterial3: true,
+          swapLegacyOnMaterial3: true,
+        ),
+        themeMode: ThemeMode.light,
         localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
           GlobalMaterialLocalizations.delegate,
           GlobalWidgetsLocalizations.delegate,
@@ -129,53 +152,37 @@ class MainAppScaffoldState extends State<MainAppScaffold> {
 
   @override
   Widget build(BuildContext context) {
-    // Check if liquid glass is supported
-      return Scaffold(
-          extendBody: true,
-          backgroundColor: Colors.transparent,
-          body: Stack(
-            children: [
-              // Background content that will be visible through the glass
-              Positioned.fill(
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Theme.of(context).colorScheme.surface,
-                        Theme.of(context).colorScheme.surface.withOpacity(0.8),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              // Main content
-              Positioned.fill(
-                child: IndexedStack(
-                  index: _currentIndex,
-                  children: _tabs,
-                ),
-              ),
-              // Liquid glass navigation bar positioned at the bottom
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: LiquidGlassNavigationBar(
-                  items: _tabItems,
-                  currentIndex: _currentIndex,
-                  onTap: (index) {
-                    setState(() {
-                      _currentIndex = index;
-                    });
-                  },
-                ),
-              ),
-            ],
+    return Scaffold(
+      extendBody: true,
+      backgroundColor: Colors.white, // White app background
+      body: Stack(
+        children: [
+          // Main content
+          Positioned.fill(
+            child: IndexedStack(
+              index: _currentIndex,
+              children: _tabs,
+            ),
           ),
-        );
-    }
+          // Custom neumorphic navigation bar positioned at the bottom
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: ClayNavigationBar(
+              items: _tabItems,
+              currentIndex: _currentIndex,
+              onTap: (index) {
+                setState(() {
+                  _currentIndex = index;
+                });
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class TabItem {
@@ -188,12 +195,12 @@ class TabItem {
   });
 }
 
-class LiquidGlassNavigationBar extends StatelessWidget {
+class ClayNavigationBar extends StatelessWidget {
   final List<TabItem> items;
   final int currentIndex;
   final ValueChanged<int> onTap;
 
-  const LiquidGlassNavigationBar({
+  const ClayNavigationBar({
     super.key,
     required this.items,
     required this.currentIndex,
@@ -202,66 +209,70 @@ class LiquidGlassNavigationBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Indigo San Marino inspired colors
     final theme = Theme.of(context);
-        const LiquidGlassSettings liquidGlassSettings = LiquidGlassSettings(
-          thickness: 19,
-          blend: 25, // High blend value for merging
-          lightAngle: 1 * 3.1415, // Better lighting
-          chromaticAberration: 1.5,
-          blur: 0,
-          refractiveIndex:1.1,
-          ambientStrength: 0.01
-        );
-
+    final primaryColor = theme.colorScheme.primary;
+    final surfaceColor = theme.colorScheme.surface;
+    final onSurfaceColor = theme.colorScheme.onSurface;
+    final secondaryColor = theme.colorScheme.secondary;
+    
     return Container(
-      margin: const EdgeInsets.only(left: 16, right: 16, bottom: 32),
+      margin: const EdgeInsets.only(left: 10, right: 10, bottom: 16),
       height: 90,
-
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: List.generate(items.length, (index) {
+            final isSelected = index == currentIndex;
+            final item = items[index];
+            
+            return Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 5),
+                child: GestureDetector(
+                  onTap: () => onTap(index),
       
-      child: LiquidGlassLayer(
-        settings: liquidGlassSettings,
-        child: Stack(
-          children: [
-                      // Background liquid glass - doesn't interfere
-            // Navigation buttons on top
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: List.generate(items.length, (index) {
-                final isSelected = index == currentIndex;
-                final item = items[index];
-                
-                return Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 1),
-                    child: GestureDetector(
-                      onTap: () => onTap(index),
-                      child: LiquidGlass.inLayer(
-                        shape: LiquidRoundedSuperellipse(
-                          borderRadius: Radius.circular(isSelected ? 90 : 70),
-                        ),
-                        glassContainsChild: false,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeInOut,
-                          height: isSelected ? 90 : 70,
-                          width: double.infinity,
-                          child: Icon(
+                  child: ClayContainer(
+                    color: surfaceColor, // Use theme surface color
+                    width:150,
+                    height: 150,
+                    borderRadius: 70, // Perfect circle (half of 70)
+                    depth: 10,
+                    spread: 5,
+                    emboss: false,
+                    // Concave when pressed (selected), none when not selected
+                    curveType: isSelected ? CurveType.concave : CurveType.none,
+                    child: Container(
+                      height: 70,
+                      width: 70, // Make it square for perfect circle
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
                             item.icon,
+                            size: isSelected ? 28 : 24, // Slightly smaller to fit circle
                             color: isSelected 
-                                ? theme.colorScheme.primary
-                                : theme.colorScheme.onSurface.withOpacity(1),
-                            size: isSelected ? 37 : 28,
+                                ? primaryColor // Selected icons use primary color
+                                : onSurfaceColor, // Unselected icons use onSurface color
                           ),
-                        ),
+                          const SizedBox(height: 2),
+                          Text(
+                            item.label,
+                            style: TextStyle(
+                              fontSize: 10, // Smaller text to fit in circle
+                              color: isSelected ? Colors.black : Colors.black45,
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            ),
+                          ),
+          
+                        ],
                       ),
                     ),
                   ),
-                );
-              }),
-            ),
-          ],
+                ),
+              ),
+            );
+          }),
         ),
-      ),
     );
   }
 }
@@ -328,8 +339,9 @@ class _StatsScreenState extends State<StatsScreen> {
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(
+      navigationBar: CupertinoNavigationBar(
         middle: Text('Practice Stats'),
+        transitionBetweenRoutes: false,
       ),
       child: SafeArea(
         child: _isLoading
@@ -481,8 +493,11 @@ class SettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const CupertinoPageScaffold(
-      navigationBar: CupertinoNavigationBar(middle: Text('Settings')),
+    return CupertinoPageScaffold(
+      navigationBar: CupertinoNavigationBar(
+        middle: Text('Settings'),
+        transitionBetweenRoutes: false,
+      ),
       child: Center(child: Text('Settings Screen - Placeholder')),
     );
   }

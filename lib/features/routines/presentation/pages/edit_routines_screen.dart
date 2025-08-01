@@ -120,6 +120,7 @@ class _EditRoutinesScreenState extends State<EditRoutinesScreen> {
         return CupertinoPageScaffold(
           navigationBar: CupertinoNavigationBar(
             middle: const Text('Edit Routines'),
+            transitionBetweenRoutes: false,
             leading: CupertinoButton(
               padding: EdgeInsets.zero,
               child: const Text('Back'),

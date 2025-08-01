@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:clay_containers/clay_containers.dart';
 import 'package:metronome/metronome.dart';
 import 'package:xml/xml.dart';
 import 'package:simple_sheet_music/simple_sheet_music.dart';
@@ -1003,17 +1004,44 @@ class _SongViewerScreenState extends State<SongViewerScreen>
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final primaryColor = theme.colorScheme.primary;
+    final surfaceColor = theme.colorScheme.surface;
+    final onSurfaceColor = theme.colorScheme.onSurface;
+    final secondaryColor = theme.colorScheme.secondary;
+    
     if (_isLoading) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Loading...')),
-        body: const Center(child: CircularProgressIndicator()),
+        backgroundColor: Colors.white,
+        appBar: AppBar(
+          title: Text(
+            'Loading...',
+            style: TextStyle(color: onSurfaceColor),
+          ),
+          backgroundColor: surfaceColor,
+          iconTheme: IconThemeData(color: onSurfaceColor),
+        ),
+        body: Center(
+          child: CircularProgressIndicator(
+            color: primaryColor,
+          ),
+        ),
       );
     }
 
     if (_chords.isEmpty) {
       return Scaffold(
-        appBar: AppBar(),
-        body: const Center(child: Text('Error: No chords found in song.')),
+        backgroundColor: Colors.white,
+        appBar: AppBar(
+          backgroundColor: surfaceColor,
+          iconTheme: IconThemeData(color: onSurfaceColor),
+        ),
+        body: Center(
+          child: Text(
+            'Error: No chords found in song.',
+            style: TextStyle(color: onSurfaceColor),
+          ),
+        ),
       );
     }
 

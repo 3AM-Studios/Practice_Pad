@@ -5,9 +5,10 @@ class SettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const CupertinoPageScaffold(
+    return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
         middle: Text('Settings'),
+        transitionBetweenRoutes: false,
       ),
       child: Center(child: Text('Settings Screen - Placeholder')),
     );
