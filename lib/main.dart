@@ -129,51 +129,53 @@ class MainAppScaffoldState extends State<MainAppScaffold> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      extendBody: true,
-      body: Stack(
-        children: [
-          // Background content that will be visible through the glass
-          Positioned.fill(
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Theme.of(context).colorScheme.surface,
-                    Theme.of(context).colorScheme.surface.withOpacity(0.8),
-                  ],
+    // Check if liquid glass is supported
+      return Scaffold(
+          extendBody: true,
+          backgroundColor: Colors.transparent,
+          body: Stack(
+            children: [
+              // Background content that will be visible through the glass
+              Positioned.fill(
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Theme.of(context).colorScheme.surface,
+                        Theme.of(context).colorScheme.surface.withOpacity(0.8),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-            ),
+              // Main content
+              Positioned.fill(
+                child: IndexedStack(
+                  index: _currentIndex,
+                  children: _tabs,
+                ),
+              ),
+              // Liquid glass navigation bar positioned at the bottom
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: LiquidGlassNavigationBar(
+                  items: _tabItems,
+                  currentIndex: _currentIndex,
+                  onTap: (index) {
+                    setState(() {
+                      _currentIndex = index;
+                    });
+                  },
+                ),
+              ),
+            ],
           ),
-          // Main content
-          Positioned.fill(
-            child: IndexedStack(
-              index: _currentIndex,
-              children: _tabs,
-            ),
-          ),
-          // Liquid glass navigation bar positioned at the bottom
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: LiquidGlassNavigationBar(
-              items: _tabItems,
-              currentIndex: _currentIndex,
-              onTap: (index) {
-                setState(() {
-                  _currentIndex = index;
-                });
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+        );
+    }
 }
 
 class TabItem {
@@ -201,110 +203,55 @@ class LiquidGlassNavigationBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+        const LiquidGlassSettings liquidGlassSettings = LiquidGlassSettings(
+          thickness: 19,
+          blend: 25, // High blend value for merging
+          lightAngle: 1 * 3.1415, // Better lighting
+          chromaticAberration: 1.5,
+          blur: 0,
+          refractiveIndex:1.1,
+          ambientStrength: 0.01
+        );
+
     return Container(
-      margin: const EdgeInsets.all(16),
-      height: 80,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(25),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surface.withOpacity(0),
-              borderRadius: BorderRadius.circular(25),
-              border: Border.all(
-                color: theme.colorScheme.outline.withOpacity(0.2),
-                width: 1,
-              ),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Colors.white.withOpacity(0.1),
-                  Colors.white.withOpacity(0.05),
-                ],
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 10,
-                  spreadRadius: 2,
-                ),
-                BoxShadow(
-                  color: Colors.white.withOpacity(0.1),
-                  blurRadius: 10,
-                  spreadRadius: 1,
-                  offset: const Offset(-1, -1),
-                ),
-              ],
-            ),
-            child: Row(
+      margin: const EdgeInsets.only(left: 16, right: 16, bottom: 32),
+      height: 90,
+
+      
+      child: LiquidGlassLayer(
+        settings: liquidGlassSettings,
+        child: Stack(
+          children: [
+                      // Background liquid glass - doesn't interfere
+            // Navigation buttons on top
+            Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: List.generate(items.length, (index) {
                 final isSelected = index == currentIndex;
                 final item = items[index];
                 
                 return Expanded(
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 1),
+                    child: GestureDetector(
                       onTap: () => onTap(index),
-                      borderRadius: BorderRadius.circular(25),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: isSelected 
-                                    ? theme.colorScheme.primary.withOpacity(0.3)
-                                    : Colors.transparent,
-                                borderRadius: BorderRadius.circular(12),
-                                gradient: isSelected 
-                                    ? LinearGradient(
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                        colors: [
-                                          theme.colorScheme.primary.withOpacity(0.3),
-                                          theme.colorScheme.primary.withOpacity(0.1),
-                                        ],
-                                      )
-                                    : null,
-                                boxShadow: isSelected 
-                                    ? [
-                                        BoxShadow(
-                                          color: theme.colorScheme.primary.withOpacity(0.3),
-                                          blurRadius: 8,
-                                          spreadRadius: 1,
-                                        ),
-                                      ]
-                                    : null,
-                              ),
-                              child: Icon(
-                                item.icon,
-                                color: isSelected 
-                                    ? theme.colorScheme.primary
-                                    : theme.colorScheme.onSurface.withOpacity(0.6),
-                                size: 24,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              item.label,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                                color: isSelected 
-                                    ? theme.colorScheme.primary
-                                    : theme.colorScheme.onSurface.withOpacity(0.6),
-                              ),
-                            ),
-                          ],
+                      child: LiquidGlass.inLayer(
+                        shape: LiquidRoundedSuperellipse(
+                          borderRadius: Radius.circular(isSelected ? 90 : 70),
+                        ),
+                        glassContainsChild: false,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeInOut,
+                          height: isSelected ? 90 : 70,
+                          width: double.infinity,
+                          child: Icon(
+                            item.icon,
+                            color: isSelected 
+                                ? theme.colorScheme.primary
+                                : theme.colorScheme.onSurface.withOpacity(1),
+                            size: isSelected ? 37 : 28,
+                          ),
                         ),
                       ),
                     ),
@@ -312,7 +259,7 @@ class LiquidGlassNavigationBar extends StatelessWidget {
                 );
               }),
             ),
-          ),
+          ],
         ),
       ),
     );
