@@ -1,8 +1,9 @@
-import 'package:simple_sheet_music/simple_sheet_music.dart';
+//import simple sheet music package
+import 'package:music_sheet/index.dart';
 import 'package:flutter/material.dart';
 import 'package:clay_containers/clay_containers.dart';
+import 'package:music_sheet/src/constants.dart';
 import 'dart:math' as math;
-import 'package:simple_sheet_music/src/constants.dart';
 
 /// Represents a chord symbol with Roman numeral analysis capability and MusicXML support.
 /// 
@@ -833,9 +834,12 @@ class ChordSymbol {
   }
 
   /// Renders the chord symbol directly on canvas above a measure
+  /// Uses variables from measure.dart's paintMeasure function
+
+
   void render(Canvas canvas, Size size, double measureOriginX, double staffLineCenterY, double measureWidth) {
-    // Position chord symbol above the staff
-    final chordY = staffLineCenterY - (Constants.staffSpace * 6);
+    // Position chord symbol well above the staff for visibility
+    final chordY = staffLineCenterY - (Constants.staffSpace * 6); // Moved much higher
     
     // Center the chord symbol horizontally in the measure
     final chordX = measureOriginX + (measureWidth / 2);
@@ -844,14 +848,14 @@ class ChordSymbol {
     final chordText = '${effectiveRootName}${effectiveQuality}';
     final romanText = getRomanNumeral();
     
-    // Create text painter for chord symbol
+    // Create text painter for chord symbol with much larger font size
     final chordTextPainter = TextPainter(
       text: TextSpan(
         text: chordText,
         style: const TextStyle(
-          fontSize: 18,
+          fontSize: 36, // Much larger font
           fontWeight: FontWeight.bold,
-          color: Colors.white,
+          color: Colors.black,
         ),
       ),
       textDirection: TextDirection.ltr,
@@ -859,14 +863,14 @@ class ChordSymbol {
     
     chordTextPainter.layout();
     
-    // Create text painter for Roman numeral
+    // Create text painter for Roman numeral with larger font size
     final romanTextPainter = TextPainter(
       text: TextSpan(
         text: romanText + getQualitySuperscript(),
         style: const TextStyle(
-          fontSize: 14,
+          fontSize: 28, // Much larger font
           fontWeight: FontWeight.w600,
-          color: Colors.white,
+          color: Colors.black,
         ),
       ),
       textDirection: TextDirection.ltr,
@@ -874,11 +878,11 @@ class ChordSymbol {
     
     romanTextPainter.layout();
     
-    // Calculate container size
-    final containerWidth = math.max(chordTextPainter.width, romanTextPainter.width) + 24;
-    final containerHeight = chordTextPainter.height + romanTextPainter.height + 16;
+    // Calculate container size with substantial padding
+    final containerWidth = math.max(chordTextPainter.width, romanTextPainter.width) + 48; // More padding
+    final containerHeight = chordTextPainter.height + romanTextPainter.height + 32; // More padding
     
-    // Draw the clay container background
+    // Draw the container background with bright color for visibility
     final containerRect = Rect.fromCenter(
       center: Offset(chordX, chordY),
       width: containerWidth,
@@ -886,34 +890,42 @@ class ChordSymbol {
     );
     
     final paint = Paint()
-      ..color = Colors.orange.withOpacity(0.8) // Non-diatonic color for now
+      ..color = Colors.yellow // Bright yellow for maximum visibility
       ..style = PaintingStyle.fill;
     
-    final rrect = RRect.fromRectAndRadius(containerRect, const Radius.circular(12));
+    final rrect = RRect.fromRectAndRadius(containerRect, const Radius.circular(16)); // Larger border radius
     canvas.drawRRect(rrect, paint);
     
-    // Draw border
+    // Draw thick border for visibility
     final borderPaint = Paint()
-      ..color = Colors.orange.shade700
+      ..color = Colors.orange.shade800
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5;
+      ..strokeWidth = 3.0; // Thicker border
     
     canvas.drawRRect(rrect, borderPaint);
     
-    // Draw Roman numeral text (top)
+    // Draw Roman numeral text (top) with more spacing
     final romanOffset = Offset(
       chordX - (romanTextPainter.width / 2),
-      chordY - (containerHeight / 2) + 8,
+      chordY - (containerHeight / 2) + 12,
     );
     romanTextPainter.paint(canvas, romanOffset);
     
-    // Draw chord symbol text (bottom)
+    // Draw chord symbol text (bottom) with more spacing
     final chordOffset = Offset(
       chordX - (chordTextPainter.width / 2),
-      chordY - (containerHeight / 2) + 8 + romanTextPainter.height,
+      chordY - (containerHeight / 2) + 12 + romanTextPainter.height + 8,
     );
     chordTextPainter.paint(canvas, chordOffset);
+    
+    // Debug: Draw a red circle to verify position
+    final debugPaint = Paint()
+      ..color = Colors.red
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(Offset(chordX, chordY), 5, debugPaint);
   }
+
+
 
   /// Builds a styled chord symbol widget that can be used both in lists and above measures
   Widget buildWidget({

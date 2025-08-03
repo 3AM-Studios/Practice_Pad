@@ -7,8 +7,8 @@ import 'package:flutter/services.dart';
 import 'package:clay_containers/clay_containers.dart';
 import 'package:metronome/metronome.dart';
 import 'package:xml/xml.dart';
-import 'package:simple_sheet_music/simple_sheet_music.dart';
-import 'package:simple_sheet_music/src/music_objects/interface/musical_symbol.dart';
+import 'package:music_sheet/simple_sheet_music.dart' as music_sheet;
+
 import 'package:practice_pad/features/song_viewer/presentation/widgets/beat_timeline.dart';
 import 'package:practice_pad/features/song_viewer/presentation/widgets/measure/chord_symbol/chord_symbol.dart';
 import 'package:practice_pad/features/song_viewer/presentation/widgets/measure/chord_measure.dart';
@@ -18,6 +18,7 @@ import 'package:practice_pad/models/practice_item.dart';
 import 'package:practice_pad/models/chord_progression.dart';
 import 'package:practice_pad/widgets/active_session_banner.dart';
 import 'package:practice_pad/features/practice/presentation/pages/practice_session_screen.dart';
+import 'package:music_sheet/index.dart';
 
 class SongViewerScreen extends StatefulWidget {
   final String songAssetPath;
@@ -48,6 +49,14 @@ class _SongViewerScreenState extends State<SongViewerScreen>
   double _totalSongDurationInBeats = 0;
   int _currentBpm = 0;
   String _songTitle = '';
+
+  // Performance optimization: Cache sheet music widget
+  Widget? _cachedSheetMusicWidget;
+  List<ChordMeasure>? _lastRenderedMeasures;
+  
+  // Performance optimization: Use ValueNotifier for beat updates
+  late ValueNotifier<int> _beatNotifier;
+  late ValueNotifier<int> _songBeatNotifier;
   String _keySignature = '';
   bool _isMinorKey = false; // Toggle between major/minor interpretation
   String _timeSignature = '';
@@ -72,6 +81,11 @@ class _SongViewerScreenState extends State<SongViewerScreen>
   void initState() {
     super.initState();
     _currentBpm = widget.bpm;
+    
+    // Initialize ValueNotifiers for performance optimization
+    _beatNotifier = ValueNotifier<int>(0);
+    _songBeatNotifier = ValueNotifier<int>(0);
+    
     _loadAndParseSong();
   }
 
@@ -144,6 +158,11 @@ class _SongViewerScreenState extends State<SongViewerScreen>
 
   /// Builds the dial menu widget that appears below the key indicator
   Widget _buildDialMenuWidget() {
+    // Disabled when chord symbols are disabled
+    if (_chordSymbols.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    
     if (!_showDialMenu || _selectedChordGroup == null) {
       return const SizedBox.shrink(); // Return empty widget when not showing
     }
@@ -559,6 +578,74 @@ class _SongViewerScreenState extends State<SongViewerScreen>
     return signatureToName[keySignature] ?? '';
   }
 
+  /// Creates a KeySignature from KeySignatureType
+  music_sheet.KeySignature _createKeySignatureFromType(KeySignatureType keySignatureType) {
+    switch (keySignatureType) {
+      case KeySignatureType.cMajor:
+        return music_sheet.KeySignature.cMajor();
+      case KeySignatureType.gMajor:
+        return music_sheet.KeySignature.gMajor();
+      case KeySignatureType.dMajor:
+        return music_sheet.KeySignature.dMajor();
+      case KeySignatureType.aMajor:
+        return music_sheet.KeySignature.aMajor();
+      case KeySignatureType.eMajor:
+        return music_sheet.KeySignature.eMajor();
+      case KeySignatureType.bMajor:
+        return music_sheet.KeySignature.bMajor();
+      case KeySignatureType.fSharpMajor:
+        return music_sheet.KeySignature.fSharpMajor();
+      case KeySignatureType.cSharpMajor:
+        return music_sheet.KeySignature.cSharpMajor();
+      case KeySignatureType.fMajor:
+        return music_sheet.KeySignature.fMajor();
+      case KeySignatureType.bFlatMajor:
+        return music_sheet.KeySignature.bFlatMajor();
+      case KeySignatureType.eFlatMajor:
+        return music_sheet.KeySignature.eFlatMajor();
+      case KeySignatureType.aFlatMajor:
+        return music_sheet.KeySignature.aFlatMajor();
+      case KeySignatureType.dFlatMajor:
+        return music_sheet.KeySignature.dFlatMajor();
+      case KeySignatureType.gFlatMajor:
+        return music_sheet.KeySignature.gFlatMajor();
+      case KeySignatureType.cFlatMajor:
+        return music_sheet.KeySignature.cFlatMajor();
+      case KeySignatureType.aMinor:
+        return music_sheet.KeySignature.aMinor();
+      case KeySignatureType.eMinor:
+        return music_sheet.KeySignature.eMinor();
+      case KeySignatureType.bMinor:
+        return music_sheet.KeySignature.bMinor();
+      case KeySignatureType.fSharpMinor:
+        return music_sheet.KeySignature.fSharpMinor();
+      case KeySignatureType.cSharpMinor:
+        return music_sheet.KeySignature.cSharpMinor();
+      case KeySignatureType.gSharpMinor:
+        return music_sheet.KeySignature.gSharpMinor();
+      case KeySignatureType.dSharpMinor:
+        return music_sheet.KeySignature.dSharpMinor();
+      case KeySignatureType.aSharpMinor:
+        return music_sheet.KeySignature.aSharpMinor();
+      case KeySignatureType.dMinor:
+        return music_sheet.KeySignature.dMinor();
+      case KeySignatureType.gMinor:
+        return music_sheet.KeySignature.gMinor();
+      case KeySignatureType.cMinor:
+        return music_sheet.KeySignature.cMinor();
+      case KeySignatureType.fMinor:
+        return music_sheet.KeySignature.fMinor();
+      case KeySignatureType.bFlatMinor:
+        return music_sheet.KeySignature.bFlatMinor();
+      case KeySignatureType.eFlatMinor:
+        return music_sheet.KeySignature.eFlatMinor();
+      case KeySignatureType.aFlatMinor:
+        return music_sheet.KeySignature.aFlatMinor();
+      default:
+        return music_sheet.KeySignature.cMajor(); // Default fallback
+    }
+  }
+
   /// Loads and parses the MusicXML file to extract both chord symbols and musical notation
   Future<void> _loadAndParseSong() async {
     try {
@@ -619,76 +706,81 @@ class _SongViewerScreenState extends State<SongViewerScreen>
           }
 
           // Collect musical symbols for this measure
-          final musicalSymbols = <MusicalSymbol>[];
+          final musicalSymbols = <dynamic>[];
           final measureChords = <ChordSymbol>[];
-          
-          // Track harmony for chord symbols
-          XmlElement? activeHarmony;
           
           // Only add clef and key signature to the first measure
           if (measureNumber == 1) {
-          
             // Add default clef
-            musicalSymbols.add(Clef(ClefType.treble));
+            musicalSymbols.add(music_sheet.Clef.treble());
             
             // Add key signature based on the global key signature
             final keySignatureType = _getCurrentKeySignature();
-            musicalSymbols.add(KeySignature(keySignatureType));
+            musicalSymbols.add(_createKeySignatureFromType(keySignatureType));
             
             // Add time signature - parse from the existing _timeSignature variable
             final timeSigParts = _timeSignature.split('/');
             if (timeSigParts.length == 2) {
               final num = int.tryParse(timeSigParts[0]) ?? 4;
               final denom = int.tryParse(timeSigParts[1]) ?? 4;
-              musicalSymbols.add(TimeSignature(num, denom));
+              if (num == 4 && denom == 4) {
+                musicalSymbols.add(music_sheet.TimeSignature.fourFour());
+              } else if (num == 3 && denom == 4) {
+                musicalSymbols.add(music_sheet.TimeSignature.threeFour());
+              } else if (num == 2 && denom == 4) {
+                musicalSymbols.add(music_sheet.TimeSignature.twoFour());
+              } else {
+                // Default to 4/4 if unsupported
+                musicalSymbols.add(music_sheet.TimeSignature.fourFour());
+              }
             }
           }
-          // else add rest of meassure length
+          // else add rest of measure length
           else {
             // Add a rest for the remaining measure length
-            musicalSymbols.add(Rest(RestType.quarter));
-            musicalSymbols.add(Rest(RestType.quarter));
-            musicalSymbols.add(Rest(RestType.quarter));
-            musicalSymbols.add(Rest(RestType.quarter));
+            musicalSymbols.add(music_sheet.Rest(music_sheet.RestType.quarter));
+            musicalSymbols.add(music_sheet.Rest(music_sheet.RestType.quarter));
+            musicalSymbols.add(music_sheet.Rest(music_sheet.RestType.quarter));
+            musicalSymbols.add(music_sheet.Rest(music_sheet.RestType.quarter));
           }
 
           // Process all elements in the measure
           for (final element in measure.children.whereType<XmlElement>()) {
             switch (element.name.local) {
               case 'harmony':
-                activeHarmony = element;
+                // Process harmony element to extract chord symbols immediately
+                final chordSymbol = _createChordFromHarmony(
+                  element,
+                  4.0, // Default whole note duration for now
+                  measureNumber,
+                );
+                if (chordSymbol != null) {
+                  measureChords.add(chordSymbol);
+                  print('Added chord symbol: ${chordSymbol.effectiveRootName}${chordSymbol.effectiveQuality} to measure $measureNumber');
+                }
                 break;
                 
               case 'note':
-              print('is note is note');
-                // Process note elements for chord symbol association only
+                print('Processing note in measure $measureNumber');
+                // Process note elements for duration calculations if needed
                 final durationNode = element.findElements('duration').firstOrNull;
-                final isRest = element.findElements('rest').isNotEmpty;
                 
                 if (durationNode != null) {
                   final durationValue = int.parse(durationNode.innerText);
                   final durationInBeats = durationValue / divisions;
-                  
-                  // Associate chord symbol with this note if we have an active harmony
-                  if (!isRest && activeHarmony != null) {
-                    final chord = _createChordFromHarmony(activeHarmony, durationInBeats, measureNumber);
-                    if (chord != null) {
-                      measureChords.add(chord);
-                      activeHarmony = null; // Clear to avoid duplication
-                    }
-                  }
+                  print('  Note duration: $durationInBeats beats');
                 }
                 break;
             }
           }
-          //print length musical symbols
+          
           print('Measure $measureNumber: Found ${musicalSymbols.length} musical symbols and ${measureChords.length} chord symbols');
+          
           // Create measure with musical symbols and chord symbols
           final chordMeasure = ChordMeasure(
-            // make isNewLine true every 5 measures 
-            musicalSymbols,
+            musicalSymbols.cast(),
             chordSymbols: measureChords,
-            isNewLine: measureNumber % 5 == 1,
+            isNewLine: measureNumber % 6 == 1, // Set to true every 4 measures (1, 5, 9, etc.)
           );
           chordMeasures.add(chordMeasure);
         }
@@ -721,6 +813,10 @@ class _SongViewerScreenState extends State<SongViewerScreen>
         _currentBeatInMeasure = 0;
         _userInputBeats.clear();
         _totalSongDurationInBeats = _chordSymbols.fold(0.0, (sum, chord) => sum + (chord.durationBeats ?? 0.0));
+        
+        // Invalidate sheet music cache when measures change
+        _cachedSheetMusicWidget = null;
+        _lastRenderedMeasures = null;
       });
 
       // Initialize global keys for chord interaction
@@ -1305,6 +1401,11 @@ class _SongViewerScreenState extends State<SongViewerScreen>
 
   /// Builds the chord progression creation button
   Widget _buildChordProgressionButton() {
+    // Disabled when chord symbols are disabled
+    if (_chordSymbols.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    
     if (_selectedChordIndices.isEmpty || widget.practiceArea == null) {
       return const SizedBox.shrink();
     }
@@ -1453,15 +1554,58 @@ class _SongViewerScreenState extends State<SongViewerScreen>
     });
   }
 
+  /// Builds cached sheet music widget to prevent expensive rebuilds
+  Widget _buildCachedSheetMusic() {
+    // Only rebuild sheet music if measures actually changed
+    if (_cachedSheetMusicWidget == null || 
+        _lastRenderedMeasures == null ||
+        _lastRenderedMeasures!.length != _chordMeasures.length) {
+      
+      _cachedSheetMusicWidget = _chordMeasures.isNotEmpty 
+        ? RepaintBoundary(
+            child: music_sheet.SimpleSheetMusic(
+              height: 300,
+              width: 800, // Increased width for better visibility
+              measures: _chordMeasures.cast<music_sheet.Measure>(),
+              debug: false, // Disable debug mode for performance
+            ),
+          )
+        : Container(
+            child: Center(
+              child: Text('No measures to display'),
+            ),
+          );
+      
+      _lastRenderedMeasures = List.from(_chordMeasures);
+    }
+    
+    return _cachedSheetMusicWidget!;
+  }
+
   void _onTick(int tick) {
     if (!mounted || !_isPlaying) return;
-    setState(() {
-      _songBeatCounter++;
-      _currentBeatInMeasure = tick;
-      if (tick == 0) {
-        _userInputBeats.clear();
-      }
-    });
+    
+    // Update beat counters efficiently without rebuilding entire widget
+    _songBeatCounter++;
+    _currentBeatInMeasure = tick;
+    
+    // Update ValueNotifiers (these won't trigger full widget rebuilds)
+    _beatNotifier.value = tick;
+    _songBeatNotifier.value = _songBeatCounter;
+    
+    if (tick == 0) {
+      _userInputBeats.clear();
+    }
+    
+    // Only call setState if chord index actually changes
+    final oldChordIndex = _currentChordIndex;
+    final chordChanged = _updateCurrentChordBasedOnBeat();
+    
+    if (chordChanged || _currentChordIndex != oldChordIndex) {
+      setState(() {
+        // Chord index changed, need to update UI
+      });
+    }
   }
 
 
@@ -1503,6 +1647,11 @@ class _SongViewerScreenState extends State<SongViewerScreen>
   void dispose() {
     _tickSubscription?.cancel();
     _metronome.destroy();
+    
+    // Dispose ValueNotifiers
+    _beatNotifier.dispose();
+    _songBeatNotifier.dispose();
+    
     super.dispose();
   }
 
@@ -1600,12 +1749,12 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                           ),
                         ),
                       ),
-                    ),
-                  );
-                },
+                    ));
+                  },
+                ),
               ),
-            ),
-          ],
+            
+          ], 
         ),
       ),
     );
@@ -1636,7 +1785,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
       );
     }
 
-    if (_chordSymbols.isEmpty) {
+    if (_chordMeasures.isEmpty) {
       return Scaffold(
         backgroundColor: Colors.white,
         appBar: AppBar(
@@ -1645,7 +1794,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
         ),
         body: Center(
           child: Text(
-            'Error: No chords found in song.',
+            'Error: No measures found in song.',
             style: TextStyle(color: onSurfaceColor),
           ),
         ),
@@ -1804,13 +1953,10 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                         spread: 3,
                         child: Padding(
                           padding: const EdgeInsets.all(16),
-                          child: SimpleSheetMusic(
-                            measures: _chordMeasures,
-                            width: MediaQuery.of(context).size.width - 64, // Account for margins and padding
-                            height: 600, // Increased height to accommodate 3 lines of music (12 measures)
-                            onLayoutReady: (layout) {
-                              // Handle layout ready callback if needed
-                            },
+                          child: Container(
+                            width: double.infinity, // Use full available width
+                            height: 300, // Increased height to match SimpleSheetMusic
+                            child: _buildCachedSheetMusic(),
                           ),
                         ),
                       ),
@@ -1841,7 +1987,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
-                                      'Long press and drag across chord symbols to select a progression',
+                                      'Chord symbols are displayed above each measure in the sheet music',
                                       style: TextStyle(
                                         color: Colors.white70,
                                         fontSize: 14,

@@ -49,8 +49,9 @@ dependencies:
   metronome: any
   path_provider: any
   xml: any
-  simple_sheet_music:
-    path: packages/simple_sheet_music
+  music_sheet:
+    path: packages/music_sheet-main
+
   clay_containers: ^0.3.4
   flex_color_scheme: ^8.0.2
 
