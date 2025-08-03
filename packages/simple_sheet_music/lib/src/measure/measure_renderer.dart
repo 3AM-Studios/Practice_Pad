@@ -14,31 +14,45 @@ class MeasureRenderer {
     this.layout, {
     required this.measureOriginX,
     required this.staffLineCenterY,
+    this.chordSymbols = const [], // Support multiple chord symbols
   });
 
   final List<MusicalSymbolRenderer> symbolRenderers;
   final MeasureMetrics measureMetrics;
   final double measureOriginX;
   final double staffLineCenterY;
+  final List<dynamic> chordSymbols; // Multiple chord symbols for this measure
 
-  /// Performs a hit test at the given [position] and returns the corresponding [MusicalSymbolRenderer].
-  ///
-  /// Returns `null` if no symbol is hit.
-  MusicalSymbolRenderer? hitTest(Offset position) {
-    for (final object in symbolRenderers) {
-      if (object.isHit(position)) {
-        return object;
-      }
-    }
-    return null;
-  }
+  // /// Performs a hit test at the given [position] and returns the corresponding [MusicalSymbolRenderer].
+  // ///
+  // /// Returns `null` if no symbol is hit.
+  // MusicalSymbolRenderer? hitTest(Offset position) {
+  //   for (final object in symbolRenderers) {
+  //     if (object.isHit(position)) {
+  //       return object;
+  //     }
+  //   }
+  //   return null;
+  // }
 
   /// Renders the measure on the given [canvas] with the specified [size].
   void render(Canvas canvas, Size size) {
     _renderStaffLine(canvas);
+    
+    // // Render chord symbols above the measure
+    // for (final chordSymbol in chordSymbols) {
+    //   if (chordSymbol != null && chordSymbol.render != null) {
+    //     chordSymbol.render(canvas, size, measureOriginX, staffLineCenterY, width);
+    //   }
+    // }
+    
+    // Render musical symbols
     for (final symbol in symbolRenderers) {
       symbol.render(canvas);
     }
+
+    // Add bar line at the end of the measure
+    _renderBarLine(canvas);
   }
 
   void _renderStaffLine(Canvas canvas) {
@@ -59,6 +73,19 @@ class MeasureRenderer {
           ..strokeWidth = measureMetrics.staffLineThickness,
       );
     }
+  }
+
+  void _renderBarLine(Canvas canvas) {
+    final barLineX = measureOriginX + width - Constants.staffSpace * 0.2; // Small margin before bar line
+    
+    // Draw vertical bar line at the end of the measure
+    canvas.drawLine(
+      Offset(barLineX, staffLineCenterY - Constants.staffSpace * 2),
+      Offset(barLineX, staffLineCenterY + Constants.staffSpace * 2),
+      Paint()
+        ..color = layout.lineColor
+        ..strokeWidth = measureMetrics.staffLineThickness * 1.2, // Slightly thicker for bar lines
+    );
   }
 
   final SheetMusicLayout layout;

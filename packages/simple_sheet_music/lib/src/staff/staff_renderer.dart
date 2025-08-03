@@ -11,15 +11,15 @@ class StaffRenderer {
   /// Performs a hit test at the given position on the staff.
   ///
   /// Returns the [MusicalSymbolRenderer] that was hit, or `null` if no object was hit.
-  MusicalSymbolRenderer? hitTest(Offset position) {
-    for (final measure in measureRendereres) {
-      final hit = measure.hitTest(position);
-      if (hit != null) {
-        return hit;
-      }
-    }
-    return null;
-  }
+  // MusicalSymbolRenderer? hitTest(Offset position) {
+  //   for (final measure in measureRendereres) {
+  //     final hit = measure.hitTest(position);
+  //     if (hit != null) {
+  //       return hit;
+  //     }
+  //   }
+  //   return null;
+  // }
 
   /// Renders the staff on the given canvas with the specified size and font family.
   void render(Canvas canvas, Size size) {

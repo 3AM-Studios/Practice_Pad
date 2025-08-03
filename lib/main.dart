@@ -61,7 +61,7 @@ class PracticeLoverApp extends StatelessWidget {
         title: 'PracticeLover',
         debugShowCheckedModeBanner: false,
         theme: FlexThemeData.light(
-          scheme: FlexScheme.indigo,
+          scheme: FlexScheme.indigoM3,
           surfaceMode: FlexSurfaceMode.levelSurfacesLowScaffold,
           blendLevel: 7,
           subThemesData: const FlexSubThemesData(

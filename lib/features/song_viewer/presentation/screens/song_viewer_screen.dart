@@ -8,8 +8,10 @@ import 'package:clay_containers/clay_containers.dart';
 import 'package:metronome/metronome.dart';
 import 'package:xml/xml.dart';
 import 'package:simple_sheet_music/simple_sheet_music.dart';
+import 'package:simple_sheet_music/src/music_objects/interface/musical_symbol.dart';
 import 'package:practice_pad/features/song_viewer/presentation/widgets/beat_timeline.dart';
 import 'package:practice_pad/features/song_viewer/presentation/widgets/measure/chord_symbol/chord_symbol.dart';
+import 'package:practice_pad/features/song_viewer/presentation/widgets/measure/chord_measure.dart';
 import 'package:practice_pad/features/song_viewer/presentation/widgets/concentric_dial_menu.dart';
 import 'package:practice_pad/models/practice_area.dart';
 import 'package:practice_pad/models/practice_item.dart';
@@ -40,7 +42,8 @@ class _SongViewerScreenState extends State<SongViewerScreen>
   StreamSubscription<int>? _tickSubscription;
   bool _isPlaying = false;
 
-  List<ChordSymbol> _chords = [];
+  List<ChordSymbol> _chordSymbols = [];
+  List<ChordMeasure> _chordMeasures = []; // Combined measures with chord symbols
   int _currentChordIndex = 0;
   double _totalSongDurationInBeats = 0;
   int _currentBpm = 0;
@@ -57,12 +60,11 @@ class _SongViewerScreenState extends State<SongViewerScreen>
   bool _showDialMenu = false; // Controls whether the dial menu widget is visible
   List<int>? _selectedChordGroup; // The chord group currently selected for key change
 
-  // Chord selection state for practice item creation
+  // Chord selection state for practice item creation (temporarily disabled for canvas rendering)
   Set<int> _selectedChordIndices = <int>{}; // Selected chord indices
   bool _isDragging = false; // Whether user is currently dragging
   int? _dragStartIndex; // Starting index of drag selection
   bool _isLongPressing = false; // Whether user is in long press selection mode
-  int? _animatingChordIndex; // Index of chord currently animating
   int? _lastHoveredIndex; // Last chord index that was hovered during drag
   List<GlobalKey> _chordGlobalKeys = []; // Keys for chord widgets to get their positions
 
@@ -96,10 +98,40 @@ class _SongViewerScreenState extends State<SongViewerScreen>
   void _showDialMenuWidget(List<int> chordGroup) {
     print('Showing dial menu widget for chord group: $chordGroup');
     
+    // Find all consecutive non-diatonic chords starting from the tapped chord
+    final consecutiveGroup = _findConsecutiveNonDiatonicSequence(chordGroup.first);
+    
     setState(() {
       _showDialMenu = true;
-      _selectedChordGroup = chordGroup;
+      _selectedChordGroup = consecutiveGroup;
     });
+  }
+
+  /// Finds all consecutive non-diatonic chords starting from a given index
+  List<int> _findConsecutiveNonDiatonicSequence(int startIndex) {
+    final List<int> sequence = [];
+    
+    if (startIndex >= _chordSymbols.length) return sequence;
+    
+    final startChord = _chordSymbols[startIndex];
+    final currentKey = _getCurrentKeySignature();
+    
+    // Only proceed if the start chord is non-diatonic
+    if (!startChord.isDiatonicTo(currentKey)) {
+      sequence.add(startIndex);
+      
+      // Look forward for consecutive non-diatonic chords
+      for (int i = startIndex + 1; i < _chordSymbols.length; i++) {
+        final chord = _chordSymbols[i];
+        if (!chord.isDiatonicTo(currentKey)) {
+          sequence.add(i);
+        } else {
+          break; // Stop at first diatonic chord
+        }
+      }
+    }
+    
+    return sequence;
   }
 
   /// Hides the dial menu widget
@@ -116,171 +148,661 @@ class _SongViewerScreenState extends State<SongViewerScreen>
       return const SizedBox.shrink(); // Return empty widget when not showing
     }
 
-    // Create the dial menu items
-    final outerItems = _createMajorKeyDialItems();
-    final innerItems = _createMinorKeyDialItems();
+    final theme = Theme.of(context);
+    final surfaceColor = theme.colorScheme.surface;
+
+    // Get the current key context for non-diatonic chord
+    final currentKey = _getCurrentKeyName();
+
+    // Create the dial menu items with proper arrangement
+    final outerItems = _createMajorKeyDialItems(currentKey);
+    final innerItems = _createMinorKeyDialItems(currentKey);
     
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 16),
-      child: ConcentricDialMenu(
-        size: 300,
-        outerItems: outerItems,
-        innerItems: innerItems,
-        onSelectionChanged: (innerIndex, outerIndex) {
-          // Handle key selection
-          if (outerIndex != null) {
-            print('Selected major key: ${outerItems[outerIndex].label} for chord group: $_selectedChordGroup');
-            // TODO: Apply key change to the chord group
-          }
-          if (innerIndex != null) {
-            print('Selected minor key: ${innerItems[innerIndex].label} for chord group: $_selectedChordGroup');
-            // TODO: Apply key change to the chord group
-          }
-          _hideDialMenuWidget(); // Hide menu after selection
-        },
+      child: ClayContainer(
+        color: surfaceColor,
+        borderRadius: 20,
+        depth: 12,
+        spread: 4,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              Text(
+                'Reharmonize Sequence',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.primary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ConcentricDialMenu(
+                size: 250,
+                outerItems: outerItems,
+                innerItems: innerItems,
+                onSelectionChanged: (innerIndex, outerIndex) {
+                  if (outerIndex != null) {
+                    final selectedKey = outerItems[outerIndex].label;
+                    _applyKeyChangeToChordGroup(selectedKey, false);
+                    _hideDialMenuWidget();
+                  } else if (innerIndex != null) {
+                    final selectedKey = innerItems[innerIndex].label;
+                    _applyKeyChangeToChordGroup(selectedKey.replaceAll('m', ''), true);
+                    _hideDialMenuWidget();
+                  }
+                },
+                centerText: 'Keys',
+                highlightedOuterIndex: _getCurrentlyModifiedMajorKeyIndex(outerItems),
+                highlightedInnerIndex: _getCurrentlyModifiedMinorKeyIndex(innerItems),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _hideDialMenuWidget,
+                child: const Text('Cancel'),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  /// Creates the major key dial items (outer ring)
-  List<DialItem> _createMajorKeyDialItems() {
-    final majorKeys = [
+  /// Applies a key change to the selected chord group
+  void _applyKeyChangeToChordGroup(String keyName, bool isMinor) {
+    if (_selectedChordGroup == null) return;
+
+    // Convert key name to KeySignatureType
+    final newKeySignature = _getKeySignatureFromKeyName(keyName, isMinor);
+    if (newKeySignature == null) {
+      print('Error: Could not convert key name "$keyName" to KeySignatureType');
+      return;
+    }
+
+    setState(() {
+      // Apply the modified key signature to all chords in the group
+      for (final chordIndex in _selectedChordGroup!) {
+        if (chordIndex >= 0 && chordIndex < _chordSymbols.length) {
+          final originalChord = _chordSymbols[chordIndex];
+          
+          // Create a new chord with the modified key signature
+          if (originalChord.rootStep != null) {
+            // From MusicXML
+            _chordSymbols[chordIndex] = ChordSymbol.fromMusicXML(
+              originalChord.rootStep!,
+              originalChord.rootAlter ?? 0,
+              originalChord.kind!,
+              originalChord.durationBeats!,
+              originalChord.measureNumber!,
+              position: originalChord.position,
+              originalKeySignature: originalChord.originalKeySignature,
+              modifiedKeySignature: newKeySignature,
+            );
+          } else {
+            // Direct creation
+            _chordSymbols[chordIndex] = ChordSymbol(
+              originalChord.rootName!,
+              originalChord.quality!,
+              position: originalChord.position,
+              originalKeySignature: originalChord.originalKeySignature,
+              modifiedKeySignature: newKeySignature,
+            );
+          }
+        }
+      }
+    });
+
+    // Show success message
+    final keyDisplayName = isMinor ? '$keyName Minor' : '$keyName Major';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Chord group reharmonized in $keyDisplayName'),
+        backgroundColor: Colors.green,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  /// Converts a key name string to KeySignatureType enum
+  KeySignatureType? _getKeySignatureFromKeyName(String keyName, bool isMinor) {
+    // Remove any 'm' suffix for minor keys
+    final cleanKeyName = keyName.replaceAll('m', '');
+    
+    // Map key names to KeySignatureType based on the available constants
+    // Reference the existing _getKeySignatureFromFifths mapping
+    final Map<String, List<KeySignatureType>> keyMap = {
+      'C': [KeySignatureType.cMajor, KeySignatureType.aMinor],
+      'G': [KeySignatureType.gMajor, KeySignatureType.eMinor],
+      'D': [KeySignatureType.dMajor, KeySignatureType.bMinor],
+      'A': [KeySignatureType.aMajor, KeySignatureType.fSharpMinor],
+      'E': [KeySignatureType.eMajor, KeySignatureType.cSharpMinor],
+      'B': [KeySignatureType.bMajor, KeySignatureType.gSharpMinor],
+      'F#': [KeySignatureType.fSharpMajor, KeySignatureType.dSharpMinor],
+      'C#': [KeySignatureType.cSharpMajor, KeySignatureType.aSharpMinor],
+      'F': [KeySignatureType.fMajor, KeySignatureType.dMinor],
+      'Bb': [KeySignatureType.bFlatMajor, KeySignatureType.gMinor],
+      'Eb': [KeySignatureType.eFlatMajor, KeySignatureType.cMinor],
+      'Ab': [KeySignatureType.aFlatMajor, KeySignatureType.fMinor],
+      'Db': [KeySignatureType.dFlatMajor, KeySignatureType.bFlatMinor],
+      'Gb': [KeySignatureType.gFlatMajor, KeySignatureType.eFlatMinor],
+      'Cb': [KeySignatureType.cFlatMajor, KeySignatureType.aFlatMinor],
+      // Handle minor key names directly
+      'Am': [KeySignatureType.cMajor, KeySignatureType.aMinor],
+      'Em': [KeySignatureType.gMajor, KeySignatureType.eMinor],
+      'Bm': [KeySignatureType.dMajor, KeySignatureType.bMinor],
+      'F#m': [KeySignatureType.aMajor, KeySignatureType.fSharpMinor],
+      'C#m': [KeySignatureType.eMajor, KeySignatureType.cSharpMinor],
+      'G#m': [KeySignatureType.bMajor, KeySignatureType.gSharpMinor],
+      'D#m': [KeySignatureType.fSharpMajor, KeySignatureType.dSharpMinor],
+      'A#m': [KeySignatureType.cSharpMajor, KeySignatureType.aSharpMinor],
+      'Dm': [KeySignatureType.fMajor, KeySignatureType.dMinor],
+      'Gm': [KeySignatureType.bFlatMajor, KeySignatureType.gMinor],
+      'Cm': [KeySignatureType.eFlatMajor, KeySignatureType.cMinor],
+      'Fm': [KeySignatureType.aFlatMajor, KeySignatureType.fMinor],
+      'Bbm': [KeySignatureType.dFlatMajor, KeySignatureType.bFlatMinor],
+      'Ebm': [KeySignatureType.gFlatMajor, KeySignatureType.eFlatMinor],
+      'Abm': [KeySignatureType.cFlatMajor, KeySignatureType.aFlatMinor],
+    };
+
+    final keyTypes = keyMap[cleanKeyName] ?? keyMap[keyName];
+    if (keyTypes == null) return null;
+    
+    return isMinor ? keyTypes[1] : keyTypes[0];
+  }
+
+  /// Creates the major key dial items (outer ring) with current key at top
+  List<DialItem> _createMajorKeyDialItems(String currentKey) {
+    final allMajorKeys = [
       'C', 'G', 'D', 'A', 'E', 'B', 'F#', 'Db', 'Ab', 'Eb', 'Bb', 'F'
     ];
     
-    return majorKeys.map((key) => DialItem(
-      icon: Icons.music_note,
+    // Find the index of the current key, default to C if not found
+    final currentIndex = allMajorKeys.indexOf(currentKey.split(' ')[0]);
+    final startIndex = currentIndex != -1 ? currentIndex : 0;
+    
+    // Arrange keys so current key is at the top (index 0)
+    final orderedKeys = <String>[];
+    for (int i = 0; i < allMajorKeys.length; i++) {
+      final index = (startIndex + i) % allMajorKeys.length;
+      orderedKeys.add(allMajorKeys[index]);
+    }
+    
+    return orderedKeys.map((key) => DialItem(
       label: key,
     )).toList();
   }
 
-  /// Creates the minor key dial items (inner ring)
-  List<DialItem> _createMinorKeyDialItems() {
-    final minorKeys = [
+  /// Creates the minor key dial items (inner ring) with current key at top
+  List<DialItem> _createMinorKeyDialItems(String currentKey) {
+    final allMinorKeys = [
       'Am', 'Em', 'Bm', 'F#m', 'C#m', 'G#m', 'D#m', 'Bbm', 'Fm', 'Cm', 'Gm', 'Dm'
     ];
     
-    return minorKeys.map((key) => DialItem(
-      icon: Icons.music_note,
+    // Extract minor key from current key context
+    final currentMinorKey = _isMinorKey ? currentKey.split(' ')[0] + 'm' : _getRelativeMinor(currentKey.split(' ')[0]);
+    final currentIndex = allMinorKeys.indexOf(currentMinorKey);
+    final startIndex = currentIndex != -1 ? currentIndex : 0;
+    
+    // Arrange keys so current minor key is at the top (index 0)
+    final orderedKeys = <String>[];
+    for (int i = 0; i < allMinorKeys.length; i++) {
+      final index = (startIndex + i) % allMinorKeys.length;
+      orderedKeys.add(allMinorKeys[index]);
+    }
+    
+    return orderedKeys.map((key) => DialItem(
       label: key,
     )).toList();
   }
 
+  /// Gets the current key name
+  String _getCurrentKeyName() {
+    final keyParts = _keySignature.split(' / ');
+    if (keyParts.length == 2) {
+      return _isMinorKey ? keyParts[1].trim() : keyParts[0].trim();
+    }
+    return keyParts[0].trim();
+  }
+
+  /// Gets the relative minor key for a major key
+  String _getRelativeMinor(String majorKey) {
+    const majorToMinor = {
+      'C': 'Am', 'G': 'Em', 'D': 'Bm', 'A': 'F#m', 'E': 'C#m', 'B': 'G#m',
+      'F#': 'D#m', 'Db': 'Bbm', 'Ab': 'Fm', 'Eb': 'Cm', 'Bb': 'Gm', 'F': 'Dm'
+    };
+    return majorToMinor[majorKey] ?? 'Am';
+  }
+
+  /// Gets suggested key for reharmonizing the selected chord group
+  Map<String, String> _getSuggestedKeyForChordGroup() {
+    if (_selectedChordGroup == null || _selectedChordGroup!.isEmpty) {
+      return {'major': 'C', 'minor': 'Am'};
+    }
+
+    // Analyze the first chord in the group to suggest a key
+    final firstChordIndex = _selectedChordGroup!.first;
+    if (firstChordIndex >= 0 && firstChordIndex < _chordSymbols.length) {
+      final chord = _chordSymbols[firstChordIndex];
+      final chordRoot = chord.effectiveRootName;
+      
+      // Simple heuristic: suggest the chord root as a potential key
+      final suggestedMajor = chordRoot;
+      final suggestedMinor = _getRelativeMinor(chordRoot);
+      
+      return {'major': suggestedMajor, 'minor': suggestedMinor};
+    }
+    
+    return {'major': 'C', 'minor': 'Am'};
+  }
+
+  /// Gets the highlighted index for major key in the dial
+  int? _getHighlightedMajorKeyIndex(String suggestedKey, List<DialItem> outerItems) {
+    for (int i = 0; i < outerItems.length; i++) {
+      if (outerItems[i].label == suggestedKey) {
+        return i;
+      }
+    }
+    return null;
+  }
+
+  /// Gets the highlighted index for minor key in the dial
+  int? _getHighlightedMinorKeyIndex(String suggestedKey, List<DialItem> innerItems) {
+    for (int i = 0; i < innerItems.length; i++) {
+      if (innerItems[i].label == suggestedKey) {
+        return i;
+      }
+    }
+    return null;
+  }
+
+  /// Gets the currently modified major key index for highlighting in the dial
+  int? _getCurrentlyModifiedMajorKeyIndex(List<DialItem> outerItems) {
+    if (_selectedChordGroup == null || _selectedChordGroup!.isEmpty) return null;
+    
+    // Get the modified key signature from the first chord in the group
+    final firstChordIndex = _selectedChordGroup!.first;
+    if (firstChordIndex >= _chordSymbols.length) return null;
+    
+    final chord = _chordSymbols[firstChordIndex];
+    if (chord.modifiedKeySignature == null) return null;
+    
+    // Convert the modified key signature to a readable key name
+    final keyName = _getKeyNameFromSignature(chord.modifiedKeySignature!);
+    if (keyName.isEmpty) return null;
+    
+    // Extract major key name (remove "Major" suffix)
+    final majorKeyName = keyName.replaceAll(' Major', '');
+    
+    // Find the index in the outer items
+    for (int i = 0; i < outerItems.length; i++) {
+      if (outerItems[i].label == majorKeyName) {
+        return i;
+      }
+    }
+    return null;
+  }
+
+  /// Gets the currently modified minor key index for highlighting in the dial
+  int? _getCurrentlyModifiedMinorKeyIndex(List<DialItem> innerItems) {
+    if (_selectedChordGroup == null || _selectedChordGroup!.isEmpty) return null;
+    
+    // Get the modified key signature from the first chord in the group
+    final firstChordIndex = _selectedChordGroup!.first;
+    if (firstChordIndex >= _chordSymbols.length) return null;
+    
+    final chord = _chordSymbols[firstChordIndex];
+    if (chord.modifiedKeySignature == null) return null;
+    
+    // Convert the modified key signature to a readable key name
+    final keyName = _getKeyNameFromSignature(chord.modifiedKeySignature!);
+    if (keyName.isEmpty) return null;
+    
+    // Extract minor key name (remove "Minor" suffix and add "m")
+    final minorKeyName = keyName.replaceAll(' Minor', 'm');
+    
+    // Find the index in the inner items
+    for (int i = 0; i < innerItems.length; i++) {
+      if (innerItems[i].label == minorKeyName) {
+        return i;
+      }
+    }
+    return null;
+  }
+
+  /// Builds a key change indicator for a specific chord if it starts a new reharmonized group
+  Widget? _buildKeyChangeIndicatorForChord(int chordIndex) {
+    if (chordIndex >= _chordSymbols.length) return null;
+    
+    final chord = _chordSymbols[chordIndex];
+    
+    // Only show indicator if this chord has a modified key signature AND is the start of a group
+    if (chord.modifiedKeySignature != null && _isStartOfReharmonizedGroup(chordIndex)) {
+      final keyName = _getKeyNameFromSignature(chord.modifiedKeySignature!);
+      
+      if (keyName.isNotEmpty) {
+        return Container(
+          margin: const EdgeInsets.only(bottom: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+              width: 1,
+            ),
+          ),
+          child: Text(
+            keyName,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
+        );
+      }
+    }
+    
+    return null;
+  }
+
+  /// Checks if a chord index is the start of a reharmonized group
+  bool _isStartOfReharmonizedGroup(int chordIndex) {
+    if (chordIndex >= _chordSymbols.length) return false;
+    
+    final currentChord = _chordSymbols[chordIndex];
+    if (currentChord.modifiedKeySignature == null) return false;
+    
+    // Check if the previous chord has a different (or no) modified key signature
+    if (chordIndex == 0) return true;
+    
+    final previousChord = _chordSymbols[chordIndex - 1];
+    return previousChord.modifiedKeySignature != currentChord.modifiedKeySignature;
+  }
+
+  /// Gets a readable key name from KeySignatureType
+  String _getKeyNameFromSignature(KeySignatureType keySignature) {
+    const signatureToName = {
+      KeySignatureType.cMajor: 'C Major',
+      KeySignatureType.gMajor: 'G Major',
+      KeySignatureType.dMajor: 'D Major',
+      KeySignatureType.aMajor: 'A Major',
+      KeySignatureType.eMajor: 'E Major',
+      KeySignatureType.bMajor: 'B Major',
+      KeySignatureType.fSharpMajor: 'F# Major',
+      KeySignatureType.cSharpMajor: 'C# Major',
+      KeySignatureType.fMajor: 'F Major',
+      KeySignatureType.bFlatMajor: 'Bb Major',
+      KeySignatureType.eFlatMajor: 'Eb Major',
+      KeySignatureType.aFlatMajor: 'Ab Major',
+      KeySignatureType.dFlatMajor: 'Db Major',
+      KeySignatureType.gFlatMajor: 'Gb Major',
+      KeySignatureType.cFlatMajor: 'Cb Major',
+      KeySignatureType.aMinor: 'A Minor',
+      KeySignatureType.eMinor: 'E Minor',
+      KeySignatureType.bMinor: 'B Minor',
+      KeySignatureType.fSharpMinor: 'F# Minor',
+      KeySignatureType.cSharpMinor: 'C# Minor',
+      KeySignatureType.gSharpMinor: 'G# Minor',
+      KeySignatureType.dSharpMinor: 'D# Minor',
+      KeySignatureType.aSharpMinor: 'A# Minor',
+      KeySignatureType.dMinor: 'D Minor',
+      KeySignatureType.gMinor: 'G Minor',
+      KeySignatureType.cMinor: 'C Minor',
+      KeySignatureType.fMinor: 'F Minor',
+      KeySignatureType.bFlatMinor: 'Bb Minor',
+      KeySignatureType.eFlatMinor: 'Eb Minor',
+      KeySignatureType.aFlatMinor: 'Ab Minor',
+    };
+    
+    return signatureToName[keySignature] ?? '';
+  }
+
+  /// Loads and parses the MusicXML file to extract both chord symbols and musical notation
   Future<void> _loadAndParseSong() async {
     try {
-      // --- 1. Load and Prep ---
-      final xmlString = await rootBundle.loadString(widget.songAssetPath);
+      // --- 1. Load and Parse MusicXML ---
+      String xmlString = await rootBundle.loadString(widget.songAssetPath);
       final doc = XmlDocument.parse(xmlString);
 
-      final workTitle =
-          doc.findAllElements('work-title').firstOrNull?.innerText ??
-              'Unknown Title';
-      final fifths = int.tryParse(
-              doc.findAllElements('fifths').firstOrNull?.innerText ?? '0') ??
-          0;
-      final keySignature = _fifthsToKey[fifths] ?? 'Unknown';
+      // Extract basic song information
+      final workElement = doc.findAllElements('work').firstOrNull;
+      if (workElement != null) {
+        final workTitle = workElement.findElements('work-title').firstOrNull;
+        if (workTitle != null) {
+          _songTitle = workTitle.innerText;
+        }
+      }
 
-      // Get the divisions value, essential for timing. Throws if not found.
-      final divisions =
-          int.parse(doc.findAllElements('divisions').first.innerText);
+      // Extract attributes like time signature and key signature
+      final attributesElement = doc.findAllElements('attributes').firstOrNull;
+      if (attributesElement != null) {
+        // Time signature
+        final timeElement = attributesElement.findElements('time').firstOrNull;
+        if (timeElement != null) {
+          final beats = timeElement.findElements('beats').firstOrNull?.innerText ?? '4';
+          final beatType = timeElement.findElements('beat-type').firstOrNull?.innerText ?? '4';
+          _timeSignature = '$beats/$beatType';
+          _beatsPerMeasure = int.tryParse(beats) ?? 4;
+        }
 
-      // Get time signature for the metronome
-      final timeElement = doc.findAllElements('time').first;
-      final beats =
-          int.parse(timeElement.findElements('beats').first.innerText);
-      final beatType =
-          int.parse(timeElement.findElements('beat-type').first.innerText);
-      final timeSignature = '$beats/$beatType';
-      _beatsPerMeasure = beats;
-
-      // --- 2. The Parsing Logic ---
-      final List<ChordSymbol> allChords = [];
-      XmlElement? activeHarmony; // The chord that is currently active
-
-      // Find all <part> elements and then iterate through their children
-      final parts = doc.findAllElements('part');
-      for (final part in parts) {
-        final measures = part.findElements('measure');
-        for (final measure in measures) {
-          final measureNumber =
-              int.tryParse(measure.getAttribute('number') ?? '0') ?? 0;
-          // In each measure, process elements in order
-          for (final element in measure.children.whereType<XmlElement>()) {
-            // If we find a new harmony, it becomes the active one
-            if (element.name.local == 'harmony') {
-              activeHarmony = element;
-            }
-
-            // If we find a note, it inherits the active harmony and gives it duration
-            if (element.name.local == 'note') {
-              // Only process notes that have duration and aren't rests
-              final durationNode = element.findElements('duration').firstOrNull;
-              final isRest = element.findElements('rest').isNotEmpty;
-
-              if (durationNode != null && !isRest && activeHarmony != null) {
-                final durationValue = int.parse(durationNode.innerText);
-                final durationInBeats = durationValue / divisions;
-
-                // Extract chord details from the active harmony
-                final rootElement = activeHarmony.findElements('root').first;
-                final rootStep =
-                    rootElement.findElements('root-step').first.innerText;
-                final rootAlter = int.tryParse(rootElement
-                            .findElements('root-alter')
-                            .firstOrNull
-                            ?.innerText ??
-                        '0') ??
-                    0;
-                final kindElement = activeHarmony.findElements('kind').first;
-                final kind =
-                    kindElement.getAttribute('text') ?? kindElement.innerText;
-
-                // Create the timed chord and add it to our list
-                allChords.add(ChordSymbol.fromMusicXML(
-                  rootStep,
-                  rootAlter,
-                  kind,
-                  durationInBeats,
-                  measureNumber,
-                ));
-              }
-            }
+        // Key signature
+        final keyElement = attributesElement.findElements('key').firstOrNull;
+        if (keyElement != null) {
+          final fifthsElement = keyElement.findElements('fifths').firstOrNull;
+          if (fifthsElement != null) {
+            final fifths = int.tryParse(fifthsElement.innerText) ?? 0;
+            _keySignature = _fifthsToKey[fifths] ?? 'C / Am';
           }
         }
       }
 
-      // Error handling if parsing yields no chords
-      if (allChords.isEmpty) {
-        throw 'No valid chords were parsed from the MusicXML file.';
+      // --- 2. Parse Musical Content and Create Measures ---
+      int divisions = 1; // Default divisions per quarter note
+      final chordMeasures = <ChordMeasure>[];
+      
+      // Find all <part> elements and then iterate through their children
+      final parts = doc.findAllElements('part');
+      for (final part in parts) {
+        final partMeasures = part.findElements('measure');
+        for (final measure in partMeasures) {
+          final measureNumber = int.tryParse(measure.getAttribute('number') ?? '0') ?? 0;
+          
+          // Extract divisions for duration calculations
+          final attributesInMeasure = measure.findElements('attributes').firstOrNull;
+          if (attributesInMeasure != null) {
+            final divisionsElement = attributesInMeasure.findElements('divisions').firstOrNull;
+            if (divisionsElement != null) {
+              divisions = int.tryParse(divisionsElement.innerText) ?? 1;
+            }
+          }
+
+          // Collect musical symbols for this measure
+          final musicalSymbols = <MusicalSymbol>[];
+          final measureChords = <ChordSymbol>[];
+          
+          // Track harmony for chord symbols
+          XmlElement? activeHarmony;
+          
+          // Only add clef and key signature to the first measure
+          if (measureNumber == 1) {
+          
+            // Add default clef
+            musicalSymbols.add(Clef(ClefType.treble));
+            
+            // Add key signature based on the global key signature
+            final keySignatureType = _getCurrentKeySignature();
+            musicalSymbols.add(KeySignature(keySignatureType));
+            
+            // Add time signature - parse from the existing _timeSignature variable
+            final timeSigParts = _timeSignature.split('/');
+            if (timeSigParts.length == 2) {
+              final num = int.tryParse(timeSigParts[0]) ?? 4;
+              final denom = int.tryParse(timeSigParts[1]) ?? 4;
+              musicalSymbols.add(TimeSignature(num, denom));
+            }
+          }
+          // else add rest of meassure length
+          else {
+            // Add a rest for the remaining measure length
+            musicalSymbols.add(Rest(RestType.quarter));
+            musicalSymbols.add(Rest(RestType.quarter));
+            musicalSymbols.add(Rest(RestType.quarter));
+            musicalSymbols.add(Rest(RestType.quarter));
+          }
+
+          // Process all elements in the measure
+          for (final element in measure.children.whereType<XmlElement>()) {
+            switch (element.name.local) {
+              case 'harmony':
+                activeHarmony = element;
+                break;
+                
+              case 'note':
+              print('is note is note');
+                // Process note elements for chord symbol association only
+                final durationNode = element.findElements('duration').firstOrNull;
+                final isRest = element.findElements('rest').isNotEmpty;
+                
+                if (durationNode != null) {
+                  final durationValue = int.parse(durationNode.innerText);
+                  final durationInBeats = durationValue / divisions;
+                  
+                  // Associate chord symbol with this note if we have an active harmony
+                  if (!isRest && activeHarmony != null) {
+                    final chord = _createChordFromHarmony(activeHarmony, durationInBeats, measureNumber);
+                    if (chord != null) {
+                      measureChords.add(chord);
+                      activeHarmony = null; // Clear to avoid duplication
+                    }
+                  }
+                }
+                break;
+            }
+          }
+          //print length musical symbols
+          print('Measure $measureNumber: Found ${musicalSymbols.length} musical symbols and ${measureChords.length} chord symbols');
+          // Create measure with musical symbols and chord symbols
+          final chordMeasure = ChordMeasure(
+            // make isNewLine true every 5 measures 
+            musicalSymbols,
+            chordSymbols: measureChords,
+            isNewLine: measureNumber % 5 == 1,
+          );
+          chordMeasures.add(chordMeasure);
+        }
+      }
+      
+
+      // Collect all chords from all measures for timeline and navigation
+      final allChords = <ChordSymbol>[];
+      for (final chordMeasure in chordMeasures) {
+        allChords.addAll(chordMeasure.chordSymbols);
       }
 
-      // --- 3. Initialize Metronome and State ---
-      await _metronome.init(
-        'assets/audio/claves44_wav.wav',
-        accentedPath: 'assets/audio/woodblock_high44_wav.wav',
-        bpm: _currentBpm,
-        timeSignature: _beatsPerMeasure,
-        enableTickCallback: true,
-      );
+      // Error handling if parsing yields no content
+      if (allChords.isEmpty && chordMeasures.isEmpty) {
+        throw 'No valid musical content was parsed from the MusicXML file.';
+      }
 
-      _tickSubscription = _metronome.tickStream.listen(_onTick);
+      print('📊 Parsed ${chordMeasures.length} measures with ${allChords.length} chords');
+      for (int i = 0; i < chordMeasures.length; i++) {
+        print('  Measure ${i + 1}: ${chordMeasures[i].musicalSymbols.length} symbols, ${chordMeasures[i].chordSymbols.length} chords');
+      }
+
+      // --- 3. Initialize State ---
+      setState(() {
+        _chordSymbols = allChords;
+        _chordMeasures = chordMeasures;
+        _currentBpm = widget.bpm;
+        _currentChordIndex = 0;
+        _songBeatCounter = 0;
+        _currentBeatInMeasure = 0;
+        _userInputBeats.clear();
+        _totalSongDurationInBeats = _chordSymbols.fold(0.0, (sum, chord) => sum + (chord.durationBeats ?? 0.0));
+      });
+
+      // Initialize global keys for chord interaction
+      _chordGlobalKeys = List.generate(_chordSymbols.length, (index) => GlobalKey());
+
+      // --- 4. Initialize Metronome ---
+      // TODO: Add proper audio assets for metronome
+      // Temporarily disabled to avoid crashes with empty audio files
+      /*
+      try {
+        await _metronome.init(
+          'assets/audio/claves44_wav.wav',
+          accentedPath: 'assets/audio/woodblock_high44_wav.wav',
+          bpm: _currentBpm,
+          timeSignature: _beatsPerMeasure,
+          enableTickCallback: true,
+        );
+
+        _tickSubscription = _metronome.tickStream.listen(_onTick);
+      } catch (e) {
+        print('Warning: Could not initialize metronome audio: $e');
+        // Continue without metronome audio for now
+      }
+      */
+      print('Metronome disabled - add proper audio assets to enable');
 
       setState(() {
         _isLoading = false;
-        _chords = allChords;
-        _songTitle = workTitle;
-        _keySignature = keySignature;
-        _timeSignature = timeSignature;
-        _totalSongDurationInBeats =
-            _chords.fold(0, (prev, chord) => prev + (chord.durationBeats ?? 0));
-        // Initialize chord keys for position tracking
-        _chordGlobalKeys = List.generate(_chords.length, (index) => GlobalKey());
       });
     } catch (e) {
+      print('Error loading song: $e');
       setState(() {
         _isLoading = false;
       });
-      print('Error loading/parsing song: $e');
+    }
+  }
+
+  /// Helper method to create ChordSymbol from harmony XML element
+  ChordSymbol? _createChordFromHarmony(XmlElement harmony, double durationInBeats, int measureNumber) {
+    try {
+      final rootElement = harmony.findElements('root').firstOrNull;
+      if (rootElement == null) return null;
+      
+      final rootStep = rootElement.findElements('root-step').firstOrNull?.innerText;
+      if (rootStep == null) return null;
+      
+      final rootAlter = int.tryParse(rootElement.findElements('root-alter').firstOrNull?.innerText ?? '0') ?? 0;
+      final kindElement = harmony.findElements('kind').firstOrNull;
+      final kind = kindElement?.getAttribute('text') ?? kindElement?.innerText ?? '';
+      
+      return ChordSymbol.fromMusicXML(
+        rootStep,
+        rootAlter,
+        kind,
+        durationInBeats,
+        measureNumber,
+      );
+    } catch (e) {
+      print('Error creating chord from harmony: $e');
+      return null;
+    }
+  }
+
+  /// Helper method to convert fifths to KeySignatureType
+  KeySignatureType _getKeySignatureTypeFromFifths(int fifths) {
+    switch (fifths) {
+      case -7: return KeySignatureType.cFlatMajor;
+      case -6: return KeySignatureType.gFlatMajor;
+      case -5: return KeySignatureType.dFlatMajor;
+      case -4: return KeySignatureType.aFlatMajor;
+      case -3: return KeySignatureType.eFlatMajor;
+      case -2: return KeySignatureType.bFlatMajor;
+      case -1: return KeySignatureType.fMajor;
+      case 0: return KeySignatureType.cMajor;
+      case 1: return KeySignatureType.gMajor;
+      case 2: return KeySignatureType.dMajor;
+      case 3: return KeySignatureType.aMajor;
+      case 4: return KeySignatureType.eMajor;
+      case 5: return KeySignatureType.bMajor;
+      case 6: return KeySignatureType.fSharpMajor;
+      case 7: return KeySignatureType.cSharpMajor;
+      default: return KeySignatureType.cMajor;
     }
   }
 
@@ -325,9 +847,20 @@ class _SongViewerScreenState extends State<SongViewerScreen>
 
   /// Builds two buttons for major/minor key selection
   Widget _buildKeyModeButtons() {
+    final theme = Theme.of(context);
+    final primaryColor = theme.colorScheme.primary;
+    final surfaceColor = theme.colorScheme.surface;
+    final onSurfaceColor = theme.colorScheme.onSurface;
+    
     final keyParts = _keySignature.split(' / ');
     if (keyParts.length != 2) {
-      return Text(_keySignature, style: const TextStyle(fontSize: 16));
+      return Text(
+        _keySignature,
+        style: TextStyle(
+          fontSize: 16,
+          color: onSurfaceColor,
+        ),
+      );
     }
     
     final majorKey = keyParts[0].trim();
@@ -337,41 +870,47 @@ class _SongViewerScreenState extends State<SongViewerScreen>
       mainAxisSize: MainAxisSize.min,
       children: [
         // Major key button
-        ElevatedButton(
-          onPressed: _isMinorKey ? () => _setMajorMode() : null,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: _isMinorKey ? Colors.grey.shade300 : Colors.blue.shade700,
-            foregroundColor: _isMinorKey ? Colors.grey.shade600 : Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            minimumSize: const Size(0, 36),
-            elevation: _isMinorKey ? 0 : 4,
-            shadowColor: _isMinorKey ? Colors.transparent : Colors.blue.shade300,
-          ),
-          child: Text(
-            '$majorKey Major',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: _isMinorKey ? FontWeight.normal : FontWeight.bold,
+        GestureDetector(
+          onTap: _isMinorKey ? () => _setMajorMode() : null,
+          child: ClayContainer(
+            color: _isMinorKey ? surfaceColor : primaryColor,
+            borderRadius: 18,
+            depth: _isMinorKey ? 5 : 12,
+            spread: _isMinorKey ? 1 : 3,
+            curveType: _isMinorKey ? CurveType.none : CurveType.concave,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Text(
+                '$majorKey Major',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: _isMinorKey ? FontWeight.normal : FontWeight.bold,
+                  color: _isMinorKey ? onSurfaceColor.withOpacity(0.6) : Colors.white,
+                ),
+              ),
             ),
           ),
         ),
         const SizedBox(width: 8),
         // Minor key button
-        ElevatedButton(
-          onPressed: !_isMinorKey ? () => _setMinorMode() : null,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: !_isMinorKey ? Colors.grey.shade300 : Colors.blue.shade700,
-            foregroundColor: !_isMinorKey ? Colors.grey.shade600 : Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            minimumSize: const Size(0, 36),
-            elevation: !_isMinorKey ? 0 : 4,
-            shadowColor: !_isMinorKey ? Colors.transparent : Colors.blue.shade300,
-          ),
-          child: Text(
-            '$minorKey Minor',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: !_isMinorKey ? FontWeight.normal : FontWeight.bold,
+        GestureDetector(
+          onTap: !_isMinorKey ? () => _setMinorMode() : null,
+          child: ClayContainer(
+            color: !_isMinorKey ? surfaceColor : primaryColor,
+            borderRadius: 18,
+            depth: !_isMinorKey ? 5 : 12,
+            spread: !_isMinorKey ? 1 : 3,
+            curveType: !_isMinorKey ? CurveType.none : CurveType.concave,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Text(
+                '$minorKey Minor',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: !_isMinorKey ? FontWeight.normal : FontWeight.bold,
+                  color: !_isMinorKey ? onSurfaceColor.withOpacity(0.6) : Colors.white,
+                ),
+              ),
             ),
           ),
         ),
@@ -395,6 +934,10 @@ class _SongViewerScreenState extends State<SongViewerScreen>
 
   /// Builds the current key indicator text below the buttons
   Widget _buildCurrentKeyIndicator() {
+    final theme = Theme.of(context);
+    final primaryColor = theme.colorScheme.primary;
+    final surfaceColor = theme.colorScheme.surface;
+    
     final keyParts = _keySignature.split(' / ');
     if (keyParts.length != 2) {
       return const SizedBox.shrink();
@@ -404,12 +947,21 @@ class _SongViewerScreenState extends State<SongViewerScreen>
     final minorKey = keyParts[1].trim();
     final currentKey = _isMinorKey ? '$minorKey Minor' : '$majorKey Major';
     
-    return Text(
-      'Current Key: $currentKey',
-      style: const TextStyle(
-        fontSize: 16,
-        fontWeight: FontWeight.bold,
-        color: Colors.black87,
+    return ClayContainer(
+      color: surfaceColor,
+      borderRadius: 15,
+      depth: 8,
+      spread: 2,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Text(
+          'Current Key: $currentKey',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: primaryColor,
+          ),
+        ),
       ),
     );
   }
@@ -421,7 +973,6 @@ class _SongViewerScreenState extends State<SongViewerScreen>
       _isDragging = false;
       _isLongPressing = false;
       _dragStartIndex = null;
-      _animatingChordIndex = null;
       _lastHoveredIndex = null;
     });
   }
@@ -430,7 +981,6 @@ class _SongViewerScreenState extends State<SongViewerScreen>
   void _startLongPressSelection(int index) {
     print('🚀 Starting long press selection on chord $index');
     setState(() {
-      _animatingChordIndex = index;
       _isLongPressing = true;
       _selectedChordIndices.clear();
       _selectedChordIndices.add(index);
@@ -441,15 +991,6 @@ class _SongViewerScreenState extends State<SongViewerScreen>
     
     // Trigger animation and haptic feedback
     HapticFeedback.mediumImpact();
-    
-    // Clear animation after short delay
-    Future.delayed(const Duration(milliseconds: 150), () {
-      if (mounted) {
-        setState(() {
-          _animatingChordIndex = null;
-        });
-      }
-    });
   }
 
   /// Updates chord selection during drag (only works if already in drag mode)
@@ -468,7 +1009,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
           final min = start < end ? start : end;
           final max = start > end ? start : end;
           
-          for (int i = min; i <= max && i < _chords.length; i++) {
+          for (int i = min; i <= max && i < _chordSymbols.length; i++) {
             _selectedChordIndices.add(i);
           }
         });
@@ -541,7 +1082,6 @@ class _SongViewerScreenState extends State<SongViewerScreen>
     setState(() {
       _isDragging = false;
       _isLongPressing = false;
-      _animatingChordIndex = null;
       // Keep _selectedChordIndices as is to show the selected chords
     });
   }
@@ -551,7 +1091,6 @@ class _SongViewerScreenState extends State<SongViewerScreen>
     setState(() {
       _isDragging = false;
       _isLongPressing = false;
-      _animatingChordIndex = null;
       _selectedChordIndices.clear();
       _dragStartIndex = null;
     });
@@ -575,8 +1114,9 @@ class _SongViewerScreenState extends State<SongViewerScreen>
     // Get Roman numerals with qualities for the selected chords
     final selectedRomanNumerals = selectedChords
         .map((i) {
-          final chord = _chords[i];
-          final romanNumeral = chord.getRomanNumeralWithKey(_getCurrentKeySignature());
+          final chord = _chordSymbols[i];
+          final keyToUse = chord.modifiedKeySignature ?? _getCurrentKeySignature();
+          final romanNumeral = chord.getRomanNumeralWithKey(keyToUse);
           final quality = chord.getQualitySuperscript();
           return quality.isNotEmpty ? '$romanNumeral$quality' : romanNumeral;
         })
@@ -769,16 +1309,39 @@ class _SongViewerScreenState extends State<SongViewerScreen>
       return const SizedBox.shrink();
     }
 
+    final theme = Theme.of(context);
+    final primaryColor = theme.colorScheme.primary;
+
     return Container(
       margin: const EdgeInsets.all(16),
-      child: ElevatedButton.icon(
-        onPressed: _showCreateChordProgressionDialog,
-        icon: const Icon(Icons.add),
-        label: Text('Create Practice Item (${_selectedChordIndices.length} chords selected)'),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.blue,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      child: GestureDetector(
+        onTap: _showCreateChordProgressionDialog,
+        child: ClayContainer(
+          color: primaryColor,
+          borderRadius: 20,
+          depth: 15,
+          spread: 4,
+          curveType: CurveType.none,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.add,
+                  color: Colors.white,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Create Practice Item (${_selectedChordIndices.length} chords selected)',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -791,23 +1354,48 @@ class _SongViewerScreenState extends State<SongViewerScreen>
       return const SizedBox.shrink();
     }
 
+    final theme = Theme.of(context);
+    final tertiaryColor = theme.colorScheme.tertiary;
+
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.all(16),
-      child: ElevatedButton.icon(
-        onPressed: _showCreateGeneralPracticeItemDialog,
-        icon: const Icon(Icons.add),
-        label: const Text('Add Practice Item'),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.orange,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 12),
+      child: GestureDetector(
+        onTap: _showCreateGeneralPracticeItemDialog,
+        child: ClayContainer(
+          color: tertiaryColor,
+          borderRadius: 20,
+    
+          curveType: CurveType.convex,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.add,
+                  color: Colors.white,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Add Practice Item',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 
   void _togglePlayback() {
+    // Metronome temporarily disabled - add proper audio assets to enable
+    print('Metronome playback disabled');
+    /*
     setState(() {
       _isPlaying = !_isPlaying;
       if (_isPlaying) {
@@ -816,9 +1404,13 @@ class _SongViewerScreenState extends State<SongViewerScreen>
         _metronome.pause();
       }
     });
+    */
   }
 
   void _restartPlayback() {
+    // Metronome temporarily disabled
+    print('Metronome restart disabled');
+    /*
     if (_isPlaying) {
       _metronome.pause();
     }
@@ -831,19 +1423,26 @@ class _SongViewerScreenState extends State<SongViewerScreen>
         _metronome.play();
       }
     });
+    */
+    setState(() {
+      _songBeatCounter = 0;
+      _currentChordIndex = 0;
+      _currentBeatInMeasure = 0;
+      _userInputBeats.clear();
+    });
   }
 
   void _changeBpm(int delta) {
     setState(() {
       _currentBpm = (_currentBpm + delta).clamp(40, 300);
-      _metronome.setBPM(_currentBpm);
+      // _metronome.setBPM(_currentBpm); // Disabled
     });
   }
 
   void _jumpToChord(int index) {
     double newSongBeatCounter = 0;
     for (int i = 0; i < index; i++) {
-      newSongBeatCounter += _chords[i].durationBeats ?? 0;
+      newSongBeatCounter += _chordSymbols[i].durationBeats ?? 0;
     }
 
     _songBeatCounter = newSongBeatCounter.floor();
@@ -867,7 +1466,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
 
 
   bool _updateCurrentChordBasedOnBeat() {
-    if (_chords.isEmpty) return false;
+    if (_chordSymbols.isEmpty) return false;
 
     double cumulativeBeats = 0;
     int newChordIndex = 0;
@@ -879,8 +1478,8 @@ class _SongViewerScreenState extends State<SongViewerScreen>
       _songBeatCounter = 1; // Loop back to the beginning
     }
 
-    for (int i = 0; i < _chords.length; i++) {
-      cumulativeBeats += _chords[i].durationBeats ?? 0;
+    for (int i = 0; i < _chordSymbols.length; i++) {
+      cumulativeBeats += _chordSymbols[i].durationBeats ?? 0;
       if (_songBeatCounter <= cumulativeBeats) {
         newChordIndex = i;
         found = true;
@@ -913,91 +1512,101 @@ class _SongViewerScreenState extends State<SongViewerScreen>
       return const SizedBox.shrink();
     }
 
+    final theme = Theme.of(context);
+    final primaryColor = theme.colorScheme.primary;
+    final secondaryColor = theme.colorScheme.secondary;
+    final surfaceColor = theme.colorScheme.surface;
+
     return Container(
-      height: 160, // Increased height to accommodate larger text and more lines
-      margin: const EdgeInsets.symmetric(vertical: 16),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade900.withOpacity(0.8),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade700),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Text(
-              'Practice Items',
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
+      height: 160,
+      margin: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+      child: ClayContainer(
+        color: surfaceColor,
+        borderRadius: 15,
+        depth: 12,
+        spread: 3,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Text(
+                'Practice Items',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: primaryColor,
+                ),
               ),
             ),
-          ),
-          Expanded(
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              itemCount: widget.practiceArea!.practiceItems.length,
-              itemBuilder: (context, index) {
-                final practiceItem = widget.practiceArea!.practiceItems[index];
-                return GestureDetector(
-                  onTap: () async {
-                    // Start a practice session for this item
-                    await Navigator.of(context).push(
-                      CupertinoPageRoute(
-                        builder: (_) => PracticeSessionScreen(
-                          practiceItem: practiceItem,
+            Expanded(
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                itemCount: widget.practiceArea!.practiceItems.length,
+                itemBuilder: (context, index) {
+                  final practiceItem = widget.practiceArea!.practiceItems[index];
+                  return GestureDetector(
+                    onTap: () async {
+                      // Start a practice session for this item
+                      await Navigator.of(context).push(
+                        CupertinoPageRoute(
+                          builder: (_) => PracticeSessionScreen(
+                            practiceItem: practiceItem,
+                          ),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      width: 200,
+                      margin: const EdgeInsets.only(right: 12, bottom: 12),
+                      child: ClayContainer(
+                        color: secondaryColor,
+                        borderRadius: 12,
+                        depth: 8,
+                        spread: 2,
+                        curveType: CurveType.none,
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                practiceItem.name,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                softWrap: true,
+                              ),
+                              if (practiceItem.description.isNotEmpty) ...[
+                                const SizedBox(height: 6),
+                                Text(
+                                  practiceItem.description,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.white,
+                                  ),
+                                  maxLines: 3,
+                                  overflow: TextOverflow.ellipsis,
+                                  softWrap: true,
+                                ),
+                              ],
+                            ],
+                          ),
                         ),
                       ),
-                    );
-                  },
-                  child: Container(
-                    width: 200, // Increased width for better text display
-                    margin: const EdgeInsets.only(right: 12, bottom: 12),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.shade800.withOpacity(0.7),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.blue.shade600),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          practiceItem.name,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                          maxLines: 2, // Allow 2 lines for practice item names
-                          overflow: TextOverflow.ellipsis,
-                          softWrap: true, // Enable soft wrapping
-                        ),
-                        if (practiceItem.description.isNotEmpty) ...[
-                          const SizedBox(height: 6),
-                          Text(
-                            practiceItem.description,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Colors.white70,
-                            ),
-                            maxLines: 3, // Allow more lines for description
-                            overflow: TextOverflow.ellipsis,
-                            softWrap: true, // Enable soft wrapping
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1008,8 +1617,6 @@ class _SongViewerScreenState extends State<SongViewerScreen>
     final primaryColor = theme.colorScheme.primary;
     final surfaceColor = theme.colorScheme.surface;
     final onSurfaceColor = theme.colorScheme.onSurface;
-    final secondaryColor = theme.colorScheme.secondary;
-    
     if (_isLoading) {
       return Scaffold(
         backgroundColor: Colors.white,
@@ -1029,7 +1636,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
       );
     }
 
-    if (_chords.isEmpty) {
+    if (_chordSymbols.isEmpty) {
       return Scaffold(
         backgroundColor: Colors.white,
         appBar: AppBar(
@@ -1045,14 +1652,20 @@ class _SongViewerScreenState extends State<SongViewerScreen>
       );
     }
 
-    int lastMeasure = -1;
-
       return Scaffold(
+        backgroundColor: Colors.white,
         appBar: AppBar(
-          title: Text(_songTitle, style: const TextStyle(fontSize: 18)),
+          title: Text(
+            _songTitle,
+            style: TextStyle(
+              fontSize: 18,
+              color: onSurfaceColor,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           elevation: 0,
-          backgroundColor: Colors.transparent,
-          foregroundColor: Colors.black,
+          backgroundColor: surfaceColor,
+          iconTheme: IconThemeData(color: onSurfaceColor),
         ),
         body: GestureDetector(
           onTap: _handleTapOutside, // Clear selection when tapping anywhere outside chords
@@ -1063,55 +1676,145 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                 children: [
                   const SizedBox(height: 16),
                   // Key signature controls
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Column(
-                        children: [
-                          _buildKeyModeButtons(),
-                          const SizedBox(height: 8),
-                          _buildCurrentKeyIndicator(),
-                        ],
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 16),
+                    child: ClayContainer(
+                      color: surfaceColor,
+                      borderRadius: 20,
+                      depth: 10,
+                      spread: 3,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Column(
+                              children: [
+                                _buildKeyModeButtons(),
+                                const SizedBox(height: 8),
+                                _buildCurrentKeyIndicator(),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
-                    ],
+                    ),
                   ),
                   // Add the dial menu widget below the key indicator
                   _buildDialMenuWidget(),
                   const SizedBox(height: 20),
                   // Playback controls
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      // BPM Controls
-                      IconButton(
-                          icon: const Icon(Icons.remove),
-                          onPressed: () => _changeBpm(-5)),
-                      Text('$_currentBpm BPM',
-                          style: const TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.bold)),
-                      IconButton(
-                          icon: const Icon(Icons.add),
-                          onPressed: () => _changeBpm(5)),
-                      const SizedBox(width: 16),
-                      Text(_timeSignature,
-                          style: const TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.bold)),
-                      const Spacer(),
-                      // Playback Controls
-                      IconButton(
-                        icon: const Icon(Icons.replay),
-                        iconSize: 32,
-                        onPressed: _restartPlayback,
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 16),
+                    child: ClayContainer(
+                      color: surfaceColor,
+                      borderRadius: 20,
+                      depth: 10,
+                      spread: 3,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            // BPM Controls
+                            ClayContainer(
+                              color: surfaceColor,
+                              borderRadius: 15,
+                              depth: 5,
+                              spread: 1,
+                              curveType: CurveType.concave,
+                              child: IconButton(
+                                icon: Icon(Icons.remove, color: primaryColor),
+                                onPressed: () => _changeBpm(-5),
+                              ),
+                            ),
+                            Text(
+                              '$_currentBpm BPM',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: onSurfaceColor,
+                              ),
+                            ),
+                            ClayContainer(
+                              color: surfaceColor,
+                              borderRadius: 15,
+                              depth: 5,
+                              spread: 1,
+                              curveType: CurveType.concave,
+                              child: IconButton(
+                                icon: Icon(Icons.add, color: primaryColor),
+                                onPressed: () => _changeBpm(5),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Text(
+                              _timeSignature,
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: onSurfaceColor,
+                              ),
+                            ),
+                            const Spacer(),
+                            // Playback Controls
+                            ClayContainer(
+                              color: surfaceColor,
+                              borderRadius: 20,
+                              depth: 8,
+                              spread: 2,
+                              curveType: CurveType.concave,
+                              child: IconButton(
+                                icon: Icon(Icons.replay, color: primaryColor),
+                                iconSize: 32,
+                                onPressed: _restartPlayback,
+                              ),
+                            ),
+                            ClayContainer(
+                              color: primaryColor,
+                              borderRadius: 25,
+                              depth: 12,
+                              spread: 3,
+                              curveType: _isPlaying ? CurveType.concave : CurveType.none,
+                              child: IconButton(
+                                icon: Icon(
+                                  _isPlaying
+                                      ? Icons.pause_circle_filled
+                                      : Icons.play_circle_filled,
+                                  color: Colors.white,
+                                ),
+                                iconSize: 48,
+                                onPressed: _togglePlayback,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      IconButton(
-                        icon: Icon(_isPlaying
-                            ? Icons.pause_circle_filled
-                            : Icons.play_circle_filled),
-                        iconSize: 48,
-                        onPressed: _togglePlayback,
-                      ),
-                    ],
+                    ),
                   ),
+                  const SizedBox(height: 20),
+                  // Sheet Music Display with Canvas-based Chord Symbols
+                  if (_chordMeasures.isNotEmpty)
+                    Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 16),
+                      child: ClayContainer(
+                        color: surfaceColor,
+                        borderRadius: 20,
+                        depth: 10,
+                        spread: 3,
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: SimpleSheetMusic(
+                            measures: _chordMeasures,
+                            width: MediaQuery.of(context).size.width - 64, // Account for margins and padding
+                            height: 600, // Increased height to accommodate 3 lines of music (12 measures)
+                            onLayoutReady: (layout) {
+                              // Handle layout ready callback if needed
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: 20),
                   // Chord progression creation button (appears when chords are selected)
                   _buildChordProgressionButton(),
@@ -1119,173 +1822,41 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                   if (_selectedChordIndices.isEmpty && !_isLongPressing)
                     Container(
                       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.blue.shade200),
-                      ),
-                      child: Column(
-                        children: [
-                          Row(
+                      child: ClayContainer(
+                        color: primaryColor.withOpacity(0.1),
+                        borderRadius: 12,
+                        depth: 8,
+                        spread: 2,
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
                             children: [
-                              Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  'Long press and drag across chord symbols to select a progression',
-                                  style: TextStyle(
-                                    color: Colors.blue.shade700,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Click and drag across chord symbols to select multiple chords',
-                            style: TextStyle(
-                              color: Colors.grey.shade600,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  // Chord symbols display with selection support
-                  Wrap(
-                    spacing: 8.0,
-                    runSpacing: 16.0,
-                    children: _chords.asMap().entries.map((entry) {
-                        final index = entry.key;
-                        final chord = entry.value;
-                        final isNonDiatonic = !chord.isDiatonicTo(_getCurrentKeySignature());
-                        final isSelected = _selectedChordIndices.contains(index);
-                        
-                        bool isNewMeasure = false;
-                        if (chord.measureNumber != lastMeasure) {
-                          isNewMeasure = true;
-                          lastMeasure = chord.measureNumber ?? 0;
-                        }
-
-                        return MouseRegion(
-                          onEnter: (_) => _onChordHover(index),
-                          child: GestureDetector(
-                            onTap: () {
-                              if (isNonDiatonic) {
-                              // Show dial menu for non-diatonic chords
-                              _showDialMenuWidget([index]);
-                            } else if (_selectedChordIndices.isEmpty) {
-                              // Regular jump to chord behavior only when no selection is active
-                              _jumpToChord(index);
-                            }
-                            // If there's an active selection, tapping clears it
-                            else {
-                              _clearChordSelection();
-                            }
-                          },
-                          onLongPress: () {
-                            // Start long press selection for any chord (diatonic or non-diatonic)
-                            _startLongPressSelection(index);
-                          },
-                          onLongPressEnd: (details) {
-                            // Handle long press end for any chord
-                            if (!_isDragging) {
-                              _cancelSelection();
-                            } else {
-                              _endChordSelection();
-                            }
-                          },
-                          child: AnimatedScale(
-                            scale: _animatingChordIndex == index ? 1.2 : 1.0,
-                            duration: const Duration(milliseconds: 150),
-                            child: AnimatedContainer(
-                              key: index < _chordGlobalKeys.length ? _chordGlobalKeys[index] : null,
-                              duration: const Duration(milliseconds: 150),
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? Colors.green.shade100 // Highlight selected chords (priority)
-                                    : index == _currentChordIndex
-                                        ? Colors.blue.shade100 // Current playing chord
-                                        : isNonDiatonic
-                                            ? Colors.orange.shade100.withOpacity(0.7) // Highlight non-diatonic
-                                            : Colors.transparent,
-                                borderRadius: BorderRadius.circular(4),
-                                border: isNewMeasure
-                                    ? const Border(
-                                        left: BorderSide(
-                                            color: Colors.black, width: 1.5))
-                                    : isSelected
-                                        ? Border.all(color: Colors.green, width: 2.0) // Selected border
-                                        : isNonDiatonic
-                                            ? Border.all(color: Colors.orange.shade400, width: 1.5)
-                                            : null,
-                                boxShadow: _animatingChordIndex == index
-                                    ? [
-                                        BoxShadow(
-                                          color: Colors.blue.withOpacity(0.5),
-                                          blurRadius: 8,
-                                          spreadRadius: 2,
-                                        )
-                                      ]
-                                    : null,
-                              ),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
+                              Row(
                                 children: [
-                                  RichText(
-                                    text: TextSpan(
-                                      children: [
-                                        TextSpan(
-                                          text: chord.getRomanNumeralWithKey(_getCurrentKeySignature()),
-                                          style: TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.normal,
-                                              color: isSelected 
-                                                  ? Colors.green.shade700
-                                                  : isNonDiatonic ? Colors.orange.shade700 : Colors.blue),
-                                        ),
-                                        if (chord.getQualitySuperscript().isNotEmpty)
-                                          TextSpan(
-                                            text: chord.getQualitySuperscript(),
-                                            style: TextStyle(
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.normal,
-                                                color: isSelected 
-                                                    ? Colors.green.shade700
-                                                    : isNonDiatonic ? Colors.orange.shade700 : Colors.blue),
-                                          ),
-                                      ],
-                                    ),
+                                  Icon(
+                                    Icons.info_outline,
+                                    color: Colors.white70,
+                                    size: 20,
                                   ),
-                                  RichText(
-                                    text: TextSpan(
-                                      children: chord.getFormattedChordSymbol().map((span) {
-                                        return TextSpan(
-                                          text: span.text,
-                                          style: span.style?.copyWith(
-                                            color: isSelected 
-                                                ? Colors.green.shade800
-                                                : isNonDiatonic ? Colors.orange.shade800 : Colors.white,
-                                          ),
-                                        );
-                                      }).toList(),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'Long press and drag across chord symbols to select a progression',
+                                      style: TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
+                                      ),
                                     ),
                                   ),
                                 ],
                               ),
-                            ),
+                            ],
                           ),
-                        ), // GestureDetector  
-                      ); // MouseRegion
-                      }).toList(),
-                  ), // Wrap
-                  const SizedBox(height: 24),
-                  // Beat timeline - positioned right after chord symbols
+                        ),
+                      ),
+                    ),
+                  // Beat timeline - positioned right after sheet music
                   Center(
                     child: SizedBox(
                       width: MediaQuery.of(context).size.width * 0.8,
@@ -1304,6 +1875,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                   _buildPracticeItemsWidget(),
                   // General practice item button (always shown)
                   _buildGeneralPracticeItemButton(),
+                  
                   const SizedBox(height: 20), // Bottom padding for scroll
                 ],
               ),

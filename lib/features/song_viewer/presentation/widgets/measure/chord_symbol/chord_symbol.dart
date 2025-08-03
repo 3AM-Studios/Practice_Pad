@@ -1,5 +1,8 @@
 import 'package:simple_sheet_music/simple_sheet_music.dart';
 import 'package:flutter/material.dart';
+import 'package:clay_containers/clay_containers.dart';
+import 'dart:math' as math;
+import 'package:simple_sheet_music/src/constants.dart';
 
 /// Represents a chord symbol with Roman numeral analysis capability and MusicXML support.
 /// 
@@ -827,5 +830,243 @@ class ChordSymbol {
         : '$roman^$qualitySuperscript';
     
     return '${effectiveRootName}${effectiveQuality}\n$romanWithQuality';
+  }
+
+  /// Renders the chord symbol directly on canvas above a measure
+  void render(Canvas canvas, Size size, double measureOriginX, double staffLineCenterY, double measureWidth) {
+    // Position chord symbol above the staff
+    final chordY = staffLineCenterY - (Constants.staffSpace * 6);
+    
+    // Center the chord symbol horizontally in the measure
+    final chordX = measureOriginX + (measureWidth / 2);
+    
+    // Create the chord symbol text
+    final chordText = '${effectiveRootName}${effectiveQuality}';
+    final romanText = getRomanNumeral();
+    
+    // Create text painter for chord symbol
+    final chordTextPainter = TextPainter(
+      text: TextSpan(
+        text: chordText,
+        style: const TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    
+    chordTextPainter.layout();
+    
+    // Create text painter for Roman numeral
+    final romanTextPainter = TextPainter(
+      text: TextSpan(
+        text: romanText + getQualitySuperscript(),
+        style: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: Colors.white,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    
+    romanTextPainter.layout();
+    
+    // Calculate container size
+    final containerWidth = math.max(chordTextPainter.width, romanTextPainter.width) + 24;
+    final containerHeight = chordTextPainter.height + romanTextPainter.height + 16;
+    
+    // Draw the clay container background
+    final containerRect = Rect.fromCenter(
+      center: Offset(chordX, chordY),
+      width: containerWidth,
+      height: containerHeight,
+    );
+    
+    final paint = Paint()
+      ..color = Colors.orange.withOpacity(0.8) // Non-diatonic color for now
+      ..style = PaintingStyle.fill;
+    
+    final rrect = RRect.fromRectAndRadius(containerRect, const Radius.circular(12));
+    canvas.drawRRect(rrect, paint);
+    
+    // Draw border
+    final borderPaint = Paint()
+      ..color = Colors.orange.shade700
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+    
+    canvas.drawRRect(rrect, borderPaint);
+    
+    // Draw Roman numeral text (top)
+    final romanOffset = Offset(
+      chordX - (romanTextPainter.width / 2),
+      chordY - (containerHeight / 2) + 8,
+    );
+    romanTextPainter.paint(canvas, romanOffset);
+    
+    // Draw chord symbol text (bottom)
+    final chordOffset = Offset(
+      chordX - (chordTextPainter.width / 2),
+      chordY - (containerHeight / 2) + 8 + romanTextPainter.height,
+    );
+    chordTextPainter.paint(canvas, chordOffset);
+  }
+
+  /// Builds a styled chord symbol widget that can be used both in lists and above measures
+  Widget buildWidget({
+    required BuildContext context,
+    required KeySignatureType currentKeySignature,
+    int? index,
+    int? currentChordIndex,
+    bool isSelected = false,
+    bool isAnimating = false,
+    bool isNewMeasure = false,
+    GlobalKey? globalKey,
+    VoidCallback? onTap,
+    VoidCallback? onLongPress,
+    void Function(LongPressEndDetails)? onLongPressEnd,
+    void Function(PointerEvent)? onHover,
+  }) {
+    final theme = Theme.of(context);
+    final primaryColor = theme.colorScheme.primary;
+    final surfaceColor = theme.colorScheme.surface;
+    final onSurfaceColor = theme.colorScheme.onSurface;
+    
+    final isNonDiatonic = modifiedKeySignature != null 
+        ? !isDiatonicTo(modifiedKeySignature!)
+        : !isDiatonicTo(currentKeySignature);
+    final isCurrentChord = index != null && currentChordIndex != null && index == currentChordIndex;
+
+    // Use the full Clay container styling for all contexts
+    return MouseRegion(
+      onEnter: onHover,
+      child: GestureDetector(
+        onTap: onTap,
+        onLongPress: onLongPress,
+        onLongPressEnd: onLongPressEnd,
+        child: AnimatedScale(
+          scale: isAnimating ? 1.2 : 1.0,
+          duration: const Duration(milliseconds: 150),
+          child: _buildClayContainer(
+            globalKey: globalKey,
+            isSelected: isSelected,
+            isCurrentChord: isCurrentChord,
+            isNonDiatonic: isNonDiatonic,
+            isNewMeasure: isNewMeasure,
+            primaryColor: primaryColor,
+            surfaceColor: surfaceColor,
+            onSurfaceColor: onSurfaceColor,
+            currentKeySignature: currentKeySignature,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildClayContainer({
+    GlobalKey? globalKey,
+    required bool isSelected,
+    required bool isCurrentChord,
+    required bool isNonDiatonic,
+    required bool isNewMeasure,
+    required Color primaryColor,
+    required Color surfaceColor,
+    required Color onSurfaceColor,
+    required KeySignatureType currentKeySignature,
+  }) {
+    return ClayContainer(
+      key: globalKey,
+      color: isSelected
+          ? primaryColor // Strong primary color for selected
+          : isCurrentChord
+              ? primaryColor.withOpacity(0.3) // Light primary for current
+              : isNonDiatonic
+                  ? Colors.orange.withOpacity(0.8) // Orange for non-diatonic
+                  : surfaceColor, // Clean surface for diatonic
+      borderRadius: 12,
+      depth: isSelected ? 15 : (isNonDiatonic ? 10 : 8),
+      spread: isSelected ? 4 : 2,
+      curveType: isSelected
+          ? CurveType.concave
+          : isCurrentChord
+              ? CurveType.convex
+              : CurveType.none,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: isNewMeasure
+              ? Border(left: BorderSide(color: primaryColor, width: 3.0))
+              : isSelected
+                  ? Border.all(color: Colors.white, width: 2.0)
+                  : isNonDiatonic
+                      ? Border.all(color: Colors.orange.shade700, width: 1.5)
+                      : null,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            RichText(
+              text: TextSpan(
+                children: [
+                  TextSpan(
+                    text: modifiedKeySignature != null 
+                        ? getRomanNumeralWithKey(modifiedKeySignature!)
+                        : getRomanNumeralWithKey(currentKeySignature),
+                    style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: isSelected 
+                            ? Colors.white
+                            : isNonDiatonic
+                                ? Colors.white
+                                : isCurrentChord
+                                    ? primaryColor
+                                    : primaryColor),
+                  ),
+                  if (getQualitySuperscript().isNotEmpty)
+                    TextSpan(
+                      text: getQualitySuperscript(),
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: isSelected 
+                              ? Colors.white
+                              : isNonDiatonic
+                                  ? Colors.white
+                                  : isCurrentChord
+                                      ? primaryColor
+                                      : primaryColor),
+                    ),
+                ],
+              ),
+            ),
+            RichText(
+              text: TextSpan(
+                children: getFormattedChordSymbol().map((span) {
+                  return TextSpan(
+                    text: span.text,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: isSelected 
+                          ? Colors.white
+                          : isCurrentChord
+                              ? Colors.white
+                              : isNonDiatonic 
+                                  ? Colors.white 
+                                  : onSurfaceColor,
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

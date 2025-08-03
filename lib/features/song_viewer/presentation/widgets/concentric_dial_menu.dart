@@ -68,6 +68,8 @@ class _ConcentricDialMenuState extends State<ConcentricDialMenu> {
             innerItems: widget.innerItems,
             selectedOuterIndex: _selectedOuterIndex,
             selectedInnerIndex: _selectedInnerIndex,
+            highlightedOuterIndex: widget.highlightedOuterIndex,
+            highlightedInnerIndex: widget.highlightedInnerIndex,
             centerText: widget.centerText,
             ringSpacing: widget.ringSpacing,
             enableOuterHighlight: widget.enableOuterHighlight,
@@ -145,6 +147,8 @@ class _DialPainter extends CustomPainter {
   final List<DialItem> innerItems;
   final int? selectedOuterIndex;
   final int? selectedInnerIndex;
+  final int? highlightedOuterIndex;
+  final int? highlightedInnerIndex;
   final String? centerText;
   final double ringSpacing;
   final bool enableOuterHighlight;
@@ -156,6 +160,8 @@ class _DialPainter extends CustomPainter {
     required this.innerItems,
     this.selectedOuterIndex,
     this.selectedInnerIndex,
+    this.highlightedOuterIndex,
+    this.highlightedInnerIndex,
     this.centerText,
     required this.ringSpacing,
     required this.enableOuterHighlight,
@@ -172,10 +178,10 @@ class _DialPainter extends CustomPainter {
     final innerButtonRadius = buttonRadius * innerButtonScale; // Use configurable scale
 
     // Draw outer ring first
-    _drawRing(canvas, center, outerRadius, outerItems, enableOuterHighlight ? selectedOuterIndex : null, buttonRadius, true);
+    _drawRing(canvas, center, outerRadius, outerItems, enableOuterHighlight ? highlightedOuterIndex : null, buttonRadius, true);
     
     // Draw inner buttons at the calculated inner radius position
-    _drawRing(canvas, center, innerRadius, innerItems, enableInnerHighlight ? selectedInnerIndex : null, innerButtonRadius, false);
+    _drawRing(canvas, center, innerRadius, innerItems, enableInnerHighlight ? highlightedInnerIndex : null, innerButtonRadius, false);
     
     // Draw center text if provided
     if (centerText != null && centerText!.isNotEmpty) {
@@ -223,59 +229,30 @@ class _DialPainter extends CustomPainter {
       
       canvas.drawCircle(itemCenter, buttonRadius, paint);
       
-      // Only draw icon if it exists
-      if (items[i].icon != null) {
-        TextPainter iconPainter = TextPainter(
-          textDirection: TextDirection.ltr,
-          text: TextSpan(
-            text: String.fromCharCode(items[i].icon!.codePoint),
-            style: TextStyle(
-              color: (i == selectedIndex) ? Colors.white : Colors.black,
-              fontSize: buttonRadius * 0.8,
-              fontFamily: items[i].icon!.fontFamily,
-              package: items[i].icon!.fontPackage,
-            ),
+      // Draw text label (for key names, always show the label)
+      String displayText = items[i].label;
+      
+      TextPainter labelPainter = TextPainter(
+        textDirection: TextDirection.ltr,
+        text: TextSpan(
+          text: displayText,
+          style: TextStyle(
+            color: (i == selectedIndex) 
+              ? Colors.white 
+              : (isOuterRing ? Colors.black : Colors.white), // White text for dark inner buttons
+            fontSize: isOuterRing ? buttonRadius * 0.3 : buttonRadius * 0.25, // Appropriate size for key names
+            fontWeight: FontWeight.bold,
           ),
-        );
-        iconPainter.layout();
-        iconPainter.paint(
-          canvas, 
-          Offset(
-            itemCenter.dx - iconPainter.width / 2,
-            itemCenter.dy - iconPainter.height / 2,
-          ),
-        );
-      } else {
-        // Draw text label instead of icon
-        String displayText = items[i].label;
-        
-        // For inner ring (minus buttons), always show minus symbol
-        if (!isOuterRing) {
-          displayText = '-';
-        }
-        
-        TextPainter labelPainter = TextPainter(
-          textDirection: TextDirection.ltr,
-          text: TextSpan(
-            text: displayText,
-            style: TextStyle(
-              color: (i == selectedIndex) 
-                ? Colors.white 
-                : (isOuterRing ? Colors.black : Colors.white), // White text for dark inner buttons
-              fontSize: isOuterRing ? buttonRadius * 0.3 : buttonRadius * 0.5, // Larger minus text
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        );
-        labelPainter.layout();
-        labelPainter.paint(
-          canvas, 
-          Offset(
-            itemCenter.dx - labelPainter.width / 2,
-            itemCenter.dy - labelPainter.height / 2,
-          ),
-        );
-      }
+        ),
+      );
+      labelPainter.layout();
+      labelPainter.paint(
+        canvas, 
+        Offset(
+          itemCenter.dx - labelPainter.width / 2,
+          itemCenter.dy - labelPainter.height / 2,
+        ),
+      );
       
       // Draw outer text if this is the outer ring and outer text is provided
       if (isOuterRing && items[i].outerText != null && items[i].outerText!.isNotEmpty) {

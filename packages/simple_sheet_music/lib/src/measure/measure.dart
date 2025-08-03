@@ -17,11 +17,15 @@ class Measure {
   ///
   /// The [musicalSymbols] parameter is a list of musical symbols that make up the measure.
   /// The [isNewLine] parameter indicates whether the measure is a new line in the sheet music.
+  /// The [chordSymbol] parameter is an optional chord symbol to display above the measure.
+  /// The [chordSymbols] parameter is an optional list of chord symbols to display above the measure.
   ///
   /// Throws an [AssertionError] if the [musicalSymbols] list is empty.
   const Measure(
     this.musicalSymbols, {
     this.isNewLine = false,
+    this.chordSymbol,
+    this.chordSymbols,
   }) : assert(musicalSymbols.length != 0);
 
   /// The list of musical symbols that make up the measure.
@@ -29,6 +33,20 @@ class Measure {
 
   /// Indicates whether the measure is a new line in the sheet music.
   final bool isNewLine;
+
+  /// Optional chord symbol to display above this measure (legacy single chord support).
+  final dynamic chordSymbol; // Using dynamic to avoid import dependencies
+
+  /// Optional list of chord symbols to display above this measure (supports multiple chords).
+  final List<dynamic>? chordSymbols; // Using dynamic to avoid import dependencies
+
+  /// Gets all chord symbols for this measure (combines single and multiple chord support)
+  List<dynamic> get allChordSymbols {
+    final symbols = <dynamic>[];
+    if (chordSymbol != null) symbols.add(chordSymbol);
+    if (chordSymbols != null) symbols.addAll(chordSymbols!);
+    return symbols;
+  }
 
   /// Sets the context for the measure and returns a list of musical symbol metrics.
   ///

@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:simple_sheet_music/src/constants.dart';
 import 'package:simple_sheet_music/src/extension/list_extension.dart';
 import 'package:simple_sheet_music/src/glyph_metadata.dart';
 import 'package:simple_sheet_music/src/measure/measure_renderer.dart';
@@ -16,10 +17,13 @@ class MeasureMetrics {
   /// for the measure.
   ///
   /// The [isNewLine] parameter indicates whether a line break should occur in this measure.
+  /// 
+  /// The [chordSymbols] parameter is a list of chord symbols to display above the measure.
   const MeasureMetrics(
     this.musicalSymbolsMetricses,
     this.metadata, {
     required this.isNewLine,
+    this.chordSymbols = const [],
   });
 
   /// The list of [MusicalSymbolMetrics] representing the metrics of each musical
@@ -32,9 +36,13 @@ class MeasureMetrics {
   /// Indicates whether a line break should occur in this measure.
   final bool isNewLine;
 
+  /// List of chord symbols to display above this measure.
+  final List<dynamic> chordSymbols;
+
   /// Gets the total width of all the musical symbols in the measure.
   double get objectsWidth =>
-      musicalSymbolsMetricses.map((symbol) => symbol.width).sum;
+      musicalSymbolsMetricses.map((symbol) => symbol.width).sum + 
+      Constants.staffSpace * 0.4; // Add space for bar line and margins
 
   /// Gets the maximum upper height among all the musical symbols in the measure.
   double get _symbolMaximumUpperHeight =>
@@ -44,7 +52,12 @@ class MeasureMetrics {
   double get _measureUpperHeight => metadata.measureUpperHeight;
 
   /// Returns the maximum height of the measure upper part.
-  double get upperHeight => max(_symbolMaximumUpperHeight, _measureUpperHeight);
+  /// If there are chord symbols, add extra height for them.
+  double get upperHeight {
+    final baseHeight = max(_symbolMaximumUpperHeight, _measureUpperHeight);
+    // Add extra height if there are chord symbols (about 2.5 staff spaces)
+    return chordSymbols.isNotEmpty ? baseHeight + (Constants.staffSpace * 2.5) : baseHeight;
+  }
 
   /// Gets the maximum lower height among all the musical symbols in the measure.
   double get _symbolMaximumLowerHeight =>
@@ -86,6 +99,7 @@ class MeasureMetrics {
         layout,
         measureOriginX: measureInitialX,
         staffLineCenterY: staffLineCenterY,
+        chordSymbols: chordSymbols,
       );
 
   List<MusicalSymbolRenderer> _symbolRenderers(

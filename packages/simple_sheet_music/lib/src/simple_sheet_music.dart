@@ -3,6 +3,7 @@ import 'dart:core';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:simple_sheet_music/src/constants.dart';
 import 'package:simple_sheet_music/src/glyph_metadata.dart';
 import 'package:simple_sheet_music/src/glyph_path.dart';
 import 'package:simple_sheet_music/src/measure/measure.dart';
@@ -108,25 +109,16 @@ class SimpleSheetMusicState extends State<SimpleSheetMusic> {
           metadata,
           glyphPath,
         );
-        layout = SheetMusicLayout(
+        final layout = SheetMusicLayout(
           metricsBuilder,
           widget.lineColor,
           widgetWidth: widget.width,
           widgetHeight: widget.height,
         );
 
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          widget.onLayoutReady(layout!);
-        });
-
-        return GestureDetector(
-          onTap: () {
-            // print('Tapped');
-          },
-          child: CustomPaint(
-            size: targetSize,
-            painter: SheetMusicRenderer(layout!),
-          ),
+        return CustomPaint(
+          size: targetSize,
+          painter: SheetMusicRenderer(layout),
         );
       },
     );
