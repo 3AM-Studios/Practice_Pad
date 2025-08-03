@@ -14,6 +14,11 @@ class SheetMusicRenderer extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(SheetMusicRenderer oldDelegate) => 
-    oldDelegate.sheetMusicLayout != sheetMusicLayout;
+  bool shouldRepaint(SheetMusicRenderer oldDelegate) {
+    // Only repaint if the layout has actually changed, not just on scroll
+    return oldDelegate.sheetMusicLayout != sheetMusicLayout ||
+           oldDelegate.sheetMusicLayout.metrics != sheetMusicLayout.metrics ||
+           oldDelegate.sheetMusicLayout.canvasScale != sheetMusicLayout.canvasScale ||
+           oldDelegate.sheetMusicLayout.lineColor != sheetMusicLayout.lineColor;
+  }
 }

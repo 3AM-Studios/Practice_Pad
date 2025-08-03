@@ -38,6 +38,9 @@ class SheetMusicLayout {
   /// Callback for registering the position of symbols
   final SymbolPositionCallback? symbolPositionCallback;
 
+  /// Cached staff renderers for performance optimization
+  List<StaffRenderer>? _cachedStaffRenderers;
+
   /// The maximum width of a staff.
   double get _maximumStaffWidth => metrics.maximumStaffWidth;
 
@@ -66,20 +69,25 @@ class SheetMusicLayout {
   double get _upperPaddingOnCanvas => _verticalPaddingOnCanvas / 2;
 
   /// The list of staff renderers.
-  /// The list of staff renderers.
+  /// Uses caching for performance optimization.
 List<StaffRenderer> get staffRenderers {
+  // Return cached renderers if available
+  if (_cachedStaffRenderers != null) {
+    return _cachedStaffRenderers!;
+  }
+  
+  // Generate and cache staff renderers
   var currentY = _upperPaddingOnCanvas;
-  return metrics.staffsMetricses.asMap().entries.map((entry) {
+  _cachedStaffRenderers = metrics.staffsMetricses.asMap().entries.map((entry) {
     final staffMetrics = entry.value;
     
     // Add extra spacing only when the first measure in this staff starts a new line
-        // Add extra spacing for all lines after the first
+    // Add extra spacing for all lines after the first
     if (entry.key > 0 && entry.value.measuresMetricses.any((m) => m.isNewLine)) {
       currentY += Constants.staffLineSpacing * 2; // Double the spacing, or use a custom multiplier
     } else {
       currentY += Constants.staffLineSpacing;
     }
-    
     
     currentY += staffMetrics.upperHeight;
     final staffRenderer = staffMetrics.renderer(
@@ -91,6 +99,8 @@ List<StaffRenderer> get staffRenderers {
     currentY += staffMetrics.lowerHeight;
     return staffRenderer;
   }).toList();
+  
+  return _cachedStaffRenderers!;
 }
   /// The sum of the heights of all the staffs.
   double get _staffsHeightsSum => metrics.staffsHeightSum;
@@ -127,5 +137,34 @@ List<StaffRenderer> get staffRenderers {
     for (final staff in staffRenderers) {
       staff.render(canvas, size);
     }
+  }
+
+  /// Clear the cached staff renderers to force regeneration.
+  /// Call this when layout parameters change.
+  void clearCache() {
+    _cachedStaffRenderers = null;
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! SheetMusicLayout) return false;
+    
+    return other.widgetHeight == widgetHeight &&
+           other.widgetWidth == widgetWidth &&
+           other.lineColor == lineColor &&
+           other.debug == debug &&
+           other.metrics == metrics;
+  }
+
+  @override
+  int get hashCode {
+    return Object.hash(
+      widgetHeight,
+      widgetWidth,
+      lineColor,
+      debug,
+      metrics,
+    );
   }
 }

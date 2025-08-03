@@ -99,7 +99,10 @@ class SimpleSheetMusicState extends State<SimpleSheetMusic>
   late final GlyphPaths glyphPath;
   late final GlyphMetadata metadata;
   late final Future<void> _future;
-  late SheetMusicLayout? _layout;
+  SheetMusicLayout? _layout; // Remove 'late' keyword since it can be null initially
+  
+  // Cache key to track layout changes
+  String? _lastLayoutKey;
 
   FontType get fontType => widget.fontType;
 
@@ -168,54 +171,87 @@ class SimpleSheetMusicState extends State<SimpleSheetMusic>
           return const Center(child: CircularProgressIndicator());
         }
 
-        final metricsBuilder = SheetMusicMetrics(
-          widget.measures,
-          widget.initialClefType,
-          widget.initialKeySignatureType,
-          widget.initialTimeSignatureType,
-          metadata,
-          glyphPath,
-          tempo: widget.tempo,
-        );
+        // Create layout key to detect changes
+        final layoutKey = '${widget.measures.length}_${widget.width}_${widget.height}_${widget.initialClefType}_${widget.initialKeySignatureType}_${widget.initialTimeSignatureType}';
+        
+        // Only rebuild layout if parameters have changed
+        if (_layout == null || _lastLayoutKey != layoutKey) {
+          final metricsBuilder = SheetMusicMetrics(
+            widget.measures,
+            widget.initialClefType,
+            widget.initialKeySignatureType,
+            widget.initialTimeSignatureType,
+            metadata,
+            glyphPath,
+            tempo: widget.tempo,
+          );
 
-        _layout = SheetMusicLayout(
-          metricsBuilder,
-          widget.lineColor,
-          widgetWidth: widget.width,
-          widgetHeight: widget.height,
-          symbolPositionCallback: registerSymbolPosition,
-          debug: widget.debug,
-        );
+          _layout = SheetMusicLayout(
+            metricsBuilder,
+            widget.lineColor,
+            widgetWidth: widget.width,
+            widgetHeight: widget.height,
+            symbolPositionCallback: registerSymbolPosition,
+            debug: widget.debug,
+          );
+
+          // Clear cache if layout changed to ensure fresh rendering
+          _layout!.clearCache();
+          _lastLayoutKey = layoutKey;
+        }
+
+        // Ensure layout is not null before proceeding
+        final currentLayout = _layout;
+        if (currentLayout == null) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
         // Create the sheet music renderer without highlighting
-        final renderer = SheetMusicRenderer(_layout!);
+        final renderer = SheetMusicRenderer(currentLayout);
 
         return SingleChildScrollView(
           scrollDirection: Axis.vertical,
+          physics: const BouncingScrollPhysics(
+            parent: AlwaysScrollableScrollPhysics(),
+          ),
           child: SizedBox(
             width: widget.width,
-            height: _layout!.totalContentHeight, // Use calculated content height
+            height: currentLayout.totalContentHeight, // Use calculated content height
             child: Stack(
               children: [
                 // The sheet music is rendered once and doesn't change
-                GestureDetector(
-                  onTapDown: _handleTap,
-                  child: CustomPaint(
-                    size: Size(widget.width, _layout!.totalContentHeight), // Use content height
-                    painter: renderer,
+                // Wrap in RepaintBoundary for optimal scrolling performance
+                RepaintBoundary(
+                  key: const ValueKey('sheet_music_canvas'),
+                  child: GestureDetector(
+                    onTapDown: _handleTap,
+                    child: CustomPaint(
+                      size: Size(widget.width, currentLayout.totalContentHeight), // Use content height
+                      painter: renderer,
+                    ),
                   ),
                 ),
                 // Chord symbols now rendered directly in MeasureRenderer
                 // No overlay needed
                 // The overlay that highlights the current note
+                // Wrap highlight in separate RepaintBoundary since it changes frequently
                 if (highlightedSymbolId != null)
-                  HighlightOverlay(
-                    highlightedSymbolId: highlightedSymbolId!,
-                    symbolPosition: getSymbolPosition(highlightedSymbolId),
-                    highlightColor: currentHighlightColor,
-                    canvasScale: _layout!.canvasScale,
+                  RepaintBoundary(
+                    key: const ValueKey('highlight_overlay'),
+                    child: HighlightOverlay(
+                      highlightedSymbolId: highlightedSymbolId!,
+                      symbolPosition: getSymbolPosition(highlightedSymbolId),
+                      highlightColor: currentHighlightColor,
+                      canvasScale: currentLayout.canvasScale,
+                    ),
                   ),
-                ... _buildChordSymbolOverlays(context, _layout!),
+                // Chord symbol overlays wrapped in RepaintBoundary for performance
+                RepaintBoundary(
+                  key: const ValueKey('chord_symbols_overlay'),
+                  child: Stack(children: [
+                    ..._buildChordSymbolOverlays(context, currentLayout),
+                  ]),
+                ),
               ],
             ),
           ),
@@ -288,7 +324,7 @@ List<Widget> _buildChordSymbolOverlays(BuildContext context, SheetMusicLayout la
                       isSelected: false,
                       isAnimating: false,
                       isNewMeasure: false,
-                    ),
+                    ) as Widget,
                   ),
                 );
               }
