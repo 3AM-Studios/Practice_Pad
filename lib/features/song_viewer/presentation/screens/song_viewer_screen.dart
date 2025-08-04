@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:clay_containers/clay_containers.dart';
@@ -20,6 +21,7 @@ import 'package:practice_pad/models/chord_progression.dart';
 import 'package:practice_pad/widgets/active_session_banner.dart';
 import 'package:practice_pad/features/practice/presentation/pages/practice_session_screen.dart';
 import 'package:music_sheet/index.dart';
+import 'package:music_sheet/src/music_objects/interface/musical_symbol.dart';
 
 class SongViewerScreen extends StatefulWidget {
   final String songAssetPath;
@@ -1685,12 +1687,104 @@ class _SongViewerScreenState extends State<SongViewerScreen>
     });
   }
 
+  /// Inserts a musical symbol into a measure at a specific position.
+  void _insertSymbolAtPosition(MusicalSymbol symbol, int measureIndex, int positionIndex) {
+    if (measureIndex < 0 || measureIndex >= _chordMeasures.length) return;
+
+    setState(() {
+      // 1. Create a new list of measures to ensure immutability.
+      final newMeasures = List<ChordMeasure>.from(_chordMeasures);
+      final targetMeasure = newMeasures[measureIndex];
+      final newSymbols = List<MusicalSymbol>.from(targetMeasure.musicalSymbols);
+
+      if (positionIndex >= 0 && positionIndex <= newSymbols.length) {
+        newSymbols.insert(positionIndex, symbol);
+      } else {
+        newSymbols.add(symbol);
+      }
+
+      newMeasures[measureIndex] = ChordMeasure(
+        newSymbols,
+        chordSymbols: targetMeasure.chordSymbols,
+        isNewLine: targetMeasure.isNewLine,
+      );
+
+      // 2. Update state with the new list.
+      _chordMeasures = newMeasures;
+
+      // 3. Invalidate the cache.
+      _cachedSheetMusicWidget = null;
+      _lastRenderedMeasures = null;
+      print('🎵 Inserted symbol ${symbol.runtimeType} at measure $measureIndex, position $positionIndex. Invalidating cache.');
+    });
+  }
+
+  /// Updates a musical symbol in a measure at a specific position.
+  void _updateSymbolAtPosition(MusicalSymbol symbol, int measureIndex, int positionIndex) {
+    if (measureIndex < 0 || measureIndex >= _chordMeasures.length) return;
+
+    setState(() {
+      // 1. Create a new list of measures.
+      final newMeasures = List<ChordMeasure>.from(_chordMeasures);
+      final targetMeasure = newMeasures[measureIndex];
+      final newSymbols = List<MusicalSymbol>.from(targetMeasure.musicalSymbols);
+
+      if (positionIndex >= 0 && positionIndex < newSymbols.length) {
+        newSymbols[positionIndex] = symbol;
+      }
+
+      newMeasures[measureIndex] = ChordMeasure(
+        newSymbols,
+        chordSymbols: targetMeasure.chordSymbols,
+        isNewLine: targetMeasure.isNewLine,
+      );
+
+      // 2. Update state with the new list.
+      _chordMeasures = newMeasures;
+
+      // 3. Invalidate the cache.
+      _cachedSheetMusicWidget = null;
+      _lastRenderedMeasures = null;
+      print('🎵 Updated symbol at measure $measureIndex, position $positionIndex. Invalidating cache.');
+    });
+  }
+
+  /// Deletes a musical symbol from a measure at a specific position.
+  void _deleteSymbolAtPosition(int measureIndex, int positionIndex) {
+    if (measureIndex < 0 || measureIndex >= _chordMeasures.length) return;
+
+    setState(() {
+      // 1. Create a new list of measures.
+      final newMeasures = List<ChordMeasure>.from(_chordMeasures);
+      final targetMeasure = newMeasures[measureIndex];
+      final newSymbols = List<MusicalSymbol>.from(targetMeasure.musicalSymbols);
+
+      if (positionIndex >= 0 && positionIndex < newSymbols.length) {
+        newSymbols.removeAt(positionIndex);
+      }
+
+      newMeasures[measureIndex] = ChordMeasure(
+        newSymbols,
+        chordSymbols: targetMeasure.chordSymbols,
+        isNewLine: targetMeasure.isNewLine,
+      );
+
+      // 2. Update state with the new list.
+      _chordMeasures = newMeasures;
+
+      // 3. Invalidate the cache.
+      _cachedSheetMusicWidget = null;
+      _lastRenderedMeasures = null;
+      print('🎵 Deleted symbol at measure $measureIndex, position $positionIndex. Invalidating cache.');
+    });
+  }
+
   /// Builds cached sheet music widget to prevent expensive rebuilds
   Widget _buildCachedSheetMusic() {
     // Only rebuild sheet music if measures actually changed
     if (_cachedSheetMusicWidget == null || 
         _lastRenderedMeasures == null ||
-        _lastRenderedMeasures!.length != _chordMeasures.length) {
+        !listEquals(_lastRenderedMeasures, _chordMeasures)) { // Use listEquals for proper comparison
       
       _cachedSheetMusicWidget = _chordMeasures.isNotEmpty 
         ? RepaintBoundary(
@@ -1700,6 +1794,9 @@ class _SongViewerScreenState extends State<SongViewerScreen>
               measures: _chordMeasures.cast<music_sheet.Measure>(),
               debug: false, // Disable debug mode for performance
               initialKeySignatureType: _getCurrentKeySignature(), // Pass current key signature
+              onSymbolAdd: _insertSymbolAtPosition,
+              onSymbolUpdate: _updateSymbolAtPosition,
+              onSymbolDelete: _deleteSymbolAtPosition,
               // Connect chord symbol interactions to song viewer functionality
               onChordSymbolTap: _onChordSymbolTap,
               onChordSymbolLongPress: _onChordSymbolLongPress,
@@ -2247,4 +2344,4 @@ class _SongViewerScreenState extends State<SongViewerScreen>
         ), // GestureDetector
       );
   }
-}
+    }

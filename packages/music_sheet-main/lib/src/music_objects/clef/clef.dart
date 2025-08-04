@@ -7,6 +7,7 @@ import 'package:music_sheet/src/music_objects/clef/clef_type.dart';
 import 'package:music_sheet/src/music_objects/interface/musical_symbol.dart';
 import 'package:music_sheet/src/music_objects/interface/musical_symbol_metrics.dart';
 import 'package:music_sheet/src/music_objects/interface/musical_symbol_renderer.dart';
+import 'package:music_sheet/src/music_objects/notes/note_pitch.dart';
 import 'package:music_sheet/src/musical_context.dart';
 import 'package:music_sheet/src/sheet_music_layout.dart';
 
@@ -35,6 +36,18 @@ class Clef extends MusicalSymbol {
   /// The type of the clef.
   final ClefType clefType;
 
+  Pitch get centerLinePitch {
+     switch (clefType) {
+       case ClefType.treble:
+         return Pitch.b4;
+       case ClefType.alto:
+         return Pitch.c4;
+       case ClefType.tenor:
+         return Pitch.a3;
+       case ClefType.bass:
+         return Pitch.d3;
+     }
+   }
   @override
   double get duration => 0;
 
