@@ -127,7 +127,7 @@ List<StaffRenderer> get staffRenderers {
     
     // Add some top and bottom padding
     baseHeight += 40.0; // Top padding
-    baseHeight += 20.0; // Bottom padding
+    baseHeight += 100.0; // Bottom padding - increased for better scrolling visibility
     
     return baseHeight;
   }

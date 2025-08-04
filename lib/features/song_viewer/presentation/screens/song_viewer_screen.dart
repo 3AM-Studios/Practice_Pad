@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:ui';
+import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -67,7 +68,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
 
   // Dial menu state for non-diatonic chord reharmonization
   bool _showDialMenu = false; // Controls whether the dial menu widget is visible
-  List<int>? _selectedChordGroup; // The chord group currently selected for key change
+  List<ChordSymbol>? _selectedChordGroup; // The chord group currently selected for key change
 
   // Chord selection state for practice item creation (temporarily disabled for canvas rendering)
   Set<int> _selectedChordIndices = <int>{}; // Selected chord indices
@@ -110,20 +111,23 @@ class _SongViewerScreenState extends State<SongViewerScreen>
 
   /// Shows the dial menu widget below the key indicator
   void _showDialMenuWidget(List<int> chordGroup) {
-    print('Showing dial menu widget for chord group: $chordGroup');
+    print('🎵 SHOW DIAL MENU: Called with chord group: $chordGroup');
     
     // Find all consecutive non-diatonic chords starting from the tapped chord
     final consecutiveGroup = _findConsecutiveNonDiatonicSequence(chordGroup.first);
+    print('🎵 SHOW DIAL MENU: Found consecutive group: $consecutiveGroup');
     
     setState(() {
       _showDialMenu = true;
       _selectedChordGroup = consecutiveGroup;
     });
+    
+    print('🎵 SHOW DIAL MENU: Set _selectedChordGroup to $consecutiveGroup');
   }
 
   /// Finds all consecutive non-diatonic chords starting from a given index
-  List<int> _findConsecutiveNonDiatonicSequence(int startIndex) {
-    final List<int> sequence = [];
+  List<ChordSymbol> _findConsecutiveNonDiatonicSequence(int startIndex) {
+    final List<ChordSymbol> sequence = [];
     
     if (startIndex >= _chordSymbols.length) return sequence;
     
@@ -132,13 +136,13 @@ class _SongViewerScreenState extends State<SongViewerScreen>
     
     // Only proceed if the start chord is non-diatonic
     if (!startChord.isDiatonicTo(currentKey)) {
-      sequence.add(startIndex);
+      sequence.add(startChord);
       
       // Look forward for consecutive non-diatonic chords
       for (int i = startIndex + 1; i < _chordSymbols.length; i++) {
         final chord = _chordSymbols[i];
         if (!chord.isDiatonicTo(currentKey)) {
-          sequence.add(i);
+          sequence.add(chord);
         } else {
           break; // Stop at first diatonic chord
         }
@@ -202,12 +206,16 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                 outerItems: outerItems,
                 innerItems: innerItems,
                 onSelectionChanged: (innerIndex, outerIndex) {
+                  print('🎵 DIAL MENU: Selection changed - innerIndex: $innerIndex, outerIndex: $outerIndex');
+                  
                   if (outerIndex != null) {
                     final selectedKey = outerItems[outerIndex].label;
+                    print('🎵 DIAL MENU: Selected major key "$selectedKey"');
                     _applyKeyChangeToChordGroup(selectedKey, false);
                     _hideDialMenuWidget();
                   } else if (innerIndex != null) {
                     final selectedKey = innerItems[innerIndex].label;
+                    print('🎵 DIAL MENU: Selected minor key "$selectedKey"');
                     _applyKeyChangeToChordGroup(selectedKey.replaceAll('m', ''), true);
                     _hideDialMenuWidget();
                   }
@@ -230,7 +238,13 @@ class _SongViewerScreenState extends State<SongViewerScreen>
 
   /// Applies a key change to the selected chord group
   void _applyKeyChangeToChordGroup(String keyName, bool isMinor) {
-    if (_selectedChordGroup == null) return;
+    print('🎵 APPLY KEY CHANGE: Called with keyName="$keyName", isMinor=$isMinor');
+    print('🎵 APPLY KEY CHANGE: _selectedChordGroup=$_selectedChordGroup');
+    
+    if (_selectedChordGroup == null || _selectedChordGroup!.isEmpty) {
+      print('🎵 APPLY KEY CHANGE: No selected chord group, returning');
+      return;
+    }
 
     // Convert key name to KeySignatureType
     final newKeySignature = _getKeySignatureFromKeyName(keyName, isMinor);
@@ -238,37 +252,61 @@ class _SongViewerScreenState extends State<SongViewerScreen>
       print('Error: Could not convert key name "$keyName" to KeySignatureType');
       return;
     }
+    
+    print('🎵 APPLY KEY CHANGE: New key signature: $newKeySignature');
+    print('🎵 APPLY KEY CHANGE: Updating ${_selectedChordGroup!.length} chords');
 
     setState(() {
-      // Apply the modified key signature to all chords in the group
-      for (final chordIndex in _selectedChordGroup!) {
-        if (chordIndex >= 0 && chordIndex < _chordSymbols.length) {
-          final originalChord = _chordSymbols[chordIndex];
-          
-          // Create a new chord with the modified key signature
-          if (originalChord.rootStep != null) {
-            // From MusicXML
-            _chordSymbols[chordIndex] = ChordSymbol.fromMusicXML(
-              originalChord.rootStep!,
-              originalChord.rootAlter ?? 0,
-              originalChord.kind!,
-              originalChord.durationBeats!,
-              originalChord.measureNumber!,
-              position: originalChord.position,
-              originalKeySignature: originalChord.originalKeySignature,
-              modifiedKeySignature: newKeySignature,
-            );
-          } else {
-            // Direct creation
-            _chordSymbols[chordIndex] = ChordSymbol(
-              originalChord.rootName!,
-              originalChord.quality!,
-              position: originalChord.position,
-              originalKeySignature: originalChord.originalKeySignature,
-              modifiedKeySignature: newKeySignature,
-            );
-          }
+      // Apply the modified key signature directly to all chords in the group
+      for (int i = 0; i < _selectedChordGroup!.length; i++) {
+        final originalChord = _selectedChordGroup![i];
+        print('🎵 APPLY KEY CHANGE: Updating chord: ${originalChord.displayText}');
+        
+        // Create a new chord with the modified key signature
+        ChordSymbol newChord;
+        if (originalChord.rootStep != null) {
+          // From MusicXML
+          newChord = ChordSymbol.fromMusicXML(
+            originalChord.rootStep!,
+            originalChord.rootAlter ?? 0,
+            originalChord.kind!,
+            originalChord.durationBeats!,
+            originalChord.measureNumber!,
+            position: originalChord.position,
+            originalKeySignature: originalChord.originalKeySignature,
+            modifiedKeySignature: newKeySignature,
+          );
+          print('🎵 APPLY KEY CHANGE: Created MusicXML chord with modifiedKey: ${newChord.modifiedKeySignature}');
+        } else {
+          // Direct creation
+          newChord = ChordSymbol(
+            originalChord.rootName!,
+            originalChord.quality!,
+            position: originalChord.position,
+            originalKeySignature: originalChord.originalKeySignature,
+            modifiedKeySignature: newKeySignature,
+          );
+          print('🎵 APPLY KEY CHANGE: Created direct chord with modifiedKey: ${newChord.modifiedKeySignature}');
         }
+        
+        // Update the chord in the selected group
+        _selectedChordGroup![i] = newChord;
+        
+        // Find and update this chord in all data structures
+        _updateChordInAllStructures(originalChord, newChord);
+        
+        print('🎵 APPLY KEY CHANGE: Updated chord: ${newChord.displayText}');
+      }
+      
+      // Invalidate sheet music cache since chord symbols have changed
+      _cachedSheetMusicWidget = null;
+      _lastRenderedMeasures = null;
+      print('🎵 APPLY KEY CHANGE: Invalidated cache');
+      
+      // Debug: Print a few chord symbols to verify they have the new modifiedKeySignature
+      for (int i = 0; i < math.min(3, _selectedChordGroup!.length); i++) {
+        final chord = _selectedChordGroup![i];
+        print('🎵 UPDATED CHORD $i: ${chord.effectiveRootName}${chord.effectiveQuality} - originalKey: ${chord.originalKeySignature}, modifiedKey: ${chord.modifiedKeySignature}');
       }
     });
 
@@ -281,6 +319,85 @@ class _SongViewerScreenState extends State<SongViewerScreen>
         duration: const Duration(seconds: 2),
       ),
     );
+    
+    print('🎵 APPLY KEY CHANGE: Complete');
+  }
+
+  /// Updates a chord in all data structures (_chordSymbols and _chordMeasures)
+  void _updateChordInAllStructures(ChordSymbol originalChord, ChordSymbol newChord) {
+    print('🎵 UPDATE STRUCTURES: Updating ${originalChord.displaySymbol} -> ${newChord.displaySymbol}');
+    
+    // Update in flat _chordSymbols list using property matching instead of object equality
+    for (int i = 0; i < _chordSymbols.length; i++) {
+      if (_chordsMatch(_chordSymbols[i], originalChord)) {
+        _chordSymbols[i] = newChord;
+        print('🎵 UPDATE STRUCTURES: Updated _chordSymbols[$i] from ${originalChord.displaySymbol} to ${newChord.displaySymbol}');
+      }
+    }
+    
+    // Update in _chordMeasures
+    for (int measureIndex = 0; measureIndex < _chordMeasures.length; measureIndex++) {
+      final chordMeasure = _chordMeasures[measureIndex];
+      final chordSymbols = chordMeasure.chordSymbols;
+      
+      for (int localIndex = 0; localIndex < chordSymbols.length; localIndex++) {
+        if (_chordsMatch(chordSymbols[localIndex], originalChord)) {
+          // Create new chord measure with updated chord
+          final updatedChordSymbols = List<ChordSymbol>.from(chordSymbols);
+          updatedChordSymbols[localIndex] = newChord;
+          
+          _chordMeasures[measureIndex] = ChordMeasure(
+            chordMeasure.musicalSymbols,
+            chordSymbols: updatedChordSymbols,
+            isNewLine: chordMeasure.isNewLine,
+          );
+          
+          print('🎵 UPDATE STRUCTURES: Updated measure $measureIndex, chord $localIndex from ${originalChord.displaySymbol} to ${newChord.displaySymbol}');
+          break; // Only update the first match in each measure
+        }
+      }
+    }
+  }
+
+  /// Checks if two chord symbols are the same chord based on their properties
+  bool _chordsMatch(ChordSymbol chord1, ChordSymbol chord2) {
+    return chord1.effectiveRootName == chord2.effectiveRootName &&
+           chord1.effectiveQuality == chord2.effectiveQuality &&
+           chord1.position == chord2.position &&
+           chord1.originalKeySignature == chord2.originalKeySignature;
+  }
+
+  /// Updates chord symbols in measures to match the flat _chordSymbols list
+  /// This ensures that changes to _chordSymbols are reflected in the chord measures
+  void _updateChordSymbolsInMeasures() {
+    print('🎵 UPDATE MEASURES: Starting update for ${_chordMeasures.length} measures');
+    int globalChordIndex = 0;
+    
+    for (int measureIndex = 0; measureIndex < _chordMeasures.length; measureIndex++) {
+      final chordMeasure = _chordMeasures[measureIndex];
+      final originalChordSymbols = chordMeasure.chordSymbols;
+      
+      // Create a new list with updated chord symbols
+      final updatedChordSymbols = <ChordSymbol>[];
+      
+      for (int localChordIndex = 0; localChordIndex < originalChordSymbols.length; localChordIndex++) {
+        if (globalChordIndex < _chordSymbols.length) {
+          // Add the updated chord symbol from _chordSymbols
+          updatedChordSymbols.add(_chordSymbols[globalChordIndex]);
+          print('🎵 UPDATE MEASURES: Measure $measureIndex, local index $localChordIndex, global index $globalChordIndex: ${_chordSymbols[globalChordIndex].displayText}');
+          globalChordIndex++;
+        }
+      }
+      
+      // Create a new ChordMeasure with the updated chord symbols
+      _chordMeasures[measureIndex] = ChordMeasure(
+        chordMeasure.musicalSymbols,
+        chordSymbols: updatedChordSymbols,
+        isNewLine: chordMeasure.isNewLine,
+      );
+    }
+    
+    print('🎵 UPDATE MEASURES: Updated chord symbols in ${_chordMeasures.length} measures, processed $globalChordIndex total chords');
   }
 
   /// Converts a key name string to KeySignatureType enum
@@ -400,19 +517,14 @@ class _SongViewerScreenState extends State<SongViewerScreen>
     }
 
     // Analyze the first chord in the group to suggest a key
-    final firstChordIndex = _selectedChordGroup!.first;
-    if (firstChordIndex >= 0 && firstChordIndex < _chordSymbols.length) {
-      final chord = _chordSymbols[firstChordIndex];
-      final chordRoot = chord.effectiveRootName;
-      
-      // Simple heuristic: suggest the chord root as a potential key
-      final suggestedMajor = chordRoot;
-      final suggestedMinor = _getRelativeMinor(chordRoot);
-      
-      return {'major': suggestedMajor, 'minor': suggestedMinor};
-    }
+    final firstChord = _selectedChordGroup!.first;
+    final chordRoot = firstChord.effectiveRootName;
     
-    return {'major': 'C', 'minor': 'Am'};
+    // Simple heuristic: suggest the chord root as a potential key
+    final suggestedMajor = chordRoot;
+    final suggestedMinor = _getRelativeMinor(chordRoot);
+    
+    return {'major': suggestedMajor, 'minor': suggestedMinor};
   }
 
   /// Gets the highlighted index for major key in the dial
@@ -440,14 +552,11 @@ class _SongViewerScreenState extends State<SongViewerScreen>
     if (_selectedChordGroup == null || _selectedChordGroup!.isEmpty) return null;
     
     // Get the modified key signature from the first chord in the group
-    final firstChordIndex = _selectedChordGroup!.first;
-    if (firstChordIndex >= _chordSymbols.length) return null;
-    
-    final chord = _chordSymbols[firstChordIndex];
-    if (chord.modifiedKeySignature == null) return null;
+    final firstChord = _selectedChordGroup!.first;
+    if (firstChord.modifiedKeySignature == null) return null;
     
     // Convert the modified key signature to a readable key name
-    final keyName = _getKeyNameFromSignature(chord.modifiedKeySignature!);
+    final keyName = _getKeyNameFromSignature(firstChord.modifiedKeySignature!);
     if (keyName.isEmpty) return null;
     
     // Extract major key name (remove "Major" suffix)
@@ -467,14 +576,11 @@ class _SongViewerScreenState extends State<SongViewerScreen>
     if (_selectedChordGroup == null || _selectedChordGroup!.isEmpty) return null;
     
     // Get the modified key signature from the first chord in the group
-    final firstChordIndex = _selectedChordGroup!.first;
-    if (firstChordIndex >= _chordSymbols.length) return null;
-    
-    final chord = _chordSymbols[firstChordIndex];
-    if (chord.modifiedKeySignature == null) return null;
+    final firstChord = _selectedChordGroup!.first;
+    if (firstChord.modifiedKeySignature == null) return null;
     
     // Convert the modified key signature to a readable key name
-    final keyName = _getKeyNameFromSignature(chord.modifiedKeySignature!);
+    final keyName = _getKeyNameFromSignature(firstChord.modifiedKeySignature!);
     if (keyName.isEmpty) return null;
     
     // Extract minor key name (remove "Minor" suffix and add "m")
@@ -867,12 +973,16 @@ class _SongViewerScreenState extends State<SongViewerScreen>
       final kindElement = harmony.findElements('kind').firstOrNull;
       final kind = kindElement?.getAttribute('text') ?? kindElement?.innerText ?? '';
       
+      // Get the original key signature for proper roman numeral calculation
+      final originalKeySignature = _getCurrentKeySignature();
+      
       return ChordSymbol.fromMusicXML(
         rootStep,
         rootAlter,
         kind,
         durationInBeats,
         measureNumber,
+        originalKeySignature: originalKeySignature,
       );
     } catch (e) {
       print('Error creating chord from harmony: $e');
@@ -1018,6 +1128,10 @@ class _SongViewerScreenState extends State<SongViewerScreen>
   void _setMajorMode() {
     setState(() {
       _isMinorKey = false;
+      
+      // Invalidate sheet music cache since key context changed
+      _cachedSheetMusicWidget = null;
+      _lastRenderedMeasures = null;
     });
   }
 
@@ -1025,6 +1139,10 @@ class _SongViewerScreenState extends State<SongViewerScreen>
   void _setMinorMode() {
     setState(() {
       _isMinorKey = true;
+      
+      // Invalidate sheet music cache since key context changed
+      _cachedSheetMusicWidget = null;
+      _lastRenderedMeasures = null;
     });
   }
 
@@ -1070,6 +1188,10 @@ class _SongViewerScreenState extends State<SongViewerScreen>
       _isLongPressing = false;
       _dragStartIndex = null;
       _lastHoveredIndex = null;
+      
+      // Invalidate sheet music cache to update visual selection
+      _cachedSheetMusicWidget = null;
+      _lastRenderedMeasures = null;
     });
   }
 
@@ -1083,6 +1205,10 @@ class _SongViewerScreenState extends State<SongViewerScreen>
       _isDragging = true; // Start dragging immediately
       _dragStartIndex = index;
       _lastHoveredIndex = index;
+      
+      // Invalidate sheet music cache to update visual selection
+      _cachedSheetMusicWidget = null;
+      _lastRenderedMeasures = null;
     });
     
     // Trigger animation and haptic feedback
@@ -1108,6 +1234,10 @@ class _SongViewerScreenState extends State<SongViewerScreen>
           for (int i = min; i <= max && i < _chordSymbols.length; i++) {
             _selectedChordIndices.add(i);
           }
+          
+          // Invalidate sheet music cache to update visual selection
+          _cachedSheetMusicWidget = null;
+          _lastRenderedMeasures = null;
         });
 
         // Provide haptic feedback when selection changes
@@ -1179,6 +1309,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
       _isDragging = false;
       _isLongPressing = false;
       // Keep _selectedChordIndices as is to show the selected chords
+      // Note: Don't invalidate cache here - keep selection visible
     });
   }
 
@@ -1568,6 +1699,13 @@ class _SongViewerScreenState extends State<SongViewerScreen>
               width: 800, // Increased width for better visibility
               measures: _chordMeasures.cast<music_sheet.Measure>(),
               debug: false, // Disable debug mode for performance
+              initialKeySignatureType: _getCurrentKeySignature(), // Pass current key signature
+              // Connect chord symbol interactions to song viewer functionality
+              onChordSymbolTap: _onChordSymbolTap,
+              onChordSymbolLongPress: _onChordSymbolLongPress,
+              onChordSymbolLongPressEnd: _onChordSymbolLongPressEnd,
+              onChordSymbolHover: _onChordSymbolHover,
+              isChordSelected: _isChordSelected,
             ),
           )
         : Container(
@@ -1580,6 +1718,85 @@ class _SongViewerScreenState extends State<SongViewerScreen>
     }
     
     return _cachedSheetMusicWidget!;
+  }
+
+  /// Handles chord symbol taps from sheet music
+  void _onChordSymbolTap(dynamic chordSymbol, int globalChordIndex) {
+    print('Chord symbol tapped: ${chordSymbol.toString()} at index $globalChordIndex');
+    
+    // Use the actual chord symbol that was tapped instead of relying on globalChordIndex
+    if (chordSymbol != null) {
+      print('Tapped chord: ${chordSymbol.displaySymbol}');
+      print('Current chord symbols: ${_chordSymbols.map((c) => c.displaySymbol).join(', ')}');
+      final currentKey = _getCurrentKeySignature();
+      
+      // ALWAYS check against the original key signature for dial menu availability
+      // A chord should be considered non-diatonic (and thus tappable) if it's non-diatonic to the ORIGINAL key
+      final keyForAnalysis = chordSymbol.originalKeySignature ?? currentKey;
+      if (!chordSymbol.isDiatonicTo(keyForAnalysis)) {
+        print('Non-diatonic chord detected: ${chordSymbol.displaySymbol} (non-diatonic to original key: $keyForAnalysis), showing dial menu');
+        
+        // Find the actual index of this chord in _chordSymbols for consecutive detection
+        final actualIndex = _findChordIndex(chordSymbol);
+        if (actualIndex != -1) {
+          _showDialMenuWidget([actualIndex]);
+        } else {
+          print('Warning: Could not find chord ${chordSymbol.displaySymbol} in _chordSymbols list');
+        }
+      } else {
+        print('chord ${chordSymbol.displaySymbol} is diatonic to $keyForAnalysis, no menu needed');
+      }
+    }
+  }
+
+  /// Finds the index of a chord symbol in the _chordSymbols list
+  int _findChordIndex(dynamic targetChord) {
+    for (int i = 0; i < _chordSymbols.length; i++) {
+      final chord = _chordSymbols[i];
+      // Use the same matching logic as _chordsMatch
+      if (_chordsMatch(chord, targetChord)) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  /// Handles chord symbol long press from sheet music - starts selection mode
+  void _onChordSymbolLongPress(dynamic chordSymbol, int globalChordIndex) {
+    print('Chord symbol long pressed: ${chordSymbol.toString()} at index $globalChordIndex');
+    
+    // Use the actual chord symbol instead of relying on globalChordIndex
+    if (chordSymbol != null) {
+      final actualIndex = _findChordIndex(chordSymbol);
+      if (actualIndex != -1) {
+        _startLongPressSelection(actualIndex);
+      } else {
+        print('Warning: Could not find chord ${chordSymbol.displaySymbol} in _chordSymbols list for long press');
+      }
+    }
+  }
+
+  /// Handles chord symbol long press end from sheet music - ends selection mode
+  void _onChordSymbolLongPressEnd(dynamic chordSymbol, int globalChordIndex, dynamic details) {
+    print('Chord symbol long press ended: ${chordSymbol.toString()} at index $globalChordIndex');
+    
+    // End selection mode
+    _endChordSelection();
+  }
+
+  /// Handles chord symbol hover during drag selection
+  void _onChordSymbolHover(dynamic chordSymbol, int globalChordIndex) {
+    print('Chord symbol hover: ${chordSymbol.toString()} at index $globalChordIndex');
+    
+    // Update selection if we're dragging
+    if (_isDragging && _isLongPressing) {
+      _updateChordSelectionDrag(globalChordIndex);
+    }
+  }
+
+  /// Returns whether a chord symbol is currently selected
+  bool _isChordSelected(int globalChordIndex) {
+    return _selectedChordIndices.contains(globalChordIndex);
   }
 
   void _onTick(int tick) {

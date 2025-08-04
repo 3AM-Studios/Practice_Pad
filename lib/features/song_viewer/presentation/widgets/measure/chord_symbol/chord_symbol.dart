@@ -613,6 +613,7 @@ class ChordSymbol {
   /// [original] - If true, use originalKeySignature; if false, use modifiedKeySignature
   String getRomanNumeral({bool original = true}) {
     final keySignature = original ? originalKeySignature : modifiedKeySignature;
+    print('🎵 GET ROMAN NUMERAL: ${effectiveRootName}${effectiveQuality} - original=$original, keySignature=$keySignature');
     if (keySignature == null) return '';
     
     return getRomanNumeralWithKey(keySignature);
@@ -819,8 +820,14 @@ class ChordSymbol {
   /// - "G7" in C Major -> "G7\nV^7"  
   /// - "Fmaj7" in C Major -> "Fmaj7\nIV^M7"
   String get displayText {
-    final roman = getRomanNumeral();
+    // Use modifiedKeySignature if available, otherwise use originalKeySignature
+    final roman = modifiedKeySignature != null 
+        ? getRomanNumeral(original: false) 
+        : getRomanNumeral(original: true);
     final qualitySuperscript = getQualitySuperscript();
+    
+    // Debug logging
+    print('🎵 DISPLAY TEXT: ${effectiveRootName}${effectiveQuality} - originalKey: $originalKeySignature, modifiedKey: $modifiedKeySignature, roman: "$roman"');
     
     if (roman.isEmpty) {
       return '${effectiveRootName}${effectiveQuality}';
@@ -846,7 +853,10 @@ class ChordSymbol {
     
     // Create the chord symbol text
     final chordText = '${effectiveRootName}${effectiveQuality}';
-    final romanText = getRomanNumeral();
+    // Use modifiedKeySignature if available, otherwise use originalKeySignature
+    final romanText = modifiedKeySignature != null 
+        ? getRomanNumeral(original: false) 
+        : getRomanNumeral(original: true);
     
     // Create text painter for chord symbol with much larger font size
     final chordTextPainter = TextPainter(
@@ -947,9 +957,9 @@ class ChordSymbol {
     final surfaceColor = theme.colorScheme.surface;
     final onSurfaceColor = theme.colorScheme.onSurface;
     
-    final isNonDiatonic = modifiedKeySignature != null 
-        ? !isDiatonicTo(modifiedKeySignature!)
-        : !isDiatonicTo(currentKeySignature);
+  final isNonDiatonic = originalKeySignature != null 
+      ? !isDiatonicTo(originalKeySignature!)
+      : !isDiatonicTo(currentKeySignature);
     final isCurrentChord = index != null && currentChordIndex != null && index == currentChordIndex;
 
     // Use the full Clay container styling for all contexts
