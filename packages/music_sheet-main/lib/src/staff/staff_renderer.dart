@@ -30,12 +30,12 @@ class StaffRenderer {
   }
 
   /// Renders the staff on the given canvas with the specified size and font family.
-  void render(Canvas canvas, Size size, {MusicalSymbol? symbolToExclude, MusicalSymbol? selectedNote}) {
+  void render(Canvas canvas, Size size, {MusicalSymbol? symbolToExclude, MusicalSymbol? selectedSymbol}) {
     for (var i = 0; i < measureRendereres.length; i++) {
       measureRendereres[i]
         // Pass the symbol position callback
         ..symbolPositionCallback = symbolPositionCallback
-        ..render(canvas, size, symbolToExclude: symbolToExclude, selectedNote: selectedNote);
+        ..render(canvas, size, symbolToExclude: symbolToExclude, selectedSymbol: selectedSymbol);
     }
   }
 }

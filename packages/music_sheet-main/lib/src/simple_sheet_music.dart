@@ -139,16 +139,16 @@ class SimpleSheetMusicState extends State<SimpleSheetMusic>
   List<Widget> chordSymbolOverlays = []; // Initialize as empty
 
   // Drag state...
-  Note? _draggedNote;
+  MusicalSymbol? _draggedSymbol;
   Offset? _dragPosition;
-  int? _draggedNoteMeasureIndex;
+  int? _draggedSymbolMeasureIndex;
   int?
-      _draggedNotePositionIndex; // The original index of the note in the measure
+      _draggedSymbolPositionIndex; // The original index of the note in the measure
   Clef? _draggedClef;
   Rect? _pitchHighlightRect;
-  MusicalSymbol? _selectedNote;
+  MusicalSymbol? _selectedSymbol;
 
-  bool _isAddingNewNote = false;
+  bool _isAddingNewSymbol = false;
 
   FontType get fontType => widget.fontType;
 
@@ -220,7 +220,7 @@ class SimpleSheetMusicState extends State<SimpleSheetMusic>
     setState(() {});
   }
 
-  void _handleTapDown(TapDownDetails details) {
+void _handleTapDown(TapDownDetails details) {
     if (_layout == null) return;
     final tapPosition = details.localPosition / _layout!.canvasScale;
 
@@ -234,56 +234,56 @@ class SimpleSheetMusicState extends State<SimpleSheetMusic>
         final measureRenderer = staff.measureRendereres[measureIndex];
         final symbol = measureRenderer.getSymbolAt(tapPosition);
 
-        if (symbol is Note) {
-          final clef = measureRenderer.measure.musicalSymbols
-                  .firstWhere((s) => s is Clef, orElse: () => Clef.treble())
-              as Clef;
-          _draggedClef = clef;
-          final highlightRect =
-              measureRenderer.getHighlightRectForPitch(symbol.pitch, clef);
+        // --- SCENARIO 1: Tapped an existing Note or Rest ---
+        if (symbol is Note || symbol is Rest) {
+          final clef = _draggedClef ?? Clef.treble();
+              
+          // Immediately highlight the selected symbol and prepare for the popup
           setState(() {
-            _isAddingNewNote = false;
-            _draggedNote = symbol;
-            _selectedNote = symbol;
-            _draggedNoteMeasureIndex = measureIndex;
-            _draggedNotePositionIndex =
+            _isAddingNewSymbol = false; // We are editing, not adding
+            _selectedSymbol = symbol; 
+           // This will be used by MeasureRenderer to highlight the symbol
+            _draggedSymbol = symbol;    // Keep this for the editor logic
+            _draggedClef = clef;
+            _draggedSymbolMeasureIndex = measureIndex;
+            _draggedSymbolPositionIndex =
                 measureRenderer.measure.musicalSymbols.indexOf(symbol);
             _dragPosition = details.localPosition;
-            _pitchHighlightRect = highlightRect;
+            _pitchHighlightRect = null; // IMPORTANT: Do not highlight the whole pitch line
           });
-          return;
+          return; // Found our target, exit the loops
         }
 
+        // --- SCENARIO 2: Tapped an empty space on the staff ---
         if (measureRenderer.getBounds().contains(tapPosition)) {
-          final clef = measureRenderer.measure.musicalSymbols
-                  .firstWhere((s) => s is Clef, orElse: () => Clef.treble())
-              as Clef;
+          final clef = _draggedClef ?? Clef.treble();
           _draggedClef = clef;
           final pitch = measureRenderer.getPitchForY(tapPosition.dy, clef);
+          // Highlight the entire pitch line because we are adding/dragging a new note
           final highlightRect =
               measureRenderer.getHighlightRectForPitch(pitch, clef);
+              
           setState(() {
-            _isAddingNewNote = true;
-            _draggedNote = Note(pitch);
-            _selectedNote = _draggedNote;
-            _draggedNoteMeasureIndex = measureIndex;
-            _draggedNotePositionIndex =
+            _isAddingNewSymbol = true; // We are adding a new note
+            _draggedSymbol = Note(pitch); // Create a temporary note to show
+            _selectedSymbol = null;      // Nothing is officially selected yet
+            _draggedSymbolMeasureIndex = measureIndex;
+            _draggedSymbolPositionIndex =
                 measureRenderer.getInsertionIndexForX(tapPosition.dx);
             _dragPosition = details.localPosition;
-            _pitchHighlightRect = highlightRect;
+            _pitchHighlightRect = highlightRect; // Highlight the staff line
           });
-          return;
+          return; // Found our target, exit the loops
         }
       }
     }
   }
-
   void _handlePanUpdate(DragUpdateDetails details) {
-    if (_draggedNote == null || _layout == null) return;
+    if (_draggedSymbol == null || _layout == null || _draggedSymbol is! Note) return;
     final newDragPosition = details.localPosition;
     final clef = _draggedClef ?? Clef.treble();
     final measureRenderer = _layout!
-        .staffRenderers.first.measureRendereres[_draggedNoteMeasureIndex!];
+        .staffRenderers.first.measureRendereres[_draggedSymbolMeasureIndex!];
     final newPitch = measureRenderer.getPitchForY(
         newDragPosition.dy / _layout!.canvasScale, clef);
     final newHighlightRect =
@@ -292,44 +292,58 @@ class SimpleSheetMusicState extends State<SimpleSheetMusic>
     setState(() {
       _dragPosition = newDragPosition;
       _pitchHighlightRect = newHighlightRect;
-      if (_draggedNote!.pitch != newPitch) {
-        _draggedNote = Note(newPitch,
-            noteDuration: _draggedNote!.noteDuration,
-            accidental: _draggedNote!.accidental);
-        _selectedNote = _draggedNote;
+      if ((_draggedSymbol! as Note).pitch != newPitch) {
+        _draggedSymbol = Note(newPitch,
+            noteDuration: (_draggedSymbol! as Note).noteDuration,
+            accidental: (_draggedSymbol! as Note).accidental);
+        _selectedSymbol = _draggedSymbol;
       }
     });
   }
 
   void _handlePanEnd(DragEndDetails details) async {
-    if (_draggedNote == null) return;
-    _showNoteEditorAndResetState();
+    if (_draggedSymbol == null) return;
+    _showSymbolEditorAndResetState();
   }
   void _handleTapUp(TapUpDetails details) async {
-    if (_draggedNote == null) return;
-    _showNoteEditorAndResetState();
+    if (_draggedSymbol == null) return;
+    _showSymbolEditorAndResetState();
   }
   
 
-  void _showNoteEditorAndResetState() async {
-    if (_draggedNote == null ||
+  void _showSymbolEditorAndResetState() async {
+    if (_draggedSymbol == null ||
         _layout == null ||
-        _draggedNoteMeasureIndex == null ||
+        _draggedSymbolMeasureIndex == null ||
         _dragPosition == null) {
       _resetInteractionState();
       return;
     }
 
     // Keep state alive while the popup is open
-    final noteToEdit = _draggedNote!;
+    final symbolToEdit = _draggedSymbol!;
     final position = _dragPosition!;
-    final isAdding = _isAddingNewNote;
-    final measureIndex = _draggedNoteMeasureIndex!;
-    final positionIndex = _draggedNotePositionIndex!;
+    final isAdding = _isAddingNewSymbol;
+    final measureIndex = _draggedSymbolMeasureIndex!;
+    final positionIndex = _draggedSymbolPositionIndex!;
+    final Pitch pitchForNewNote;
+    if (symbolToEdit is Note) {
+      pitchForNewNote = symbolToEdit.pitch;
+    } else {
+      final measureRenderer =
+          _layout!.staffRenderers.first.measureRendereres[measureIndex];
+      final clef = _draggedClef ?? Clef.treble();
+      // When adding a new note, the drag position is where the note should be.
+      // When editing a rest, the drag position is where the rest was tapped.
+      // We can use this to determine the pitch if we convert the rest to a note.
+      pitchForNewNote =
+          measureRenderer.getPitchForY(position.dy / _layout!.canvasScale, clef);
+    }
 
     // By awaiting here, the function pauses. The state remains,
     // so the highlight is still drawn in the background.
-    final result = await showNoteEditorPopup(context, position, noteToEdit);
+    final result =
+        await showNoteEditorPopup(context, position, symbolToEdit, pitchForNewNote);
 
     // This code runs AFTER the popup is closed.
 
@@ -356,14 +370,14 @@ class SimpleSheetMusicState extends State<SimpleSheetMusic>
 
   void _resetInteractionState() {
     setState(() {
-      _draggedNote = null;
-      _draggedNoteMeasureIndex = null;
-      _draggedNotePositionIndex = null;
+      _draggedSymbol = null;
+      _draggedSymbolMeasureIndex = null;
+      _draggedSymbolPositionIndex = null;
       _dragPosition = null;
-      _isAddingNewNote = false;
+      _isAddingNewSymbol = false;
       _pitchHighlightRect = null;
       _draggedClef = null;
-      _selectedNote = null;
+      _selectedSymbol = null;
     });
   }
 
@@ -380,10 +394,10 @@ class SimpleSheetMusicState extends State<SimpleSheetMusic>
         final currentLayout = _layout!;
         final renderer = SheetMusicRenderer(
           sheetMusicLayout: currentLayout,
-          draggedNote: _draggedNote,
+          draggedSymbol: _draggedSymbol,
           dragPosition: _dragPosition,
           pitchHighlightRect: _pitchHighlightRect,
-          selectedNote: _selectedNote,
+          selectedSymbol: _selectedSymbol,
         );
 
         return SingleChildScrollView(
