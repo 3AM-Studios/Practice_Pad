@@ -18,6 +18,7 @@ class SheetMusicLayout {
     required this.widgetWidth,
     this.symbolPositionCallback,
     this.debug = false,
+
   });
 
   /// The height of the widget.
@@ -133,9 +134,9 @@ List<StaffRenderer> get staffRenderers {
   }
 
   /// Renders the sheet music on the canvas.
-  void render(Canvas canvas, Size size) {
+  void render(Canvas canvas, Size size, {MusicalSymbol? symbolToExclude, MusicalSymbol? selectedNote}) {
     for (final staff in staffRenderers) {
-      staff.render(canvas, size);
+      staff.render(canvas, size, symbolToExclude: symbolToExclude, selectedNote: selectedNote);
     }
   }
 

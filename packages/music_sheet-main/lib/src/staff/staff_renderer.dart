@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:music_sheet/src/music_objects/interface/musical_symbol.dart';
 import 'package:music_sheet/src/measure/measure_renderer.dart';
 import 'package:music_sheet/src/music_objects/interface/musical_symbol_renderer.dart';
 import 'package:music_sheet/src/sheet_music_layout.dart';
@@ -29,12 +30,12 @@ class StaffRenderer {
   }
 
   /// Renders the staff on the given canvas with the specified size and font family.
-  void render(Canvas canvas, Size size) {
+  void render(Canvas canvas, Size size, {MusicalSymbol? symbolToExclude, MusicalSymbol? selectedNote}) {
     for (var i = 0; i < measureRendereres.length; i++) {
       measureRendereres[i]
         // Pass the symbol position callback
         ..symbolPositionCallback = symbolPositionCallback
-        ..render(canvas, size);
+        ..render(canvas, size, symbolToExclude: symbolToExclude, selectedNote: selectedNote);
     }
   }
 }

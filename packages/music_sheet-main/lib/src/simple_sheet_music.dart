@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:core';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:music_sheet/simple_sheet_music.dart';
@@ -95,21 +96,28 @@ class SimpleSheetMusic extends StatefulWidget {
   /// Callback function that is called when a musical symbol is tapped
   final OnTapMusicObjectCallback? onTap;
 
-  final void Function(MusicalSymbol symbol, int measureIndex, int positionIndex)? onSymbolAdd;
-  final void Function(MusicalSymbol symbol, int measureIndex, int positionIndex)? onSymbolUpdate;
+  final void Function(
+      MusicalSymbol symbol, int measureIndex, int positionIndex)? onSymbolAdd;
+  final void Function(
+          MusicalSymbol symbol, int measureIndex, int positionIndex)?
+      onSymbolUpdate;
   final void Function(int measureIndex, int positionIndex)? onSymbolDelete;
 
   /// Callback function that is called when a chord symbol is tapped
-  final void Function(dynamic chordSymbol, int globalChordIndex)? onChordSymbolTap;
+  final void Function(dynamic chordSymbol, int globalChordIndex)?
+      onChordSymbolTap;
 
   /// Callback function that is called when a chord symbol is long pressed
-  final void Function(dynamic chordSymbol, int globalChordIndex)? onChordSymbolLongPress;
+  final void Function(dynamic chordSymbol, int globalChordIndex)?
+      onChordSymbolLongPress;
 
   /// Callback function that is called when a chord symbol long press ends
-  final void Function(dynamic chordSymbol, int globalChordIndex, LongPressEndDetails? details)? onChordSymbolLongPressEnd;
+  final void Function(dynamic chordSymbol, int globalChordIndex,
+      LongPressEndDetails? details)? onChordSymbolLongPressEnd;
 
   /// Callback function that is called when hovering over a chord symbol during drag
-  final void Function(dynamic chordSymbol, int globalChordIndex)? onChordSymbolHover;
+  final void Function(dynamic chordSymbol, int globalChordIndex)?
+      onChordSymbolHover;
 
   /// Function to get the selection state of a chord symbol
   final bool Function(int globalChordIndex)? isChordSelected;
@@ -126,16 +134,20 @@ class SimpleSheetMusicState extends State<SimpleSheetMusic>
     with MidiPlaybackMixin {
   late final GlyphPaths glyphPath;
   late final GlyphMetadata metadata;
-  late final Future<void> _future;
-  SheetMusicLayout? _layout; // Remove 'late' keyword since it can be null initially
+  late final Future<void> _fontFuture;
+  SheetMusicLayout? _layout;
+  List<Widget> chordSymbolOverlays = []; // Initialize as empty
 
-  // Cache key to track layout changes
-  String? _lastLayoutKey;
-
+  // Drag state...
   Note? _draggedNote;
+  Offset? _dragPosition;
   int? _draggedNoteMeasureIndex;
-  int? _draggedNotePositionIndex; // The original index of the note in the measure
-  Offset? _dragPosition; // The current screen position of the drag
+  int?
+      _draggedNotePositionIndex; // The original index of the note in the measure
+  Clef? _draggedClef;
+  Rect? _pitchHighlightRect;
+  MusicalSymbol? _selectedNote;
+
   bool _isAddingNewNote = false;
 
   FontType get fontType => widget.fontType;
@@ -160,57 +172,105 @@ class SimpleSheetMusicState extends State<SimpleSheetMusic>
 
   @override
   void initState() {
-    _future = _initialize();
     super.initState();
+    _fontFuture = _loadFontAssets();
   }
 
-  Future<void> _initialize() async {
-    await load();
+  @override
+  void didUpdateWidget(SimpleSheetMusic oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.measures != oldWidget.measures ||
+        widget.width != oldWidget.width ||
+        widget.height != oldWidget.height) {
+      _updateLayout();
+    }
+  }
+
+  Future<void> _loadFontAssets() async {
+    final fontData = await rootBundle.loadString(fontType.svgPath);
+    final metadataJson = await rootBundle.loadString(fontType.metadataPath);
+    glyphPath = GlyphPaths(
+        XmlDocument.parse(fontData).findAllElements('glyph').toSet());
+    metadata = GlyphMetadata(jsonDecode(metadataJson) as Map<String, dynamic>);
     await initializeMidi();
+    _updateLayout();
   }
 
-  Future<void> load() async {
-    final xml = await rootBundle.loadString(fontType.svgPath);
-    final document = XmlDocument.parse(xml);
-    final allGlyphs = document.findAllElements('glyph').toSet();
-    glyphPath = GlyphPaths(allGlyphs);
-    final json = await rootBundle.loadString(fontType.metadataPath);
-    metadata = GlyphMetadata(jsonDecode(json) as Map<String, dynamic>);
+  void _updateLayout() {
+    final metricsBuilder = SheetMusicMetrics(
+      widget.measures,
+      widget.initialClefType,
+      widget.initialKeySignatureType,
+      widget.initialTimeSignatureType,
+      metadata,
+      glyphPath,
+      tempo: widget.tempo,
+    );
+
+    _layout = SheetMusicLayout(
+      metricsBuilder,
+      widget.lineColor,
+      widgetWidth: widget.width,
+      widgetHeight: widget.height,
+      symbolPositionCallback: registerSymbolPosition,
+      debug: widget.debug,
+    );
+
+    chordSymbolOverlays = _buildChordSymbolOverlays(context, _layout!);
+    setState(() {});
   }
 
-  void _handlePanStart(DragStartDetails details) {
+  void _handleTapDown(TapDownDetails details) {
     if (_layout == null) return;
     final tapPosition = details.localPosition / _layout!.canvasScale;
-    print("Pan Start at: $tapPosition");
 
-    for (var staffIndex = 0; staffIndex < _layout!.staffRenderers.length; staffIndex++) {
+    for (var staffIndex = 0;
+        staffIndex < _layout!.staffRenderers.length;
+        staffIndex++) {
       final staff = _layout!.staffRenderers[staffIndex];
-      for (var measureIndex = 0; measureIndex < staff.measureRendereres.length; measureIndex++) {
+      for (var measureIndex = 0;
+          measureIndex < staff.measureRendereres.length;
+          measureIndex++) {
         final measureRenderer = staff.measureRendereres[measureIndex];
         final symbol = measureRenderer.getSymbolAt(tapPosition);
 
         if (symbol is Note) {
+          final clef = measureRenderer.measure.musicalSymbols
+                  .firstWhere((s) => s is Clef, orElse: () => Clef.treble())
+              as Clef;
+          _draggedClef = clef;
+          final highlightRect =
+              measureRenderer.getHighlightRectForPitch(symbol.pitch, clef);
           setState(() {
             _isAddingNewNote = false;
             _draggedNote = symbol;
+            _selectedNote = symbol;
             _draggedNoteMeasureIndex = measureIndex;
-            _draggedNotePositionIndex = measureRenderer.measure.musicalSymbols.indexOf(symbol);
+            _draggedNotePositionIndex =
+                measureRenderer.measure.musicalSymbols.indexOf(symbol);
             _dragPosition = details.localPosition;
-            print("Dragging existing note: $_draggedNote at measure $measureIndex, position $_draggedNotePositionIndex");
+            _pitchHighlightRect = highlightRect;
           });
           return;
         }
 
         if (measureRenderer.getBounds().contains(tapPosition)) {
-          final clef = measureRenderer.measure.musicalSymbols.firstWhere((s) => s is Clef, orElse: () => Clef.treble()) as Clef;
+          final clef = measureRenderer.measure.musicalSymbols
+                  .firstWhere((s) => s is Clef, orElse: () => Clef.treble())
+              as Clef;
+          _draggedClef = clef;
           final pitch = measureRenderer.getPitchForY(tapPosition.dy, clef);
+          final highlightRect =
+              measureRenderer.getHighlightRectForPitch(pitch, clef);
           setState(() {
             _isAddingNewNote = true;
             _draggedNote = Note(pitch);
+            _selectedNote = _draggedNote;
             _draggedNoteMeasureIndex = measureIndex;
-            _draggedNotePositionIndex = measureRenderer.getInsertionIndexForX(tapPosition.dx);
+            _draggedNotePositionIndex =
+                measureRenderer.getInsertionIndexForX(tapPosition.dx);
             _dragPosition = details.localPosition;
-            print("Dragging new note: $_draggedNote at measure $measureIndex, insertion index: $_draggedNotePositionIndex");
+            _pitchHighlightRect = highlightRect;
           });
           return;
         }
@@ -220,300 +280,144 @@ class SimpleSheetMusicState extends State<SimpleSheetMusic>
 
   void _handlePanUpdate(DragUpdateDetails details) {
     if (_draggedNote == null || _layout == null) return;
+    final newDragPosition = details.localPosition;
+    final clef = _draggedClef ?? Clef.treble();
+    final measureRenderer = _layout!
+        .staffRenderers.first.measureRendereres[_draggedNoteMeasureIndex!];
+    final newPitch = measureRenderer.getPitchForY(
+        newDragPosition.dy / _layout!.canvasScale, clef);
+    final newHighlightRect =
+        measureRenderer.getHighlightRectForPitch(newPitch, clef);
 
     setState(() {
-      _dragPosition = details.localPosition;
-      final tapPosition = details.localPosition / _layout!.canvasScale;
-      final measureRenderer = _layout!.staffRenderers.first.measureRendereres[_draggedNoteMeasureIndex!];
-      final clef = measureRenderer.measure.musicalSymbols.firstWhere((s) => s is Clef, orElse: () => Clef.treble()) as Clef;
-      final newPitch = measureRenderer.getPitchForY(tapPosition.dy, clef);
+      _dragPosition = newDragPosition;
+      _pitchHighlightRect = newHighlightRect;
       if (_draggedNote!.pitch != newPitch) {
-        _draggedNote = Note(newPitch, noteDuration: _draggedNote!.noteDuration, accidental: _draggedNote!.accidental);
-        print("Note pitch updated to: $newPitch");
+        _draggedNote = Note(newPitch,
+            noteDuration: _draggedNote!.noteDuration,
+            accidental: _draggedNote!.accidental);
+        _selectedNote = _draggedNote;
       }
     });
   }
 
   void _handlePanEnd(DragEndDetails details) async {
-    if (_draggedNote == null || _layout == null || _draggedNoteMeasureIndex == null || _dragPosition == null) {
-      // Reset state just in case
-      setState(() {
-        _draggedNote = null;
-        _draggedNoteMeasureIndex = null;
-        _draggedNotePositionIndex = null;
-        _dragPosition = null;
-      });
+    if (_draggedNote == null) return;
+    _showNoteEditorAndResetState();
+  }
+  void _handleTapUp(TapUpDetails details) async {
+    if (_draggedNote == null) return;
+    _showNoteEditorAndResetState();
+  }
+  
+
+  void _showNoteEditorAndResetState() async {
+    if (_draggedNote == null ||
+        _layout == null ||
+        _draggedNoteMeasureIndex == null ||
+        _dragPosition == null) {
+      _resetInteractionState();
       return;
     }
 
-    final result = await showNoteEditorPopup(context, _dragPosition!, _draggedNote);
+    // Keep state alive while the popup is open
+    final noteToEdit = _draggedNote!;
+    final position = _dragPosition!;
+    final isAdding = _isAddingNewNote;
+    final measureIndex = _draggedNoteMeasureIndex!;
+    final positionIndex = _draggedNotePositionIndex!;
+
+    // By awaiting here, the function pauses. The state remains,
+    // so the highlight is still drawn in the background.
+    final result = await showNoteEditorPopup(context, position, noteToEdit);
+
+    // This code runs AFTER the popup is closed.
 
     if (result != null) {
-      // todo actually modify the measure
       if (result.isDelete) {
-        if (!_isAddingNewNote) {
-          print("Deleting note at measure $_draggedNoteMeasureIndex, position $_draggedNotePositionIndex");
-          widget.onSymbolDelete?.call(_draggedNoteMeasureIndex!, _draggedNotePositionIndex!);
+        if (!isAdding) {
+          widget.onSymbolDelete?.call(measureIndex, positionIndex);
         }
       } else if (result.musicalSymbol != null) {
-        if (_isAddingNewNote) {
-          print("Adding new symbol: ${result.musicalSymbol} at measure $_draggedNoteMeasureIndex, position $_draggedNotePositionIndex");
-          widget.onSymbolAdd?.call(result.musicalSymbol!, _draggedNoteMeasureIndex!, _draggedNotePositionIndex!);
+        if (isAdding) {
+          widget.onSymbolAdd
+              ?.call(result.musicalSymbol!, measureIndex, positionIndex);
         } else {
-          print("Updating symbol: ${result.musicalSymbol} at measure $_draggedNoteMeasureIndex, position $_draggedNotePositionIndex");
-          widget.onSymbolUpdate?.call(result.musicalSymbol!, _draggedNoteMeasureIndex!, _draggedNotePositionIndex!);
+          widget.onSymbolUpdate
+              ?.call(result.musicalSymbol!, measureIndex, positionIndex);
         }
       }
     }
 
-    // Reset state
+    // Now that the interaction is fully complete, reset the state.
+    // This will trigger a rebuild that removes the highlight.
+    _resetInteractionState();
+  }
+
+  void _resetInteractionState() {
     setState(() {
       _draggedNote = null;
       _draggedNoteMeasureIndex = null;
       _draggedNotePositionIndex = null;
       _dragPosition = null;
       _isAddingNewNote = false;
+      _pitchHighlightRect = null;
+      _draggedClef = null;
+      _selectedNote = null;
     });
-  }
-
-  void _handleTap(TapDownDetails details) {
-    if (_layout == null || widget.onTap == null) {
-      return;
-    }
-
-    // Convert the tap position to canvas coordinates
-    final tapPosition = details.localPosition / _layout!.canvasScale;
-
-    // Find the tapped symbol by testing each staff
-    for (final staff in _layout!.staffRenderers) {
-      final hitSymbol = staff.hitTest(tapPosition);
-      if (hitSymbol != null) {
-        widget.onTap!(hitSymbol.musicalSymbol, tapPosition);
-        return;
-      }
-    }
-  }
-
-  void _handlePanUpdateGesture(DragUpdateDetails details) {
-    if (_layout == null) return;
-
-    // Convert pan position to global chord index by finding which chord is under the position
-    _findChordAtPanPosition(details.localPosition);
-  }
-
-  void _findChordAtPanPosition(Offset localPosition) {
-    // This will find which chord is under the current pan position
-    // and trigger hover events for drag selection
-
-    // Track global chord index across all measures
-    int globalChordIndex = 0;
-
-    // Iterate through each staff line to find the chord under the position
-    for (int staffIndex = 0; staffIndex < _layout!.staffRenderers.length; staffIndex++) {
-      final staffRenderer = _layout!.staffRenderers[staffIndex];
-
-      // Iterate through each measure in this staff
-      for (int measureIndex = 0; measureIndex < staffRenderer.measureRendereres.length; measureIndex++) {
-        if (staffIndex == 0 && measureIndex == 0) {
-          // Skip the first measure in the first staff
-          continue;
-        }
-        final measureRenderer = staffRenderer.measureRendereres[measureIndex];
-        final measure = measureRenderer.measure;
-
-        // Check if this is a ChordMeasure with chord symbols
-        if (measure != null && measure.runtimeType.toString() == 'ChordMeasure') {
-          try {
-            final dynamic chordMeasure = measure;
-            final dynamic chordSymbols = chordMeasure.chordSymbols;
-
-            if (chordSymbols != null && chordSymbols is List && chordSymbols.isNotEmpty) {
-              final measureX = measureRenderer.measureOriginX * _layout!.canvasScale;
-              final measureY = measureRenderer.staffLineCenterY * _layout!.canvasScale;
-              final measureWidth = measureRenderer.width * _layout!.canvasScale;
-
-              // Check each chord symbol in this measure
-              for (int chordIndex = 0; chordIndex < chordSymbols.length; chordIndex++) {
-                final dynamic chordSymbol = chordSymbols[chordIndex];
-                if (chordSymbol != null) {
-                  // Calculate chord position (same logic as overlay positioning)
-                  double chordX;
-                  if (chordSymbols.length == 1) {
-                    chordX = measureX + (measureWidth / 2) - 25;
-                  } else {
-                    final spacing = measureWidth / chordSymbols.length;
-                    chordX = measureX + (spacing * chordIndex) + (spacing / 2) - 25;
-                  }
-
-                  final chordY = measureY - (1700 * _layout!.canvasScale);
-
-                  // Check if pan position is within this chord's bounds (rough estimation)
-                  final chordWidth = 50.0; // Approximate chord symbol width
-                  final chordHeight = 30.0; // Approximate chord symbol height
-
-                  if (localPosition.dx >= chordX &&
-                      localPosition.dx <= chordX + chordWidth &&
-                      localPosition.dy >= chordY &&
-                      localPosition.dy <= chordY + chordHeight) {
-
-                    // Found the chord under the pan position
-                    if (widget.onChordSymbolHover != null) {
-                      widget.onChordSymbolHover!(chordSymbol, globalChordIndex);
-                    }
-                    return;
-                  }
-
-                  globalChordIndex++;
-                }
-              }
-            }
-          } catch (e) {
-            print('Error finding chord at pan position: $e');
-          }
-        }
-      }
-    }
-  }
-
-  /// Generate a hash of all chord symbols to detect changes in their content
-  String _generateChordSymbolHash() {
-    final buffer = StringBuffer();
-
-    for (final measure in widget.measures) {
-      if (measure.runtimeType.toString() == 'ChordMeasure') {
-        try {
-          final dynamic chordMeasure = measure;
-          final dynamic chordSymbols = chordMeasure.chordSymbols;
-
-          if (chordSymbols != null && chordSymbols is List) {
-            for (final dynamic chordSymbol in chordSymbols) {
-              if (chordSymbol != null) {
-                // Include key properties that affect display
-                buffer.write('${chordSymbol.effectiveRootName}_');
-                buffer.write('${chordSymbol.effectiveQuality}_');
-                buffer.write('${chordSymbol.originalKeySignature}_');
-                buffer.write('${chordSymbol.modifiedKeySignature}_');
-                buffer.write('${chordSymbol.position}_');
-              }
-            }
-          }
-        } catch (e) {
-          // If we can't access chord symbols, include a fallback
-          buffer.write('measure_${measure.hashCode}_');
-        }
-      }
-    }
-
-    return buffer.toString().hashCode.toString();
-  }
-
-  /// Generate a hash of all musical symbols to detect changes in their content.
-  String _generateMusicalSymbolHash() {
-    final buffer = StringBuffer();
-    for (final measure in widget.measures) {
-      // Use the hashCode of each symbol. This assumes MusicalSymbol subclasses
-      // have a reasonable hashCode implementation.
-      for (final symbol in measure.musicalSymbols) {
-        buffer.write('${symbol.hashCode}_');
-      }
-    }
-    return buffer.toString().hashCode.toString();
   }
 
   @override
   Widget build(BuildContext context) {
     return FutureBuilder(
-      future: _future,
+      future: _fontFuture,
       builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
+        if (snapshot.connectionState != ConnectionState.done ||
+            _layout == null) {
           return const Center(child: CircularProgressIndicator());
         }
 
-        // Create layout key to detect changes - include chord and musical symbol hashes
-        final chordSymbolHash = _generateChordSymbolHash();
-        final musicalSymbolHash = _generateMusicalSymbolHash(); // Add this line
-        final layoutKey =
-            '${widget.measures.hashCode}_${widget.width}_${widget.height}_${widget.initialClefType}_${widget.initialKeySignatureType}_${widget.initialTimeSignatureType}_${chordSymbolHash}_$musicalSymbolHash'; // Update this line
-
-        // Only rebuild layout if parameters have changed
-        if (_layout == null || _lastLayoutKey != layoutKey) {
-          final metricsBuilder = SheetMusicMetrics(
-            widget.measures,
-            widget.initialClefType,
-            widget.initialKeySignatureType,
-            widget.initialTimeSignatureType,
-            metadata,
-            glyphPath,
-            tempo: widget.tempo,
-          );
-
-          _layout = SheetMusicLayout(
-            metricsBuilder,
-            widget.lineColor,
-            widgetWidth: widget.width,
-            widgetHeight: widget.height,
-            symbolPositionCallback: registerSymbolPosition,
-            debug: widget.debug,
-          );
-
-          // Clear cache if layout changed to ensure fresh rendering
-          _layout!.clearCache();
-          _lastLayoutKey = layoutKey;
-        }
-
-        // Ensure layout is not null before proceeding
-        final currentLayout = _layout;
-        if (currentLayout == null) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        // Create the sheet music renderer without highlighting
-        final renderer = SheetMusicRenderer(currentLayout);
+        final currentLayout = _layout!;
+        final renderer = SheetMusicRenderer(
+          sheetMusicLayout: currentLayout,
+          draggedNote: _draggedNote,
+          dragPosition: _dragPosition,
+          pitchHighlightRect: _pitchHighlightRect,
+          selectedNote: _selectedNote,
+        );
 
         return SingleChildScrollView(
           scrollDirection: Axis.vertical,
           physics: const BouncingScrollPhysics(
             parent: AlwaysScrollableScrollPhysics(),
           ),
-          padding: const EdgeInsets.only(bottom: 50.0), // Add bottom padding to the scroll view
+          padding: const EdgeInsets.only(
+              bottom: 50.0), // Add bottom padding to the scroll view
           child: GestureDetector(
-            onPanStart: _handlePanStart,
+            onTapDown: _handleTapDown, 
+            onTapUp: _handleTapUp,
             onPanUpdate: _handlePanUpdate,
             onPanEnd: _handlePanEnd,
-            onTapDown: _handleTap,
-            // Only handle taps that don't hit interactive widgets (chord symbols)
             behavior: HitTestBehavior.deferToChild,
             child: SizedBox(
               width: widget.width,
-              height: currentLayout.totalContentHeight, // Use calculated content height
+              height: currentLayout.totalContentHeight,
               child: Stack(
                 children: [
-                  // The sheet music is rendered once and doesn't change
-                  // Wrap in RepaintBoundary for optimal scrolling performance
+                  // 1. The main painter, now fully aware of the drag state.
                   RepaintBoundary(
                     key: const ValueKey('sheet_music_canvas'),
                     child: CustomPaint(
-                      size: Size(widget.width, currentLayout.totalContentHeight), // Use content height
+                      size:
+                          Size(widget.width, currentLayout.totalContentHeight),
                       painter: renderer,
                     ),
                   ),
-                  if (_draggedNote != null && _dragPosition != null)
-                    Positioned(
-                      left: _dragPosition!.dx - 20, // Adjust to center the note
-                      top: _dragPosition!.dy - 20,
-                      child: Opacity(
-                        opacity: 0.7,
-                        child: CustomPaint(
-                          size: const Size(40, 40),
-                          painter: NotePainter(_draggedNote!),
-                        ),
-                      ),
-                    ),
-                  // Chord symbol overlays - these need to be on top to receive touch events
-                  // Individual chord symbols need to receive touch events for selection and interaction
-                  ..._buildChordSymbolOverlays(context, currentLayout),
-                  // The overlay that highlights the current note
-                  // Wrap highlight in separate RepaintBoundary since it changes frequently
+
+                  // 2. The pre-built, cached list of chord symbols.
+                  ...chordSymbolOverlays,
+
+                  // 3. The highlight overlay for MIDI playback.
                   if (highlightedSymbolId != null)
                     RepaintBoundary(
                       key: const ValueKey('highlight_overlay'),
@@ -534,7 +438,8 @@ class SimpleSheetMusicState extends State<SimpleSheetMusic>
   }
 
   // Add this method to build the positioned chord symbol widgets
-  List<Widget> _buildChordSymbolOverlays(BuildContext context, SheetMusicLayout layout) {
+  List<Widget> _buildChordSymbolOverlays(
+      BuildContext context, SheetMusicLayout layout) {
     final overlays = <Widget>[];
 
     // Use the widget's current key signature
@@ -544,12 +449,16 @@ class SimpleSheetMusicState extends State<SimpleSheetMusic>
     int globalChordIndex = 0;
 
     // Iterate through each staff line
-    for (int staffIndex = 0; staffIndex < layout.staffRenderers.length; staffIndex++) {
+    for (int staffIndex = 0;
+        staffIndex < layout.staffRenderers.length;
+        staffIndex++) {
       final staffRenderer = layout.staffRenderers[staffIndex];
 
       // Iterate through each measure in this staff
-      for (int measureIndex = 0; measureIndex < staffRenderer.measureRendereres.length; measureIndex++) {
-        if (staffIndex == 0 &&measureIndex == 0) {
+      for (int measureIndex = 0;
+          measureIndex < staffRenderer.measureRendereres.length;
+          measureIndex++) {
+        if (staffIndex == 0 && measureIndex == 0) {
           // Skip the first measure in the first staff
           continue;
         }
@@ -557,37 +466,50 @@ class SimpleSheetMusicState extends State<SimpleSheetMusic>
         final measure = measureRenderer.measure;
 
         // Check if this is a ChordMeasure with chord symbols
-        if (measure != null && measure.runtimeType.toString() == 'ChordMeasure') {
+        if (measure != null &&
+            measure.runtimeType.toString() == 'ChordMeasure') {
           try {
             final dynamic chordMeasure = measure;
             final dynamic chordSymbols = chordMeasure.chordSymbols;
 
-            if (chordSymbols != null && chordSymbols is List && chordSymbols.isNotEmpty) {
+            if (chordSymbols != null &&
+                chordSymbols is List &&
+                chordSymbols.isNotEmpty) {
               // Convert canvas coordinates to widget coordinates
               // Same as HighlightOverlay: multiply by canvasScale
-              final measureX = measureRenderer.measureOriginX * layout.canvasScale;
-              final measureY = measureRenderer.staffLineCenterY * layout.canvasScale;
+              final measureX =
+                  measureRenderer.measureOriginX * layout.canvasScale;
+              final measureY =
+                  measureRenderer.staffLineCenterY * layout.canvasScale;
               final measureWidth = measureRenderer.width * layout.canvasScale;
 
-
               // Position chord symbols above this measure
-              for (int chordIndex = 0; chordIndex < chordSymbols.length; chordIndex++) {
+              for (int chordIndex = 0;
+                  chordIndex < chordSymbols.length;
+                  chordIndex++) {
                 final dynamic chordSymbol = chordSymbols[chordIndex];
                 if (chordSymbol != null) {
                   // Calculate position for this chord symbol - properly centered
                   double chordX;
                   if (chordSymbols.length == 1) {
                     // Single chord: center in measure
-                    chordX = measureX + (measureWidth / 2) - 25; // Better centering - reduced offset
+                    chordX = measureX +
+                        (measureWidth / 2) -
+                        25; // Better centering - reduced offset
                   } else {
                     // Multiple chords: distribute evenly
                     final spacing = measureWidth / chordSymbols.length;
-                    chordX = measureX + (spacing * chordIndex) + (spacing / 2) - 25; // Better centering
+                    chordX = measureX +
+                        (spacing * chordIndex) +
+                        (spacing / 2) -
+                        25; // Better centering
                   }
 
                   // Position properly above the staff (much higher and more consistent)
-                  final chordY = measureY - (1700 * layout.canvasScale); // Higher and more appropriate positioning
-
+                  final chordY = measureY -
+                      (1700 *
+                          layout
+                              .canvasScale); // Higher and more appropriate positioning
 
                   overlays.add(
                     Positioned(
@@ -595,32 +517,41 @@ class SimpleSheetMusicState extends State<SimpleSheetMusic>
                       top: chordY,
                       child: GestureDetector(
                         onPanUpdate: widget.onChordSymbolHover != null
-                          ? (details) {
-                              // Handle drag updates by finding chord under current position
-                              widget.onChordSymbolHover!(chordSymbol, globalChordIndex);
-                            }
-                          : null,
+                            ? (details) {
+                                // Handle drag updates by finding chord under current position
+                                widget.onChordSymbolHover!(
+                                    chordSymbol, globalChordIndex);
+                              }
+                            : null,
                         child: MouseRegion(
                           onEnter: widget.onChordSymbolHover != null
-                            ? (_) => widget.onChordSymbolHover!(chordSymbol, globalChordIndex)
-                            : null,
+                              ? (_) => widget.onChordSymbolHover!(
+                                  chordSymbol, globalChordIndex)
+                              : null,
                           child: chordSymbol.buildWidget(
                             context: context,
                             currentKeySignature: currentKeySignature,
                             // Pass selection state for visual feedback
-                            isSelected: widget.isChordSelected?.call(globalChordIndex) ?? false,
+                            isSelected: widget.isChordSelected
+                                    ?.call(globalChordIndex) ??
+                                false,
                             isAnimating: false,
                             isNewMeasure: false,
                             // Connect to widget callbacks for interaction
                             onTap: widget.onChordSymbolTap != null
-                              ? () => widget.onChordSymbolTap!(chordSymbol, globalChordIndex)
-                              : null,
+                                ? () => widget.onChordSymbolTap!(
+                                    chordSymbol, globalChordIndex)
+                                : null,
                             onLongPress: widget.onChordSymbolLongPress != null
-                              ? () => widget.onChordSymbolLongPress!(chordSymbol, globalChordIndex)
-                              : null,
-                            onLongPressEnd: widget.onChordSymbolLongPressEnd != null
-                              ? (details) => widget.onChordSymbolLongPressEnd!(chordSymbol, globalChordIndex, details)
-                              : null,
+                                ? () => widget.onChordSymbolLongPress!(
+                                    chordSymbol, globalChordIndex)
+                                : null,
+                            onLongPressEnd: widget.onChordSymbolLongPressEnd !=
+                                    null
+                                ? (details) =>
+                                    widget.onChordSymbolLongPressEnd!(
+                                        chordSymbol, globalChordIndex, details)
+                                : null,
                           ) as Widget,
                         ),
                       ),
@@ -659,7 +590,6 @@ class NotePainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
-
 
 /// A widget that draws a highlight around a musical symbol
 class HighlightOverlay extends StatelessWidget {
@@ -762,7 +692,9 @@ class ChordSymbolOverlayPainter extends CustomPainter {
 
     // Iterate through staff renderers and their measures
     for (final staffRenderer in layout.staffRenderers) {
-      for (int i = 0; i < staffRenderer.measureRendereres.length && i < measures.length; i++) {
+      for (int i = 0;
+          i < staffRenderer.measureRendereres.length && i < measures.length;
+          i++) {
         final measureRenderer = staffRenderer.measureRendereres[i];
         final measure = measures[i];
 
@@ -773,8 +705,10 @@ class ChordSymbolOverlayPainter extends CustomPainter {
           _renderChordSymbolsForMeasure(
             canvas,
             measure,
-            measureRenderer.measureOriginX * layout.canvasScale, // Apply scale to positioning
-            measureRenderer.staffLineCenterY * layout.canvasScale, // Apply scale to positioning
+            measureRenderer.measureOriginX *
+                layout.canvasScale, // Apply scale to positioning
+            measureRenderer.staffLineCenterY *
+                layout.canvasScale, // Apply scale to positioning
             measureRenderer.width * layout.canvasScale, // Apply scale to width
           );
         }
@@ -794,7 +728,8 @@ class ChordSymbolOverlayPainter extends CustomPainter {
       final dynamic chordMeasure = measure;
       final dynamic chordSymbols = chordMeasure.chordSymbols;
 
-      print('Rendering chord symbols for measure at X:$measureOriginX, Y:$staffLineCenterY, Width:$measureWidth');
+      print(
+          'Rendering chord symbols for measure at X:$measureOriginX, Y:$staffLineCenterY, Width:$measureWidth');
 
       if (chordSymbols != null && chordSymbols is List) {
         print('Found ${chordSymbols.length} chord symbols in measure');

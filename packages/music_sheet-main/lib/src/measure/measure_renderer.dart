@@ -113,8 +113,25 @@ class MeasureRenderer {
     }
   }
 
+  Rect? getHighlightRectForPitch(Pitch pitch, Clef clef) {
+    final centerLinePitch = clef.centerLinePitch;
+    final stepsFromCenter = pitch.difference(centerLinePitch);
+
+    final halfStepY = Constants.staffSpace / 2;
+    final y = staffLineCenterY - (stepsFromCenter * halfStepY);
+
+    final isLine = pitch.isLineNote(clef);
+
+    final top = isLine ? y - halfStepY / 2 : y - halfStepY;
+    final bottom = isLine ? y + halfStepY / 2 : y + halfStepY;
+    final left = measureOriginX + _barlineSpacing;
+    final right = left + width;
+
+    return Rect.fromLTRB(left, top, right, bottom);
+  }
+
   /// Renders the measure on the given [canvas] with the specified [size].
-  void render(Canvas canvas, Size size) {
+  void render(Canvas canvas, Size size, {MusicalSymbol? symbolToExclude, MusicalSymbol? selectedNote}) {
     _renderStaffLine(canvas);
     _symbolBounds.clear(); // Clear layout info from the previous frame
 
@@ -122,6 +139,9 @@ class MeasureRenderer {
     //_renderChordSymbols(canvas, size);
 
     for (final symbol in symbolRenderers) {
+      if (symbol.musicalSymbol == symbolToExclude) {
+        continue;
+      }
       // Get and store the symbol's bounding box for hit-testing
       final bounds = symbol.getBounds();
       _symbolBounds[symbol.musicalSymbol] = bounds;
@@ -133,6 +153,13 @@ class MeasureRenderer {
 
       // Render the symbol
       symbol.render(canvas);
+
+      if (symbol.musicalSymbol == selectedNote) {
+        final paint = Paint()
+          ..color = Colors.red.withOpacity(0.5)
+          ..style = PaintingStyle.fill;
+        canvas.drawRect(bounds, paint);
+      }
     }
 
     _renderBarline(canvas);

@@ -1,3 +1,5 @@
+import 'package:music_sheet/src/music_objects/clef/clef.dart';
+
 /// Enum representing the pitch of a musical note.
 enum Pitch {
   a0(0), // Pitch A0
@@ -58,7 +60,7 @@ enum Pitch {
   final int position;
 
   /// Returns the MIDI note number for this pitch.
-  /// 
+  ///
   /// MIDI note numbers range from 0 to 127, with middle C (C4) being 60.
   /// A0 (the lowest note on a piano) is 21, and C8 is 108.
   int get midiNoteNumber => position + 21;
@@ -91,6 +93,16 @@ enum Pitch {
       return Pitch.a0;
     }
     return Pitch.values[current];
+  }
+
+  int difference(Pitch other) {
+    return position - other.position;
+  }
+
+  bool isLineNote(Clef clef) {
+    final centerLinePitch = clef.centerLinePitch;
+    final diff = difference(centerLinePitch);
+    return diff.isEven;
   }
 
   /// Returns `true` if the current pitch is greater than or equal to the given [other] pitch.
