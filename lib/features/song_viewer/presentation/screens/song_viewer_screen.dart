@@ -849,7 +849,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
             musicalSymbols.add(music_sheet.Rest(music_sheet.RestType.quarter));
             musicalSymbols.add(music_sheet.Rest(music_sheet.RestType.quarter));
             musicalSymbols.add(music_sheet.Rest(music_sheet.RestType.quarter));
-            musicalSymbols.add(music_sheet.Rest(music_sheet.RestType.quarter));
+            musicalSymbols.add(music_sheet.Note(Pitch.c4));
           }
 
           // Process all elements in the measure

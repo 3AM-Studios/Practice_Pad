@@ -9,6 +9,7 @@ import 'package:music_sheet/src/midi/midi_playback_mixin.dart';
 import 'package:music_sheet/src/music_objects/interface/musical_symbol.dart';
 import 'package:music_sheet/src/sheet_music_metrics.dart';
 import 'package:music_sheet/src/sheet_music_renderer.dart';
+import 'package:practice_pad/features/song_viewer/presentation/widgets/measure/chord_symbol/chord_symbol.dart';
 import 'package:xml/xml.dart';
 
 import 'music_objects/key_signature/keysignature_type.dart';
@@ -197,8 +198,10 @@ class SimpleSheetMusicState extends State<SimpleSheetMusic>
   }
 
   void _updateLayout() {
+    final measuresWithChords = widget.measures;
+
     final metricsBuilder = SheetMusicMetrics(
-      widget.measures,
+      measuresWithChords,
       widget.initialClefType,
       widget.initialKeySignatureType,
       widget.initialTimeSignatureType,
@@ -219,6 +222,8 @@ class SimpleSheetMusicState extends State<SimpleSheetMusic>
     chordSymbolOverlays = _buildChordSymbolOverlays(context, _layout!);
     setState(() {});
   }
+
+  
 
 void _handleTapDown(TapDownDetails details) {
     if (_layout == null) return;

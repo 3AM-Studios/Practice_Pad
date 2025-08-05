@@ -17,6 +17,8 @@ import 'package:music_sheet/src/music_objects/notes/positions.dart';
 import 'package:music_sheet/src/music_objects/notes/stem_direction.dart';
 import 'package:music_sheet/src/musical_context.dart';
 import 'package:music_sheet/src/sheet_music_layout.dart';
+import 'package:practice_pad/features/song_viewer/presentation/widgets/measure/chord_symbol/chord_symbol.dart';
+import 'package:music_sheet/src/utils/scale_degree_calculator.dart';
 
 /// Represents a musical note.
 class Note extends MusicalSymbol {
@@ -24,6 +26,7 @@ class Note extends MusicalSymbol {
     this.pitch, {
     this.noteDuration = NoteDuration.quarter,
     this.accidental,
+    this.chordSymbol,
     super.color,
     super.margin,
     // this.stemDirection,
@@ -38,6 +41,9 @@ class Note extends MusicalSymbol {
   /// The accidental of the note (if any).
   final Accidental? accidental;
 
+  /// The chord symbol associated with this note.
+  final ChordSymbol? chordSymbol;
+
   /// The type of note head based on the note duration.
   NoteHeadType get noteHeadType => noteDuration.noteHeadType;
 
@@ -51,6 +57,17 @@ class Note extends MusicalSymbol {
     GlyphPaths paths,
   ) =>
       NoteMetrics(this, context, metadata, paths);
+
+  Note copyWith({Pitch? pitch, NoteDuration? noteDuration, Accidental? accidental, ChordSymbol? chordSymbol, Color? color, EdgeInsets? margin}) {
+    return Note(
+      pitch ?? this.pitch,
+      noteDuration: noteDuration ?? this.noteDuration,
+      accidental: accidental ?? this.accidental,
+      chordSymbol: chordSymbol ?? this.chordSymbol,
+      color: color ?? this.color,
+      margin: margin ?? this.margin,
+    );
+  }
 }
 
 /// Represents the metrics (size, position, etc.) of a single note in sheet music.
@@ -351,10 +368,37 @@ class NoteRenderer with DebugRenderMixin implements MusicalSymbolRenderer {
     _renderAccidental(canvas);
     _renderStem(canvas);
     _renderLegerLine(canvas);
+    _renderScaleDegree(canvas);
 
     if (layout.debug) {
       renderBoundingBox(canvas, _renderArea);
     }
+  }
+
+  void _renderScaleDegree(Canvas canvas) {
+    if (note.note.chordSymbol == null) {
+      return;
+    }
+
+    final scaleDegree = getScaleDegree(note.pitch, note.note.chordSymbol!);
+    final textPainter = TextPainter(
+      text: TextSpan(
+        text: scaleDegree,
+        style: TextStyle(color: note.color, fontSize: 24),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+
+    textPainter.layout();
+
+    final noteHeadCenter = note.noteHeadPath.getBounds().center;
+    final x = _renderOffset.dx + noteHeadCenter.dx - textPainter.width / 2;
+    final y = _renderOffset.dy +
+        (note._isStemUp
+            ? noteHeadCenter.dy + 20
+            : noteHeadCenter.dy - textPainter.height - 20);
+
+    textPainter.paint(canvas, Offset(x, y));
   }
 
   void _renderNoteHead(Canvas canvas) {

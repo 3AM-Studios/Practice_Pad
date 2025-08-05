@@ -9,8 +9,10 @@ import 'package:music_sheet/src/music_objects/interface/musical_symbol.dart';
 import 'package:music_sheet/src/music_objects/interface/musical_symbol_metrics.dart';
 import 'package:music_sheet/src/music_objects/key_signature/key_signature.dart';
 import 'package:music_sheet/src/music_objects/key_signature/keysignature_type.dart';
+import 'package:music_sheet/src/music_objects/notes/single_note/note.dart';
 import 'package:music_sheet/src/music_objects/time_signature/time_signature.dart';
 import 'package:music_sheet/src/musical_context.dart';
+import 'package:practice_pad/features/song_viewer/presentation/widgets/measure/chord_symbol/chord_symbol.dart';
 
 /// Represents a measure in sheet music.
 class Measure {
@@ -23,10 +25,14 @@ class Measure {
   const Measure(
     this.musicalSymbols, {
     this.isNewLine = false,
+    this.chordSymbols,
   }) : assert(musicalSymbols.length != 0);
 
   /// The list of musical symbols that make up the measure.
   final List<MusicalSymbol> musicalSymbols;
+
+  /// The list of chord symbols in the measure.
+  final List<ChordSymbol>? chordSymbols;
 
   /// Indicates whether the measure is a new line in the sheet music.
   final bool isNewLine;
@@ -45,12 +51,37 @@ class Measure {
   ) {
     final result = <MusicalSymbolMetrics>[];
     var symbolContext = context;
+    final notes = musicalSymbols.whereType<Note>().toList();
     for (final symbol in musicalSymbols) {
-      final symbolMetrics = symbol.setContext(symbolContext, metadata, paths);
-      symbolContext = symbolContext.update(symbol);
-      result.add(symbolMetrics);
+      if (symbol is Note) {
+        final chordSymbol = _findChordForNote(symbol, chordSymbols, notes);
+        final newNote = symbol.copyWith(chordSymbol: chordSymbol);
+        final symbolMetrics = newNote.setContext(symbolContext, metadata, paths);
+        symbolContext = symbolContext.update(newNote);
+        result.add(symbolMetrics);
+      } else {
+        final symbolMetrics = symbol.setContext(symbolContext, metadata, paths);
+        symbolContext = symbolContext.update(symbol);
+        result.add(symbolMetrics);
+      }
     }
     return result;
+  }
+
+  ChordSymbol? _findChordForNote(
+      Note note, List<ChordSymbol>? chordSymbols, List<Note> notes) {
+    if (chordSymbols == null || chordSymbols.isEmpty) {
+      return null;
+    }
+    if (chordSymbols.length == 1) {
+      return chordSymbols.first;
+    }
+
+    final notePosition = notes.indexOf(note);
+    final notesPerChord = (notes.length / chordSymbols.length).ceil();
+    final chordIndex = (notePosition / notesPerChord).floor();
+
+    return chordSymbols[chordIndex];
   }
 
   ClefType? get lastClefType {
