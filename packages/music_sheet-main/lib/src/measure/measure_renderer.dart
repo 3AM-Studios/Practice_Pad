@@ -131,7 +131,7 @@ class MeasureRenderer {
   }
 
   /// Renders the measure on the given [canvas] with the specified [size].
-  void render(Canvas canvas, Size size, {MusicalSymbol? symbolToExclude, MusicalSymbol? selectedSymbol}) {
+  void render(Canvas canvas, Size size, {MusicalSymbol? symbolToExclude, MusicalSymbol? selectedNote}) {
     _renderStaffLine(canvas);
     _symbolBounds.clear(); // Clear layout info from the previous frame
 
@@ -154,7 +154,7 @@ class MeasureRenderer {
       // Render the symbol
       symbol.render(canvas);
 
-      if (symbol.musicalSymbol == selectedSymbol) {
+      if (symbol.musicalSymbol == selectedNote) {
         final paint = Paint()
           ..color = Colors.red.withOpacity(0.5)
           ..style = PaintingStyle.fill;

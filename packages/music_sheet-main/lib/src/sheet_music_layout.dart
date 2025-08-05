@@ -134,9 +134,9 @@ List<StaffRenderer> get staffRenderers {
   }
 
   /// Renders the sheet music on the canvas.
-  void render(Canvas canvas, Size size, {MusicalSymbol? symbolToExclude, MusicalSymbol? selectedSymbol}) {
+  void render(Canvas canvas, Size size, {MusicalSymbol? symbolToExclude, MusicalSymbol? selectedNote}) {
     for (final staff in staffRenderers) {
-      staff.render(canvas, size, symbolToExclude: symbolToExclude, selectedSymbol: selectedSymbol);
+      staff.render(canvas, size, symbolToExclude: symbolToExclude, selectedNote: selectedNote);
     }
   }
 
