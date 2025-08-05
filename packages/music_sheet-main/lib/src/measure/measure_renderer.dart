@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:music_sheet/src/constants.dart';
+import 'package:music_sheet/src/extension/list_extension.dart';
 import 'package:music_sheet/src/glyph_metadata.dart';
 import 'package:music_sheet/src/glyph_path.dart';
 import 'package:music_sheet/src/measure/measure.dart';
@@ -89,13 +90,30 @@ class MeasureRenderer {
     symbolRenderers.clear();
     if (measureMetrics.symbolMetricsList.isEmpty) return;
 
-    // REMOVE the entire if/else block for targetWidth
-    
-    // REPLACE with this single, natural spacing logic
+    // Calculate the total natural width of symbols within this measure
+    final double naturalSymbolsWidth =
+        measureMetrics.symbolMetricsList.map((s) => s.width).sum;
+    final double naturalMarginsWidth =
+        measureMetrics.symbolMetricsList.map((s) => s.margin.horizontal).sum;
+
+    // Calculate the total natural width of the measure (symbols + margins)
+    final double naturalMeasureWidth = naturalSymbolsWidth + naturalMarginsWidth;
+
+    // Calculate the actual rendered width of the measure after stretching
+    final double stretchedMeasureWidth = naturalMeasureWidth * stretchFactor;
+
+    // Calculate the extra space available due to stretching
+    final double extraSpace = stretchedMeasureWidth - naturalMeasureWidth;
+
+    // Distribute the extra space evenly among the symbols (or just add to margins)
+    // For simplicity, we'll add it to the horizontal margins.
+    // This ensures the measure itself maintains its stretched width,
+    // and symbols are spaced out proportionally.
+
     var currentX = 0.0;
     for (final symbolMetric in measureMetrics.symbolMetricsList) {
-      // The space for margins and symbols is now stretched
       final margin = symbolMetric.margin;
+      // Apply stretch factor to individual margins
       currentX += margin.left * stretchFactor;
 
       final symbolX = measureOriginX + currentX;
@@ -106,6 +124,7 @@ class MeasureRenderer {
       );
       symbolRenderers.add(renderer);
 
+      // Apply stretch factor to symbol width and right margin
       currentX += (symbolMetric.width + margin.right) * stretchFactor;
     }
   }

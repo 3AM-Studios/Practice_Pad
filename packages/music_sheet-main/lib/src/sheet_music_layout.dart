@@ -26,7 +26,7 @@ class SheetMusicLayout with ChangeNotifier {
   final bool debug;
 
   /// The final, stateful list of staff renderers. This is the source of truth for drawing.
-  late final List<StaffRenderer> staffRenderers;
+  late List<StaffRenderer> staffRenderers;
 
   SheetMusicLayout(
     this.metrics,
@@ -110,7 +110,7 @@ class SheetMusicLayout with ChangeNotifier {
   double get _staffsHeightsSum => metrics.staffsHeightSum;
 
   // NO SCALING: Since we're handling width distribution manually, use 1:1 scaling
-  double get canvasScale => 1.0;
+  double get canvasScale => 0.7;
 
   // Minimal left padding
   double get _leftPaddingOnCanvas => (_kHorizontalScreenPadding / 2);
@@ -146,7 +146,6 @@ class SheetMusicLayout with ChangeNotifier {
       Map<String, MusicalSymbolMetrics> metricsCache) {
     final measureRenderer =
         staffRenderers.first.measureRendereres[measureIndex];
-    final oldWidth = measureRenderer.width;
 
     // THE FIX: Use the measure's OWN context, not the global one.
     final newMetrics = symbol.setContext(measureRenderer.musicalContext,
@@ -154,11 +153,7 @@ class SheetMusicLayout with ChangeNotifier {
     metricsCache[symbol.id] = newMetrics;
 
     measureRenderer.measure.musicalSymbols.insert(positionIndex, symbol);
-    measureRenderer.recalculateMetrics(metricsCache);
-
-    final newWidth = measureRenderer.width;
-    _reflowLineAfterMeasure(measureIndex, newWidth - oldWidth);
-
+    _buildRenderers(); // Trigger full re-layout
     notifyListeners();
   }
 
@@ -166,7 +161,6 @@ class SheetMusicLayout with ChangeNotifier {
       MusicalSymbol newSymbol, Map<String, MusicalSymbolMetrics> metricsCache) {
     final measureRenderer =
         staffRenderers.first.measureRendereres[measureIndex];
-    final oldWidth = measureRenderer.width;
 
     // THE FIX: Use the measure's OWN context.
     final newMetrics = newSymbol.setContext(measureRenderer.musicalContext,
@@ -178,11 +172,7 @@ class SheetMusicLayout with ChangeNotifier {
     metricsCache.remove(oldSymbolId);
 
     measureRenderer.measure.musicalSymbols[positionIndex] = newSymbol;
-    measureRenderer.recalculateMetrics(metricsCache);
-
-    final newWidth = measureRenderer.width;
-    _reflowLineAfterMeasure(measureIndex, newWidth - oldWidth);
-
+    _buildRenderers(); // Trigger full re-layout
     notifyListeners();
   }
 
@@ -197,30 +187,15 @@ class SheetMusicLayout with ChangeNotifier {
     metricsCache.remove(symbolToDelete.id);
 
     measureRenderer.measure.musicalSymbols.removeAt(positionIndex);
-    measureRenderer.recalculateMetrics(metricsCache);
-
-    final newWidth = measureRenderer.width;
-    _reflowLineAfterMeasure(measureIndex, newWidth - oldWidth);
+    // Instead of just recalculating metrics for the single measure,
+    // we need to trigger a full re-layout of the entire staff/sheet music
+    // to re-evaluate stretch factors and symbol positions.
+    _buildRenderers();
 
     notifyListeners();
   }
 
-  /// Helper method to shift subsequent measures on the same line after a width change.
-  void _reflowLineAfterMeasure(int measureIndex, double widthDelta) {
-    // This simple reflow now works correctly because measureRenderer.width
-    // will report its true, stretched width, and the delta will be non-zero.
-    if (widthDelta.abs() < 0.01) return;
-
-    final measureRenderers = staffRenderers.first.measureRendereres;
-    for (var i = measureIndex + 1; i < measureRenderers.length; i++) {
-      measureRenderers[i].measureOriginX += widthDelta;
-    }
-    
-    // IMPORTANT: For a truly robust system, a simple shift is not enough.
-    // After a symbol is added/deleted, you should ideally re-run the 
-    // justification logic for the entire line to recalculate the stretchFactor
-    // and reposition all subsequent measures correctly. For now, this will at least move them.
-  }
+  
 
   void render(Canvas canvas, Size size, {MusicalSymbol? selectedSymbol}) {
     for (final staff in staffRenderers) {

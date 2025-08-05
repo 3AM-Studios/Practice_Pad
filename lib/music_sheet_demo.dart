@@ -76,52 +76,91 @@ class SimpleSheetMusicDemo extends StatefulWidget {
 }
 
 class SimpleSheetMusicDemoState extends State<SimpleSheetMusicDemo> {
+  late List<Measure> _measures;
+
+  @override
+  void initState() {
+    super.initState();
+    _measures = [
+      Measure([
+        Clef.treble(),
+        TimeSignature.twoFour(),
+        KeySignature.dMajor(),
+        ChordNote([
+          const ChordNotePart(Pitch.b4),
+          const ChordNotePart(Pitch.g5),
+          const ChordNotePart(Pitch.a4),
+        ]),
+        Rest(RestType.quarter),
+        Note(Pitch.a4, noteDuration: NoteDuration.quarter),
+        Rest(RestType.sixteenth),
+      ]),
+      Measure([
+        ChordNote([
+          const ChordNotePart(Pitch.c4),
+          const ChordNotePart(Pitch.c5),
+        ], noteDuration: NoteDuration.sixteenth),
+        Note(Pitch.a4,
+            noteDuration: NoteDuration.sixteenth, accidental: Accidental.flat)
+      ]),
+      Measure(
+        [
+          Clef.bass(),
+          TimeSignature.fourFour(),
+          KeySignature.cMinor(),
+          ChordNote(
+            [
+              const ChordNotePart(Pitch.c2),
+              const ChordNotePart(Pitch.c3),
+            ],
+          ),
+          Rest(RestType.quarter),
+          Note(Pitch.a3,
+              noteDuration: NoteDuration.whole, accidental: Accidental.flat),
+        ],
+        isNewLine: true,
+      ),
+    ];
+  }
+
+  void _onSymbolAdd(MusicalSymbol symbol, int measureIndex, int positionIndex) {
+    setState(() {
+      final updatedMeasures = List<Measure>.from(_measures);
+      final measureToUpdate = updatedMeasures[measureIndex];
+      final updatedSymbols = List<MusicalSymbol>.from(measureToUpdate.musicalSymbols);
+      updatedSymbols.insert(positionIndex, symbol);
+      updatedMeasures[measureIndex] = Measure(updatedSymbols, isNewLine: measureToUpdate.isNewLine);
+      _measures = updatedMeasures;
+    });
+  }
+
+  void _onSymbolUpdate(MusicalSymbol symbol, int measureIndex, int positionIndex) {
+    setState(() {
+      final updatedMeasures = List<Measure>.from(_measures);
+      final measureToUpdate = updatedMeasures[measureIndex];
+      final updatedSymbols = List<MusicalSymbol>.from(measureToUpdate.musicalSymbols);
+      updatedSymbols[positionIndex] = symbol;
+      updatedMeasures[measureIndex] = Measure(updatedSymbols, isNewLine: measureToUpdate.isNewLine);
+      _measures = updatedMeasures;
+    });
+  }
+
+  void _onSymbolDelete(int measureIndex, int positionIndex) {
+    setState(() {
+      final updatedMeasures = List<Measure>.from(_measures);
+      final measureToUpdate = updatedMeasures[measureIndex];
+      final updatedSymbols = List<MusicalSymbol>.from(measureToUpdate.musicalSymbols);
+      updatedSymbols.removeAt(positionIndex);
+      updatedMeasures[measureIndex] = Measure(updatedSymbols, isNewLine: measureToUpdate.isNewLine);
+      _measures = updatedMeasures;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final sheetMusicSize = MediaQuery.of(context).size;
     final width = sheetMusicSize.width;
     final height = sheetMusicSize.height / 2;
-
-    Measure measure1 = Measure([
-      Clef.treble(),
-      TimeSignature.twoFour(),
-      KeySignature.dMajor(),
-      ChordNote([
-        const ChordNotePart(Pitch.b4),
-        const ChordNotePart(Pitch.g5),
-        const ChordNotePart(Pitch.a4),
-      ]),
-      Rest(RestType.quarter),
-      Note(Pitch.a4, noteDuration: NoteDuration.quarter),
-      Rest(RestType.sixteenth),
-    ]);
-    
-    Measure measure2 = Measure([
-      ChordNote([
-        const ChordNotePart(Pitch.c4),
-        const ChordNotePart(Pitch.c5),
-      ], noteDuration: NoteDuration.sixteenth),
-      Note(Pitch.a4,
-          noteDuration: NoteDuration.sixteenth, accidental: Accidental.flat)
-    ]);
-    
-    Measure measure3 = Measure(
-      [
-        Clef.bass(),
-        TimeSignature.fourFour(),
-        KeySignature.cMinor(),
-        ChordNote(
-          [
-            const ChordNotePart(Pitch.c2),
-            const ChordNotePart(Pitch.c3),
-          ],
-        ),
-        Rest(RestType.quarter),
-        Note(Pitch.a3,
-            noteDuration: NoteDuration.whole, accidental: Accidental.flat),
-      ],
-      isNewLine: true,
-    );
 
     return Scaffold(
         appBar: AppBar(title: const Text('Simple Sheet Music Demo')),
@@ -151,7 +190,10 @@ class SimpleSheetMusicDemoState extends State<SimpleSheetMusicDemo> {
                   ),
                 );
               },
-              measures: [measure1, measure2, measure3],
+              measures: _measures,
+              onSymbolAdd: _onSymbolAdd,
+              onSymbolUpdate: _onSymbolUpdate,
+              onSymbolDelete: _onSymbolDelete,
             ),
           ),
         ));

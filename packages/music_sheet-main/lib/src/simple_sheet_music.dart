@@ -380,19 +380,13 @@ void _showSymbolEditorAndResetState({
 if (result != null) {
   if (result.isDelete) {
     if (!isAdding) {
-      // OLD: widget.onSymbolDelete?.call(...);
-      _layout!.deleteSymbolAt(measureIndex, positionIndex, _metricsCache);
-      _resetInteractionState();
+      widget.onSymbolDelete?.call(measureIndex, positionIndex);
     }
   } else if (result.musicalSymbol != null) {
     if (isAdding) {
-      print('is adding');
-      _layout!.addSymbolAt(measureIndex, positionIndex, result.musicalSymbol!, _metricsCache);
-      _resetInteractionState();
+      widget.onSymbolAdd?.call(result.musicalSymbol!, measureIndex, positionIndex);
     } else {
-      // OLD: widget.onSymbolUpdate?.call(...);
-      _layout!.updateSymbolAt(measureIndex, positionIndex, result.musicalSymbol!, _metricsCache);
-      _resetInteractionState();
+      widget.onSymbolUpdate?.call(result.musicalSymbol!, measureIndex, positionIndex);
     }
   }
 }
@@ -468,7 +462,9 @@ void _resetInteractionState() {
 
                 // ===== LAYER 2: Other Overlays (Unchanged) =====
                 // Your existing logic for chord symbols and MIDI highlights remains the same.
+
                 ...chordSymbolOverlays,
+
                 if (highlightedSymbolId != null)
                   RepaintBoundary(
                     key: const ValueKey('highlight_overlay'),
@@ -580,7 +576,7 @@ void _resetInteractionState() {
 
                   // Position properly above the staff (much higher and more consistent)
                   final chordY = measureY -
-                      (1700 *
+                      (140 *
                           layout
                               .canvasScale); // Higher and more appropriate positioning
 
