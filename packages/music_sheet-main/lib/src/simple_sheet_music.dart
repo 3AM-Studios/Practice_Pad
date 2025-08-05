@@ -311,63 +311,60 @@ void _handleTapDown(TapDownDetails details) {
   }
   
 
-  void _showSymbolEditorAndResetState() async {
+void _showSymbolEditorAndResetState() async {
     if (_draggedSymbol == null ||
         _layout == null ||
         _draggedSymbolMeasureIndex == null ||
         _dragPosition == null) {
-      _resetInteractionState();
+      _resetInteractionState(); // Still good to have this failsafe
       return;
     }
 
-    // Keep state alive while the popup is open
+    // 1. CAPTURE the current state into local variables before we clear it.
     final symbolToEdit = _draggedSymbol!;
     final position = _dragPosition!;
     final isAdding = _isAddingNewSymbol;
     final measureIndex = _draggedSymbolMeasureIndex!;
     final positionIndex = _draggedSymbolPositionIndex!;
-    final Pitch pitchForNewNote;
-    if (symbolToEdit is Note) {
-      pitchForNewNote = symbolToEdit.pitch;
-    } else {
-      final measureRenderer =
-          _layout!.staffRenderers.first.measureRendereres[measureIndex];
-      final clef = _draggedClef ?? Clef.treble();
-      // When adding a new note, the drag position is where the note should be.
-      // When editing a rest, the drag position is where the rest was tapped.
-      // We can use this to determine the pitch if we convert the rest to a note.
-      pitchForNewNote =
-          measureRenderer.getPitchForY(position.dy / _layout!.canvasScale, clef);
-    }
+    
+    // 2. RESET the interaction state IMMEDIATELY.
+    // This tells the build method to stop drawing highlights *before* the popup appears.
+    _resetInteractionState();
 
-    // By awaiting here, the function pauses. The state remains,
-    // so the highlight is still drawn in the background.
-    final result =
-        await showNoteEditorPopup(context, position, symbolToEdit);
+    // 3. SHOW the popup. The main widget is now "idle" in the background,
+    // ensuring a smooth animation. We use the local variables we just saved.
+    final result = await showNoteEditorPopup(
+      context,
+      position, // The local variable
+      symbolToEdit, // The local variable
+    );
 
-    // This code runs AFTER the popup is closed.
-
+    // 4. PROCESS the result after the popup is closed.
     if (result != null) {
       if (result.isDelete) {
+        // Only delete if we were not in the middle of adding a new symbol.
         if (!isAdding) {
           widget.onSymbolDelete?.call(measureIndex, positionIndex);
         }
       } else if (result.musicalSymbol != null) {
         if (isAdding) {
-          widget.onSymbolAdd
-              ?.call(result.musicalSymbol!, measureIndex, positionIndex);
+          widget.onSymbolAdd?.call(
+            result.musicalSymbol!,
+            measureIndex,
+            positionIndex,
+          );
         } else {
-          widget.onSymbolUpdate
-              ?.call(result.musicalSymbol!, measureIndex, positionIndex);
+          widget.onSymbolUpdate?.call(
+            result.musicalSymbol!,
+            measureIndex,
+            positionIndex,
+          );
         }
       }
     }
-
-    // Now that the interaction is fully complete, reset the state.
-    // This will trigger a rebuild that removes the highlight.
-    _resetInteractionState();
-  }
-
+    
+    // The state is already reset, so no final call is needed here.
+}
   void _resetInteractionState() {
     setState(() {
       _draggedSymbol = null;
