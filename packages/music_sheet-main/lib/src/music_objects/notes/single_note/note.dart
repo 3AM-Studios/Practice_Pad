@@ -16,6 +16,7 @@ import 'package:music_sheet/src/musical_context.dart';
 import 'package:music_sheet/src/sheet_music_layout.dart';
 import 'package:practice_pad/features/song_viewer/presentation/widgets/measure/chord_symbol/chord_symbol.dart';
 import 'package:music_sheet/src/utils/scale_degree_calculator.dart';
+import 'package:music_sheet/src/utils/chord_note_association.dart';
 
 /// Represents a musical note.
 class Note extends MusicalSymbol with EquatableMixin {
@@ -196,7 +197,7 @@ class NoteMetrics implements MusicalSymbolMetrics {
 
 /// A class that renders a musical note symbol.
 class NoteRenderer with DebugRenderMixin implements MusicalSymbolRenderer {
-  const NoteRenderer(
+  NoteRenderer(
     this.noteMetrics,
     this.layout, {
     required this.staffLineCenterY,
@@ -211,6 +212,14 @@ class NoteRenderer with DebugRenderMixin implements MusicalSymbolRenderer {
 
   @override
   final MusicalSymbol musicalSymbol;
+
+  /// The chord symbol associated with this note (for extension number display)
+  ChordSymbol? _associatedChordSymbol;
+
+  /// Sets the chord symbol associated with this note
+  void setAssociatedChordSymbol(ChordSymbol? chordSymbol) {
+    _associatedChordSymbol = chordSymbol;
+  }
 
   Offset get _renderOffset => Offset(symbolX, staffLineCenterY);
   Offset get _pitchOffset => noteMetrics.stavePosition.positionOffset;
@@ -229,6 +238,7 @@ class NoteRenderer with DebugRenderMixin implements MusicalSymbolRenderer {
     _renderFlag(canvas);
     _renderLegerLine(canvas);
     _renderScaleDegree(canvas);
+    _renderChordExtension(canvas);
 
     if (layout.debug) {
       renderBoundingBox(canvas, getBounds());
@@ -309,5 +319,71 @@ class NoteRenderer with DebugRenderMixin implements MusicalSymbolRenderer {
         : noteHeadBounds.top - textPainter.height - (10 / layout.canvasScale);
 
     textPainter.paint(canvas, Offset(x, y));
+  }
+
+  void _renderChordExtension(Canvas canvas) {
+    // Only render chord extension if we have an associated chord symbol
+    if (_associatedChordSymbol == null) return;
+    
+    final note = musicalSymbol as Note;
+    final extension = getChordExtension(note, _associatedChordSymbol!);
+    if (extension.isEmpty) return;
+
+    // Create a paint for the clay container background
+    final containerPaint = Paint()
+      ..color = Colors.grey.shade200
+      ..style = PaintingStyle.fill;
+
+    // Create a paint for the container border
+    final borderPaint = Paint()
+      ..color = Colors.grey.shade400
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+
+    // Create text painter for the extension number
+    final textPainter = TextPainter(
+      text: TextSpan(
+        text: extension,
+        style: TextStyle(
+          color: Colors.black87,
+          fontSize: 12 / layout.canvasScale,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    textPainter.layout();
+
+    // Get note head bounds for positioning
+    final noteHeadBounds = noteMetrics.noteHeadPath.getBounds().shift(
+      _renderOffset + _pitchOffset + Offset(noteMetrics.accidentalWidth, 0)
+    );
+    final noteHeadCenter = noteHeadBounds.center;
+
+    // Calculate container size with padding
+    const padding = 4.0;
+    final containerWidth = textPainter.width + (padding * 2);
+    final containerHeight = textPainter.height + (padding * 2);
+
+    // Position the container based on stem direction
+    final containerX = noteHeadCenter.dx - containerWidth / 2;
+    final containerY = noteMetrics.isStemUp
+        ? noteHeadBounds.bottom + (8 / layout.canvasScale)
+        : noteHeadBounds.top - containerHeight - (8 / layout.canvasScale);
+
+    // Create container rectangle with rounded corners
+    final containerRect = Rect.fromLTWH(containerX, containerY, containerWidth, containerHeight);
+    final rrect = RRect.fromRectAndRadius(containerRect, const Radius.circular(6.0));
+
+    // Draw the clay container background
+    canvas.drawRRect(rrect, containerPaint);
+    
+    // Draw the border
+    canvas.drawRRect(rrect, borderPaint);
+
+    // Draw the text centered in the container
+    final textX = containerX + padding;
+    final textY = containerY + padding;
+    textPainter.paint(canvas, Offset(textX, textY));
   }
 }

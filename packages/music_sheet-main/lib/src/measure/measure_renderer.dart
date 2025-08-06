@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:music_sheet/src/constants.dart';
-import 'package:music_sheet/src/extension/list_extension.dart';
 import 'package:music_sheet/src/glyph_metadata.dart';
 import 'package:music_sheet/src/glyph_path.dart';
 import 'package:music_sheet/src/measure/measure.dart';
@@ -10,8 +9,11 @@ import 'package:music_sheet/src/music_objects/interface/musical_symbol.dart';
 import 'package:music_sheet/src/music_objects/interface/musical_symbol_metrics.dart';
 import 'package:music_sheet/src/music_objects/interface/musical_symbol_renderer.dart';
 import 'package:music_sheet/src/music_objects/notes/note_pitch.dart';
+import 'package:music_sheet/src/music_objects/notes/single_note/note.dart';
 import 'package:music_sheet/src/sheet_music_layout.dart';
 import 'package:music_sheet/src/musical_context.dart';
+import 'package:music_sheet/src/utils/chord_note_association.dart';
+import 'package:practice_pad/features/song_viewer/presentation/widgets/measure/chord_symbol/chord_symbol.dart';
 
 /// The renderer for a measure in sheet music.
 /// This class is now stateful and manages its own layout, allowing for
@@ -85,43 +87,60 @@ class MeasureRenderer {
     _buildRenderers();
   }
 
+  /// Gets chord symbols for this measure if it's a ChordMeasure
+  List<ChordSymbol> get chordSymbols {
+    try {
+      // Use dynamic casting to access chordSymbols if it's a ChordMeasure
+      final dynamic chordMeasure = measure;
+      if (chordMeasure.runtimeType.toString().contains('ChordMeasure')) {
+        return chordMeasure.chordSymbols ?? <ChordSymbol>[];
+      }
+    } catch (e) {
+      // If casting fails, return empty list
+    }
+    return <ChordSymbol>[];
+  }
+
   /// Internal helper to create the list of [MusicalSymbolRenderer] objects.
   void _buildRenderers() {
     symbolRenderers.clear();
     if (measureMetrics.symbolMetricsList.isEmpty) return;
 
-    // Calculate the total natural width of symbols within this measure
-    final double naturalSymbolsWidth =
-        measureMetrics.symbolMetricsList.map((s) => s.width).sum;
-    final double naturalMarginsWidth =
-        measureMetrics.symbolMetricsList.map((s) => s.margin.horizontal).sum;
-
-    // Calculate the total natural width of the measure (symbols + margins)
-    final double naturalMeasureWidth = naturalSymbolsWidth + naturalMarginsWidth;
-
-    // Calculate the actual rendered width of the measure after stretching
-    final double stretchedMeasureWidth = naturalMeasureWidth * stretchFactor;
-
-    // Calculate the extra space available due to stretching
-    final double extraSpace = stretchedMeasureWidth - naturalMeasureWidth;
-
-    // Distribute the extra space evenly among the symbols (or just add to margins)
-    // For simplicity, we'll add it to the horizontal margins.
-    // This ensures the measure itself maintains its stretched width,
-    // and symbols are spaced out proportionally.
+    // Get chord symbols for this measure
+    final measureChordSymbols = chordSymbols;
 
     var currentX = 0.0;
-    for (final symbolMetric in measureMetrics.symbolMetricsList) {
+    int noteIndex = 0; // Track note index for chord association
+    
+    for (int i = 0; i < measureMetrics.symbolMetricsList.length; i++) {
+      final symbolMetric = measureMetrics.symbolMetricsList[i];
       final margin = symbolMetric.margin;
       // Apply stretch factor to individual margins
       currentX += margin.left * stretchFactor;
 
       final symbolX = measureOriginX + currentX;
+      
+      // Check if this symbol is a Note and associate with chord symbol
+      ChordSymbol? associatedChord;
+      if (symbolMetric is NoteMetrics) {
+        associatedChord = getChordSymbolForNote(
+          noteIndex,
+          measure.musicalSymbols,
+          measureChordSymbols,
+        );
+        noteIndex++;
+      }
+      
       final renderer = symbolMetric.renderer(
         layout,
         staffLineCenterY: staffLineCenterY,
         symbolX: symbolX,
       );
+      
+      // If this is a note renderer, set the associated chord symbol
+      if (renderer is NoteRenderer && associatedChord != null) {
+        renderer.setAssociatedChordSymbol(associatedChord);
+      }
       symbolRenderers.add(renderer);
 
       // Apply stretch factor to symbol width and right margin
