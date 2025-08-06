@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:music_sheet/index.dart';
 import 'package:music_sheet/simple_sheet_music.dart';
 
 void main() {

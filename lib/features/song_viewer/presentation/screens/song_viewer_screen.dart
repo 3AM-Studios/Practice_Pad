@@ -48,6 +48,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
 
   List<ChordSymbol> _chordSymbols = [];
   List<ChordMeasure> _chordMeasures = []; // Combined measures with chord symbols
+  Map<int, int> _globalToLocalIndexMap = {}; // Maps sheet music globalChordIndex to _chordSymbols index
   int _currentChordIndex = 0;
   double _totalSongDurationInBeats = 0;
   int _currentBpm = 0;
@@ -79,6 +80,12 @@ class _SongViewerScreenState extends State<SongViewerScreen>
   bool _isLongPressing = false; // Whether user is in long press selection mode
   int? _lastHoveredIndex; // Last chord index that was hovered during drag
   List<GlobalKey> _chordGlobalKeys = []; // Keys for chord widgets to get their positions
+  
+  // Auto-scroll functionality
+  final ScrollController _scrollController = ScrollController();
+  Timer? _autoScrollTimer;
+  Offset? _currentMousePosition;
+  final GlobalKey _sheetMusicKey = GlobalKey();
 
   @override
   void initState() {
@@ -367,6 +374,35 @@ class _SongViewerScreenState extends State<SongViewerScreen>
            chord1.effectiveQuality == chord2.effectiveQuality &&
            chord1.position == chord2.position &&
            chord1.originalKeySignature == chord2.originalKeySignature;
+  }
+
+  /// Builds mapping from sheet music globalChordIndex to _chordSymbols index
+  void _buildGlobalIndexMapping() {
+    _globalToLocalIndexMap.clear();
+    int globalIndex = 0;
+    int localIndex = 0;
+    
+    // Iterate through measures to match the sheet music widget's logic
+    for (int measureIndex = 0; measureIndex < _chordMeasures.length; measureIndex++) {
+      final chordMeasure = _chordMeasures[measureIndex];
+      
+      // Skip first measure rendering but count its chords (matching sheet music widget logic)
+      if (measureIndex == 0) {
+        // Count chords in first measure but don't map them (they're not rendered)
+        globalIndex += chordMeasure.chordSymbols.length;
+        localIndex += chordMeasure.chordSymbols.length;
+        continue;
+      }
+      
+      // Map each chord in this measure
+      for (int chordIndex = 0; chordIndex < chordMeasure.chordSymbols.length; chordIndex++) {
+        _globalToLocalIndexMap[globalIndex] = localIndex;
+        globalIndex++;
+        localIndex++;
+      }
+    }
+    
+    print('Created mapping: $_globalToLocalIndexMap');
   }
 
   /// Updates chord symbols in measures to match the flat _chordSymbols list
@@ -922,6 +958,9 @@ class _SongViewerScreenState extends State<SongViewerScreen>
         _userInputBeats.clear();
         _totalSongDurationInBeats = _chordSymbols.fold(0.0, (sum, chord) => sum + (chord.durationBeats ?? 0.0));
         
+        // Create mapping from globalChordIndex to _chordSymbols index
+        _buildGlobalIndexMapping();
+        
         // Invalidate sheet music cache when measures change
         _cachedSheetMusicWidget = null;
         _lastRenderedMeasures = null;
@@ -1080,6 +1119,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
         // Major key button
         GestureDetector(
           onTap: _isMinorKey ? () => _setMajorMode() : null,
+          behavior: HitTestBehavior.opaque, // Block taps from going to parent
           child: ClayContainer(
             color: _isMinorKey ? surfaceColor : primaryColor,
             borderRadius: 18,
@@ -1103,6 +1143,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
         // Minor key button
         GestureDetector(
           onTap: !_isMinorKey ? () => _setMinorMode() : null,
+          behavior: HitTestBehavior.opaque, // Block taps from going to parent
           child: ClayContainer(
             color: !_isMinorKey ? surfaceColor : primaryColor,
             borderRadius: 18,
@@ -1184,6 +1225,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
 
   /// Clears chord selection
   void _clearChordSelection() {
+    _stopAutoScroll();
     setState(() {
       _selectedChordIndices.clear();
       _isDragging = false;
@@ -1307,6 +1349,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
 
   /// Ends chord selection
   void _endChordSelection() {
+    _stopAutoScroll();
     setState(() {
       _isDragging = false;
       _isLongPressing = false;
@@ -1549,7 +1592,11 @@ class _SongViewerScreenState extends State<SongViewerScreen>
     return Container(
       margin: const EdgeInsets.all(16),
       child: GestureDetector(
-        onTap: _showCreateChordProgressionDialog,
+        onTap: () {
+          // Prevent the tap from clearing selection by stopping propagation
+          _showCreateChordProgressionDialog();
+        },
+        behavior: HitTestBehavior.opaque, // Block taps from going to parent
         child: ClayContainer(
           color: primaryColor,
           borderRadius: 20,
@@ -1595,7 +1642,11 @@ class _SongViewerScreenState extends State<SongViewerScreen>
       width: double.infinity,
       margin: const EdgeInsets.all(16),
       child: GestureDetector(
-        onTap: _showCreateGeneralPracticeItemDialog,
+        onTap: () {
+          // Prevent the tap from clearing selection by stopping propagation
+          _showCreateGeneralPracticeItemDialog();
+        },
+        behavior: HitTestBehavior.opaque, // Block taps from going to parent
         child: ClayContainer(
           color: tertiaryColor,
           borderRadius: 20,
@@ -1788,21 +1839,37 @@ class _SongViewerScreenState extends State<SongViewerScreen>
       
       _cachedSheetMusicWidget = _chordMeasures.isNotEmpty 
         ? RepaintBoundary(
-            child: music_sheet.SimpleSheetMusic(
-              height: 300,
-              width: 800, // Increased width for better visibility
-              measures: _chordMeasures.cast<music_sheet.Measure>(),
-              debug: false, // Disable debug mode for performance
-              initialKeySignatureType: _getCurrentKeySignature(), // Pass current key signature
-              onSymbolAdd: _insertSymbolAtPosition,
-              onSymbolUpdate: _updateSymbolAtPosition,
-              onSymbolDelete: _deleteSymbolAtPosition,
-              // Connect chord symbol interactions to song viewer functionality
-              onChordSymbolTap: _onChordSymbolTap,
-              onChordSymbolLongPress: _onChordSymbolLongPress,
-              onChordSymbolLongPressEnd: _onChordSymbolLongPressEnd,
-              onChordSymbolHover: _onChordSymbolHover,
-              isChordSelected: _isChordSelected,
+            child: GestureDetector(
+              onTap: () {
+                // Clear selection when tapping on sheet music area (but not on chord symbols)
+                // This will be called for general sheet music area taps
+                if (_selectedChordIndices.isNotEmpty) {
+                  _clearChordSelection();
+                }
+              },
+              behavior: HitTestBehavior.deferToChild, // Only handle taps not handled by children
+              child: MouseRegion(
+                key: _sheetMusicKey,
+                onHover: (event) {
+                  _currentMousePosition = event.position;
+                },
+                child: music_sheet.SimpleSheetMusic(
+                height: 300,
+                width: MediaQuery.of(context).size.width - 64, // Fit container width minus padding (32*2)
+                measures: _chordMeasures.cast<music_sheet.Measure>(),
+                debug: false, // Disable debug mode for performance
+                initialKeySignatureType: _getCurrentKeySignature(), // Pass current key signature
+                onSymbolAdd: _insertSymbolAtPosition,
+                onSymbolUpdate: _updateSymbolAtPosition,
+                onSymbolDelete: _deleteSymbolAtPosition,
+                // Connect chord symbol interactions to song viewer functionality
+                onChordSymbolTap: _onChordSymbolTap,
+                onChordSymbolLongPress: _onChordSymbolLongPress,
+                onChordSymbolLongPressEnd: _onChordSymbolLongPressEnd,
+                onChordSymbolHover: _onChordSymbolHover,
+                isChordSelected: _isChordSelected,
+                ),
+              ),
             ),
           )
         : Container(
@@ -1821,6 +1888,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
   void _onChordSymbolTap(dynamic chordSymbol, int globalChordIndex) {
     print('Chord symbol tapped: ${chordSymbol.toString()} at index $globalChordIndex');
     
+    // Chord symbol tapped - this prevents the parent GestureDetector from clearing selection
     // Use the actual chord symbol that was tapped instead of relying on globalChordIndex
     if (chordSymbol != null) {
       print('Tapped chord: ${chordSymbol.displaySymbol}');
@@ -1842,16 +1910,28 @@ class _SongViewerScreenState extends State<SongViewerScreen>
         }
       } else {
         print('chord ${chordSymbol.displaySymbol} is diatonic to $keyForAnalysis, no menu needed');
+        // For diatonic chords, we don't show a menu but we still "handle" the tap
+        // to prevent the parent GestureDetector from clearing the selection
       }
     }
   }
 
   /// Finds the index of a chord symbol in the _chordSymbols list
   int _findChordIndex(dynamic targetChord) {
+    // First try object identity (most reliable)
+    for (int i = 0; i < _chordSymbols.length; i++) {
+      if (identical(_chordSymbols[i], targetChord)) {
+        return i;
+      }
+    }
+    
+    // Fallback to property matching, but find the closest match considering position
+    // This helps distinguish between duplicate chords
     for (int i = 0; i < _chordSymbols.length; i++) {
       final chord = _chordSymbols[i];
-      // Use the same matching logic as _chordsMatch
       if (_chordsMatch(chord, targetChord)) {
+        // For duplicate chords, this will still return the first match
+        // but it's better than nothing
         return i;
       }
     }
@@ -1862,14 +1942,13 @@ class _SongViewerScreenState extends State<SongViewerScreen>
   void _onChordSymbolLongPress(dynamic chordSymbol, int globalChordIndex) {
     print('Chord symbol long pressed: ${chordSymbol.toString()} at index $globalChordIndex');
     
-    // Use the actual chord symbol instead of relying on globalChordIndex
-    if (chordSymbol != null) {
-      final actualIndex = _findChordIndex(chordSymbol);
-      if (actualIndex != -1) {
-        _startLongPressSelection(actualIndex);
-      } else {
-        print('Warning: Could not find chord ${chordSymbol.displaySymbol} in _chordSymbols list for long press');
-      }
+    // Use mapping to get the correct local index
+    final localIndex = _globalToLocalIndexMap[globalChordIndex];
+    if (localIndex != null && localIndex >= 0 && localIndex < _chordSymbols.length) {
+      print('Mapped global index $globalChordIndex to local index $localIndex');
+      _startLongPressSelection(localIndex);
+    } else {
+      print('Warning: Could not map globalChordIndex $globalChordIndex to local index');
     }
   }
 
@@ -1887,13 +1966,85 @@ class _SongViewerScreenState extends State<SongViewerScreen>
     
     // Update selection if we're dragging
     if (_isDragging && _isLongPressing) {
-      _updateChordSelectionDrag(globalChordIndex);
+      // Use mapping to get the correct local index
+      final localIndex = _globalToLocalIndexMap[globalChordIndex];
+      if (localIndex != null && localIndex >= 0 && localIndex < _chordSymbols.length) {
+        _updateChordSelectionDrag(localIndex);
+        // Auto-scroll is now handled globally in the MouseRegion
+      } else {
+        print('Warning: Could not map globalChordIndex $globalChordIndex to local index for hover');
+      }
     }
   }
 
   /// Returns whether a chord symbol is currently selected
   bool _isChordSelected(int globalChordIndex) {
-    return _selectedChordIndices.contains(globalChordIndex);
+    if (_selectedChordIndices.isEmpty) return false;
+    
+    // Use mapping to get the correct local index
+    final localIndex = _globalToLocalIndexMap[globalChordIndex];
+    if (localIndex != null) {
+      return _selectedChordIndices.contains(localIndex);
+    }
+    return false;
+  }
+
+  /// Check if auto-scrolling should be triggered during drag selection
+  void _checkAutoScroll() {
+    if (!_scrollController.hasClients || _currentMousePosition == null) return;
+    
+    // Get the sheet music widget's render box
+    final RenderBox? sheetMusicBox = _sheetMusicKey.currentContext?.findRenderObject() as RenderBox?;
+    if (sheetMusicBox == null) return;
+    
+    // Get sheet music widget's position and size
+    final sheetMusicPosition = sheetMusicBox.localToGlobal(Offset.zero);
+    final sheetMusicSize = sheetMusicBox.size;
+    
+    // Define scroll zone (100 pixels below the sheet music widget)
+    const scrollZoneHeight = 100.0;
+    final sheetMusicBottom = sheetMusicPosition.dy + sheetMusicSize.height;
+    final scrollZoneBottom = sheetMusicBottom + scrollZoneHeight;
+    
+    // Check if mouse is below the sheet music widget (in the scroll zone)
+    if (_currentMousePosition!.dy >= sheetMusicBottom && _currentMousePosition!.dy <= scrollZoneBottom) {
+      _startAutoScroll();
+    } else {
+      _stopAutoScroll();
+    }
+  }
+
+  /// Start auto-scrolling timer
+  void _startAutoScroll() {
+    if (_autoScrollTimer != null) return; // Already scrolling
+    
+    _autoScrollTimer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
+      if (!_isDragging || !_isLongPressing) {
+        timer.cancel();
+        _autoScrollTimer = null;
+        return;
+      }
+      
+      // Scroll down during drag
+      if (_scrollController.hasClients) {
+        final currentOffset = _scrollController.offset;
+        final maxOffset = _scrollController.position.maxScrollExtent;
+        
+        if (currentOffset < maxOffset) {
+          _scrollController.animateTo(
+            currentOffset + 3.0, // Scroll down by 3 pixels (slower)
+            duration: const Duration(milliseconds: 50),
+            curve: Curves.linear,
+          );
+        }
+      }
+    });
+  }
+
+  /// Stop auto-scrolling
+  void _stopAutoScroll() {
+    _autoScrollTimer?.cancel();
+    _autoScrollTimer = null;
   }
 
   void _onTick(int tick) {
@@ -1961,6 +2112,10 @@ class _SongViewerScreenState extends State<SongViewerScreen>
   void dispose() {
     _tickSubscription?.cancel();
     _metronome.destroy();
+    
+    // Clean up auto-scroll timer
+    _autoScrollTimer?.cancel();
+    _scrollController.dispose();
     
     // Dispose ValueNotifiers
     _beatNotifier.dispose();
@@ -2130,11 +2285,20 @@ class _SongViewerScreenState extends State<SongViewerScreen>
           backgroundColor: surfaceColor,
           iconTheme: IconThemeData(color: onSurfaceColor),
         ),
-        body: GestureDetector(
-          onTap: _handleTapOutside, // Clear selection when tapping anywhere outside chords
-          child: SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        body: MouseRegion(
+          onHover: (event) {
+            // Track mouse position globally for auto-scroll detection
+            _currentMousePosition = event.position;
+            if (_isDragging && _isLongPressing) {
+              _checkAutoScroll();
+            }
+          },
+          child: GestureDetector(
+            onTap: _handleTapOutside, // Clear selection when tapping anywhere outside chords
+            child: SafeArea(
+              child: SingleChildScrollView(
+                controller: _scrollController,
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Column(
                 children: [
                   const SizedBox(height: 16),
@@ -2268,7 +2432,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                         child: Padding(
                           padding: const EdgeInsets.all(16),
                           child: SizedBox(
-                            width: double.infinity, // Use full available width
+                            width: MediaQuery.of(context).size.width - 64, // Match SimpleSheetMusic width
                             height: 300, // Increased height to match SimpleSheetMusic
                             child: _buildCachedSheetMusic(),
                           ),
@@ -2341,7 +2505,8 @@ class _SongViewerScreenState extends State<SongViewerScreen>
               ),
             ),
           ),
-        ), // GestureDetector
-      );
-  }
-    }
+        ), // MouseRegio
+      )); // Scaffold
+    }  
+}
+

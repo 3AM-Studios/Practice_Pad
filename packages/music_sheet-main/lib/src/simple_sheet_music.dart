@@ -515,7 +515,7 @@ void _resetInteractionState() {
     // Use the widget's current key signature
     final currentKeySignature = widget.initialKeySignatureType;
 
-    // Track global chord index across all measures
+    // Track global chord index across all measures - need to account for ALL measures in the source data
     int globalChordIndex = 0;
 
     // Iterate through each staff line
@@ -528,12 +528,31 @@ void _resetInteractionState() {
       for (int measureIndex = 0;
           measureIndex < staffRenderer.measureRendereres.length;
           measureIndex++) {
-        if (staffIndex == 0 && measureIndex == 0) {
-          // Skip the first measure in the first staff
-          continue;
-        }
         final measureRenderer = staffRenderer.measureRendereres[measureIndex];
         final measure = measureRenderer.measure;
+        
+        // Always count chords from all measures (including skipped ones) to maintain correct indexing
+        if (measure.runtimeType.toString() == 'ChordMeasure') {
+          try {
+            final dynamic chordMeasure = measure;
+            final dynamic chordSymbols = chordMeasure.chordSymbols;
+            
+            if (chordSymbols != null && chordSymbols is List && chordSymbols.isNotEmpty) {
+              if (staffIndex == 0 && measureIndex == 0) {
+                // Skip rendering the first measure but still increment the index for consistency
+                globalChordIndex += chordSymbols.length;
+                continue;
+              }
+            }
+          } catch (e) {
+            // If there's an error accessing chord symbols, continue
+          }
+        }
+        
+        if (staffIndex == 0 && measureIndex == 0) {
+          // Skip the first measure in the first staff (already handled above)
+          continue;
+        }
 
         // Check if this is a ChordMeasure with chord symbols
         if (measure.runtimeType.toString() == 'ChordMeasure') {
@@ -558,6 +577,9 @@ void _resetInteractionState() {
                   chordIndex++) {
                 final dynamic chordSymbol = chordSymbols[chordIndex];
                 if (chordSymbol != null) {
+                  // Capture the current globalChordIndex value for this chord symbol
+                  final int currentGlobalIndex = globalChordIndex;
+                  
                   // Calculate position for this chord symbol - properly centered
                   double chordX;
                   if (chordSymbols.length == 1) {
@@ -589,37 +611,37 @@ void _resetInteractionState() {
                             ? (details) {
                                 // Handle drag updates by finding chord under current position
                                 widget.onChordSymbolHover!(
-                                    chordSymbol, globalChordIndex);
+                                    chordSymbol, currentGlobalIndex);
                               }
                             : null,
                         child: MouseRegion(
                           onEnter: widget.onChordSymbolHover != null
                               ? (_) => widget.onChordSymbolHover!(
-                                  chordSymbol, globalChordIndex)
+                                  chordSymbol, currentGlobalIndex)
                               : null,
                           child: chordSymbol.buildWidget(
                             context: context,
                             currentKeySignature: currentKeySignature,
                             // Pass selection state for visual feedback
                             isSelected: widget.isChordSelected
-                                    ?.call(globalChordIndex) ??
+                                    ?.call(currentGlobalIndex) ??
                                 false,
                             isAnimating: false,
                             isNewMeasure: false,
                             // Connect to widget callbacks for interaction
                             onTap: widget.onChordSymbolTap != null
                                 ? () => widget.onChordSymbolTap!(
-                                    chordSymbol, globalChordIndex)
+                                    chordSymbol, currentGlobalIndex)
                                 : null,
                             onLongPress: widget.onChordSymbolLongPress != null
                                 ? () => widget.onChordSymbolLongPress!(
-                                    chordSymbol, globalChordIndex)
+                                    chordSymbol, currentGlobalIndex)
                                 : null,
                             onLongPressEnd: widget.onChordSymbolLongPressEnd !=
                                     null
                                 ? (details) =>
                                     widget.onChordSymbolLongPressEnd!(
-                                        chordSymbol, globalChordIndex, details)
+                                        chordSymbol, currentGlobalIndex, details)
                                 : null,
                           ) as Widget,
                         ),

@@ -180,7 +180,6 @@ class SheetMusicLayout with ChangeNotifier {
       Map<String, MusicalSymbolMetrics> metricsCache) {
     final measureRenderer =
         staffRenderers.first.measureRendereres[measureIndex];
-    final oldWidth = measureRenderer.width;
 
     final symbolToDelete =
         measureRenderer.measure.musicalSymbols[positionIndex];
