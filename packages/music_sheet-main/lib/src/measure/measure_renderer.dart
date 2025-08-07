@@ -14,6 +14,9 @@ import 'package:music_sheet/src/sheet_music_layout.dart';
 import 'package:music_sheet/src/musical_context.dart';
 import 'package:music_sheet/src/utils/chord_note_association.dart';
 import 'package:practice_pad/features/song_viewer/presentation/widgets/measure/chord_symbol/chord_symbol.dart';
+import 'package:music_sheet/src/music_objects/notes/note_beam/beam_group.dart';
+import 'package:music_sheet/src/music_objects/notes/note_beam/beam_calculator.dart';
+import 'package:music_sheet/src/music_objects/notes/note_beam/beam_renderer.dart';
 
 /// The renderer for a measure in sheet music.
 /// This class is now stateful and manages its own layout, allowing for
@@ -35,6 +38,8 @@ class MeasureRenderer {
   late MeasureMetrics measureMetrics;
   List<MusicalSymbolRenderer> symbolRenderers = [];
   final Map<MusicalSymbol, Rect> _symbolBounds = {};
+  List<BeamRenderer> beamRenderers = [];
+  final Map<Note, Offset> _beamedNoteCustomStems = {};
 
   final double? targetWidth;
   final double stretchFactor;
@@ -104,6 +109,8 @@ class MeasureRenderer {
   /// Internal helper to create the list of [MusicalSymbolRenderer] objects.
   void _buildRenderers() {
     symbolRenderers.clear();
+    beamRenderers.clear();
+    _beamedNoteCustomStems.clear();
     if (measureMetrics.symbolMetricsList.isEmpty) return;
 
     // Get chord symbols for this measure
@@ -111,16 +118,39 @@ class MeasureRenderer {
 
     var currentX = 0.0;
     int noteIndex = 0; // Track note index for chord association
+    final notePositions = <double>[];
+    final noteMetricsList = <NoteMetrics>[];
+    final notes = <Note>[];
     
+    // First pass: collect note information and create beam groups
     for (int i = 0; i < measureMetrics.symbolMetricsList.length; i++) {
       final symbolMetric = measureMetrics.symbolMetricsList[i];
       final margin = symbolMetric.margin;
-      // Apply stretch factor to individual margins
       currentX += margin.left * stretchFactor;
-
       final symbolX = measureOriginX + currentX;
       
-      // Check if this symbol is a Note and associate with chord symbol
+      if (symbolMetric is NoteMetrics) {
+        notePositions.add(symbolX);
+        noteMetricsList.add(symbolMetric);
+        notes.add(symbolMetric.note);
+        noteIndex++;
+      }
+      currentX += (symbolMetric.width + margin.right) * stretchFactor;
+    }
+    
+    // Create beam groups and calculate adjusted stem positions
+    _createBeamRenderers(notes, notePositions, noteMetricsList);
+    
+    // Second pass: create renderers with adjusted stem positions for beamed notes
+    currentX = 0.0;
+    noteIndex = 0;
+    for (int i = 0; i < measureMetrics.symbolMetricsList.length; i++) {
+      final symbolMetric = measureMetrics.symbolMetricsList[i];
+      final margin = symbolMetric.margin;
+      currentX += margin.left * stretchFactor;
+      final symbolX = measureOriginX + currentX;
+      
+      // Check if this symbol is a Note and associate with chord symbol  
       ChordSymbol? associatedChord;
       if (symbolMetric is NoteMetrics) {
         associatedChord = getChordSymbolForNote(
@@ -137,9 +167,17 @@ class MeasureRenderer {
         symbolX: symbolX,
       );
       
-      // If this is a note renderer, set the associated chord symbol
-      if (renderer is NoteRenderer && associatedChord != null) {
-        renderer.setAssociatedChordSymbol(associatedChord);
+      // If this is a note renderer, set the associated chord symbol and custom stem tip if applicable
+      if (renderer is NoteRenderer) {
+        if (associatedChord != null) {
+          renderer.setAssociatedChordSymbol(associatedChord);
+        }
+        
+        // Check if this note has a custom stem tip position (beamed note)
+        final note = (symbolMetric as NoteMetrics).note;
+        if (_beamedNoteCustomStems.containsKey(note)) {
+          renderer.setCustomStemTipOffset(_beamedNoteCustomStems[note]!);
+        }
       }
       symbolRenderers.add(renderer);
 
@@ -147,11 +185,91 @@ class MeasureRenderer {
       currentX += (symbolMetric.width + margin.right) * stretchFactor;
     }
   }
+
+  /// Creates beam renderers for grouped notes
+  void _createBeamRenderers(List<Note> notes, List<double> notePositions, List<NoteMetrics> noteMetricsList) {
+    if (notes.isEmpty) return;
+    
+    // Create beam groups
+    final beamGroups = BeamGroupAnalyzer.createBeamGroups(notes);
+    
+    final beamCalculator = BeamCalculator(glyphMetadata);
+    
+    for (final beamGroup in beamGroups) {
+      if (!beamGroup.shouldBeBeamed) continue;
+      
+      // Find the indices of notes in this beam group
+      final groupIndices = <int>[];
+      for (final note in beamGroup.notes) {
+        final index = notes.indexOf(note);
+        if (index >= 0) groupIndices.add(index);
+      }
+      
+      if (groupIndices.length < 2) continue;
+      
+      // Get positions and stem tips for the beam group
+      // Use stem position instead of note head center for proper beam connection
+      final groupNotePositions = groupIndices.map((i) {
+        final noteMetrics = noteMetricsList[i];
+        return notePositions[i] + noteMetrics.stemRootOffset.dx;
+      }).toList();
+      
+      // Use the original stem tip positions to calculate beam slope
+      final originalGroupStemTipYPositions = groupIndices.map((i) {
+        final noteMetrics = noteMetricsList[i];
+        return staffLineCenterY + noteMetrics.stemTipOffset.dy + noteMetrics.stavePosition.positionOffset.dy;
+      }).toList();
+      
+      // Calculate beam metrics with original positions to get proper slope
+      final preliminaryBeamMetrics = beamCalculator.calculateBeamMetrics(
+        beamGroup,
+        groupNotePositions,
+        originalGroupStemTipYPositions,
+      );
+      
+      // Now calculate where each stem should end to connect to this sloped beam
+      final adjustedGroupStemTipYPositions = groupNotePositions.map((x) {
+        return preliminaryBeamMetrics.getYAtX(x);
+      }).toList();
+      
+      // Set custom stem tip positions for all notes in this beam group
+      for (int i = 0; i < groupIndices.length; i++) {
+        final noteIndex = groupIndices[i];
+        final noteMetrics = noteMetricsList[noteIndex];
+        final adjustedStemTipY = adjustedGroupStemTipYPositions[i];
+        
+        // Calculate the custom stem tip offset relative to note position
+        final customStemTipOffset = Offset(
+          noteMetrics.stemRootOffset.dx,
+          adjustedStemTipY - staffLineCenterY - noteMetrics.stavePosition.positionOffset.dy,
+        );
+        
+        // Store this information for later use when creating note renderers
+        _beamedNoteCustomStems[notes[noteIndex]] = customStemTipOffset;
+      }
+      
+      // Use the preliminary beam metrics (which already have the right slope)
+      final beamMetrics = preliminaryBeamMetrics;
+      
+      // Create beam renderer
+      final beamRenderer = BeamRenderer(
+        beamGroup: beamGroup,
+        beamMetrics: beamMetrics,
+        noteXPositions: groupNotePositions,
+        stemTipYPositions: adjustedGroupStemTipYPositions,
+        color: layout.lineColor,
+      );
+      
+      beamRenderers.add(beamRenderer);
+    }
+  }
+
   
   // The 'render' method itself remains largely the same.
   void render(Canvas canvas, Size size, {MusicalSymbol? selectedSymbol}) {
     _symbolBounds.clear(); // Clear layout info from the previous frame
 
+    // Render symbols but hide flags for beamed notes
     for (final symbolRenderer in symbolRenderers) {
       final bounds = symbolRenderer.getBounds();
       _symbolBounds[symbolRenderer.musicalSymbol] = bounds;
@@ -160,7 +278,18 @@ class MeasureRenderer {
         symbolPositionCallback!(symbolRenderer.musicalSymbol, bounds);
       }
 
-      symbolRenderer.render(canvas);
+      // Check if this note should have its flag hidden (it's part of a beam)
+      bool shouldHideFlag = false;
+      if (symbolRenderer is NoteRenderer) {
+        shouldHideFlag = _isNoteBeamed(symbolRenderer.noteMetrics.note);
+      }
+
+      // Render the symbol (with flag conditionally hidden)
+      if (shouldHideFlag && symbolRenderer is NoteRenderer) {
+        _renderNoteWithoutFlag(canvas, symbolRenderer);
+      } else {
+        symbolRenderer.render(canvas);
+      }
 
       if (symbolRenderer.musicalSymbol == selectedSymbol) {
         final paint = Paint()
@@ -169,7 +298,29 @@ class MeasureRenderer {
         canvas.drawRect(bounds, paint);
       }
     }
+
+    // Render beams
+    for (final beamRenderer in beamRenderers) {
+      beamRenderer.render(canvas);
+    }
+    
     _renderBarline(canvas);
+  }
+
+  /// Checks if a note is part of a beam group
+  bool _isNoteBeamed(Note note) {
+    for (final beamRenderer in beamRenderers) {
+      if (beamRenderer.beamGroup.notes.contains(note)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Renders a note without its flag (for beamed notes)
+  void _renderNoteWithoutFlag(Canvas canvas, NoteRenderer noteRenderer) {
+    // Access the note renderer's private methods through a custom render
+    noteRenderer.renderWithoutFlag(canvas);
   }
 
   // All other public methods and getters remain the same as they operate on the

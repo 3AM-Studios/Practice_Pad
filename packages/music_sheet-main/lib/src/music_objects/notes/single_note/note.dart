@@ -17,6 +17,7 @@ import 'package:music_sheet/src/sheet_music_layout.dart';
 import 'package:practice_pad/features/song_viewer/presentation/widgets/measure/chord_symbol/chord_symbol.dart';
 import 'package:music_sheet/src/utils/scale_degree_calculator.dart';
 import 'package:music_sheet/src/utils/chord_note_association.dart';
+import 'package:music_sheet/src/constants.dart';
 
 /// Represents a musical note.
 class Note extends MusicalSymbol with EquatableMixin {
@@ -137,7 +138,15 @@ class NoteMetrics implements MusicalSymbolMetrics {
   /// Calculates the stem tip as if there were no flag.
   Offset get _stemTipWithoutFlag {
     final stemRootToStaffCenterDist = (stemRootOffset.dy + stavePosition.positionOffset.dy).abs();
-    final minStemLength = metadata.minStemLength;
+    // Increase stem length to 2.5 staff spaces (staff space is the distance between lines)
+    // Constants.staffSpace represents one staff space, so 2.5 * staffSpace = 2.5 spaces
+    var minStemLength = Constants.staffSpace * 2.5;
+    
+    // Make stem-down stems slightly shorter to match stem-up stems visually
+    if (!isStemUp) {
+      minStemLength *= 0.9; // Make stem-down 90% of stem-up length
+    }
+    
     final isStemCentered = stemRootToStaffCenterDist > minStemLength;
 
     if (isStemCentered) {
@@ -215,10 +224,18 @@ class NoteRenderer with DebugRenderMixin implements MusicalSymbolRenderer {
 
   /// The chord symbol associated with this note (for extension number display)
   ChordSymbol? _associatedChordSymbol;
+  
+  /// Custom stem tip position for beamed notes
+  Offset? _customStemTipOffset;
 
   /// Sets the chord symbol associated with this note
   void setAssociatedChordSymbol(ChordSymbol? chordSymbol) {
     _associatedChordSymbol = chordSymbol;
+  }
+  
+  /// Sets a custom stem tip position (used for beamed notes)
+  void setCustomStemTipOffset(Offset stemTipOffset) {
+    _customStemTipOffset = stemTipOffset;
   }
 
   Offset get _renderOffset => Offset(symbolX, staffLineCenterY);
@@ -245,6 +262,21 @@ class NoteRenderer with DebugRenderMixin implements MusicalSymbolRenderer {
     }
   }
 
+  /// Renders the note without its flag (used for beamed notes)
+  void renderWithoutFlag(Canvas canvas) {
+    _renderAccidental(canvas);
+    _renderNoteHead(canvas);
+    _renderStem(canvas); // This will use custom stem tip if set
+    // Note: _renderFlag is intentionally skipped
+    _renderLegerLine(canvas);
+    _renderScaleDegree(canvas);
+    _renderChordExtension(canvas);
+
+    if (layout.debug) {
+      renderBoundingBox(canvas, getBounds());
+    }
+  }
+
   void _renderAccidental(Canvas canvas) {
     if (!noteMetrics.hasAccidental) return;
     final path = noteMetrics.accidentalPath!;
@@ -261,9 +293,13 @@ class NoteRenderer with DebugRenderMixin implements MusicalSymbolRenderer {
   void _renderStem(Canvas canvas) {
     if (!noteMetrics.hasStem) return;
     final offset = _renderOffset + _pitchOffset;
+    
+    // Use custom stem tip if set (for beamed notes), otherwise use calculated stem tip
+    final stemTip = _customStemTipOffset ?? noteMetrics.stemTipOffset;
+    
     canvas.drawLine(
       noteMetrics.stemRootOffset + offset,
-      noteMetrics.stemTipOffset + offset,
+      stemTip + offset,
       Paint()
         ..color = noteMetrics.color
         ..strokeWidth = noteMetrics.stemThickness,
