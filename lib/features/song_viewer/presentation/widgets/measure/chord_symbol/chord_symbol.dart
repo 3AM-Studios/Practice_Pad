@@ -253,17 +253,17 @@ class ChordSymbol {
   /// This is the SINGLE SOURCE OF TRUTH for all chord quality formatting
   static String formatChordQuality(String quality) {
     // Handle chord quality patterns with proper superscript notation
+    // Order matters: handle more specific patterns before general ones
     return quality
-        .replaceAll('m7b5', 'ø⁷')   // Half-diminished (must be before m7 replacement)
-        .replaceAll('half-diminished', 'ø⁷')
-        .replaceAll('min7', '⁻⁷')  // Minor 7th
-        .replaceAll('maj7', 'ᴹ⁷')  // Major 7th with capital M
-        .replaceAll('m7', '⁻⁷')    // Minor 7th (alternative)
-        .replaceAll('M7', 'ᴹ⁷')    // Major 7th (alternative)
-        .replaceAll('m9', '⁻⁹')    // Minor 9th
-        .replaceAll('maj9', 'ᴹ⁹')  // Major 9th with capital M
-        .replaceAll('m6', '⁻⁶')    // Minor 6th
-        .replaceAll('6', '⁶')      // Major 6th
+        // Handle diminished chords first (most specific)
+        .replaceAll('m7b5', 'ø')    // Half-diminished (just the symbol, no 7)
+        .replaceAll('half-diminished', 'ø')
+        .replaceAll('dim7', '°')    // Fully diminished (just the symbol, no 7) 
+        .replaceAll('diminished-seventh', '°')
+        .replaceAll('diminished', '°')
+        .replaceAll('dim', '°')     // Diminished triad
+        
+        // Handle complex 7th chords with alterations
         .replaceAll('7b9', '⁷ᵇ⁹')  // Dominant 7th flat 9
         .replaceAll('7#9', '⁷♯⁹')  // Dominant 7th sharp 9
         .replaceAll('7b5', '⁷ᵇ⁵')  // Dominant 7th flat 5
@@ -271,18 +271,45 @@ class ChordSymbol {
         .replaceAll('7+', '⁷⁺')    // Dominant 7th augmented 5
         .replaceAll('aug7', '⁺⁷')  // Augmented 7th
         .replaceAll('augmented-seventh', '⁺⁷')
-        .replaceAll('dim7', '°⁷')  // Diminished 7th
-        .replaceAll('dim', '°')    // Diminished
-        .replaceAll('diminished', '°')
+        
+        // Handle 7th chords
+        .replaceAll('min7', '⁻⁷')  // Minor 7th
+        .replaceAll('maj7', 'ᴹ⁷')  // Major 7th with capital M
+        .replaceAll('m7', '⁻⁷')    // Minor 7th (alternative)
+        .replaceAll('M7', 'ᴹ⁷')    // Major 7th (alternative)
+        
+        // Handle extended chords with alterations
+        .replaceAll('#11', '♯¹¹')  // Sharp 11
+        .replaceAll('b13', 'ᵇ¹³')  // Flat 13
+        .replaceAll('maj9', 'ᴹ⁹')  // Major 9th with capital M
+        .replaceAll('m9', '⁻⁹')    // Minor 9th
+        .replaceAll('add9', 'ᵃᵈᵈ⁹') // Add 9
+        
+        // Handle standalone alterations (must come before general numbers)
+        .replaceAll('#9', '♯⁹')    // Sharp 9 (standalone)
+        .replaceAll('#5', '♯⁵')    // Sharp 5 (standalone)
+        .replaceAll('b9', 'ᵇ⁹')    // Flat 9 (standalone)
+        .replaceAll('b5', 'ᵇ⁵')    // Flat 5 (standalone)
+        
+        // Handle suspended chords
         .replaceAll('sus4', 'ˢᵘˢ⁴') // Suspended 4th
         .replaceAll('sus2', 'ˢᵘˢ²') // Suspended 2nd
-        .replaceAll('add9', 'ᵃᵈᵈ⁹') // Add 9
+        
+        // Handle 6th chords
+        .replaceAll('m6', '⁻⁶')    // Minor 6th
+        .replaceAll('6', '⁶')      // Major 6th
+        
+        // Handle augmented
         .replaceAll('aug', '⁺')    // Augmented
+        
+        // Handle basic qualities
         .replaceAll('min', '')     // Minor triad (no symbol)
-        .replaceAll('maj', 'ᴹᵃʲ')  // Major triad with superscript 
-        .replaceAll('9', '⁹')     // 9th chord
-        .replaceAll('11', '¹¹')   // 11th chord
+        .replaceAll('maj', 'ᴹᵃʲ')  // Major triad with superscript
+        
+        // Handle general numbers last to avoid conflicts
         .replaceAll('13', '¹³')   // 13th chord
+        .replaceAll('11', '¹¹')   // 11th chord
+        .replaceAll('9', '⁹')     // 9th chord
         .replaceAll('7', '⁷');    // Dominant 7th (keep this last to avoid conflicts)
   }
 
@@ -959,6 +986,7 @@ class ChordSymbol {
     bool isSelected = false,
     bool isAnimating = false,
     bool isNewMeasure = false,
+    bool isStartOfReharmonizedSequence = false,
     GlobalKey? globalKey,
     VoidCallback? onTap,
     VoidCallback? onLongPress,
@@ -995,6 +1023,7 @@ class ChordSymbol {
             surfaceColor: surfaceColor,
             onSurfaceColor: onSurfaceColor,
             currentKeySignature: currentKeySignature,
+            isStartOfReharmonizedSequence: isStartOfReharmonizedSequence,
           ),
         ),
       ),
@@ -1011,36 +1040,48 @@ class ChordSymbol {
     required Color surfaceColor,
     required Color onSurfaceColor,
     required KeySignatureType currentKeySignature,
+    required bool isStartOfReharmonizedSequence,
   }) {
-    return ClayContainer(
-      key: globalKey,
-      color: isSelected
-          ? primaryColor // Strong primary color for selected
-          : isCurrentChord
-              ? primaryColor.withOpacity(0.3) // Light primary for current
-              : isNonDiatonic
-                  ? Colors.orange.withOpacity(0.8) // Orange for non-diatonic
-                  : surfaceColor, // Clean surface for diatonic
-      borderRadius: 12,
-      depth: isSelected ? 15 : (isNonDiatonic ? 10 : 8),
-      spread: isSelected ? 4 : 2,
-      curveType: isSelected
-          ? CurveType.concave
-          : isCurrentChord
-              ? CurveType.convex
-              : CurveType.none,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          border: isNewMeasure
-              ? Border(left: BorderSide(color: primaryColor, width: 3.0))
-              : isSelected
-                  ? Border.all(color: Colors.white, width: 2.0)
-                  : isNonDiatonic
-                      ? Border.all(color: Colors.orange.shade700, width: 1.5)
-                      : null,
-        ),
+    final bool isReharmonized = modifiedKeySignature != null;
+    final Color reharmonizeColor = Colors.purple; // Color for reharmonized chords
+    
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        // Main chord container at original position
+        ClayContainer(
+          key: globalKey,
+          color: isSelected
+              ? primaryColor // Strong primary color for selected
+              : isCurrentChord
+                  ? primaryColor.withOpacity(0.3) // Light primary for current
+                  : isReharmonized
+                      ? reharmonizeColor.withOpacity(0.8) // Purple for reharmonized
+                      : isNonDiatonic
+                          ? Colors.orange.withOpacity(0.8) // Orange for non-diatonic
+                          : surfaceColor, // Clean surface for diatonic
+          borderRadius: 12,
+          depth: isSelected ? 15 : (isReharmonized || isNonDiatonic ? 10 : 8),
+          spread: isSelected ? 4 : 2,
+          curveType: isSelected
+              ? CurveType.concave
+              : isCurrentChord
+                  ? CurveType.convex
+                  : CurveType.none,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: isNewMeasure
+                  ? Border(left: BorderSide(color: primaryColor, width: 3.0))
+                  : isSelected
+                      ? Border.all(color: Colors.white, width: 2.0)
+                      : isReharmonized
+                          ? Border.all(color: reharmonizeColor.withOpacity(0.8), width: 1.5)
+                          : isNonDiatonic
+                              ? Border.all(color: Colors.orange.withOpacity(0.8), width: 1.5)
+                              : null,
+            ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1101,7 +1142,104 @@ class ChordSymbol {
             ),
           ],
         ),
-      ),
+          ),
+        ),
+        // Key indicator positioned above the chord (only shows when needed)
+        if (isReharmonized && isStartOfReharmonizedSequence)
+          Positioned(
+            top: -20, // Position above the chord container
+            left: 0,
+            right: 0,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: reharmonizeColor.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: reharmonizeColor.withOpacity(0.6),
+                  width: 1,
+                ),
+              ),
+              child: Text(
+                _getKeyNameFromSignature(modifiedKeySignature!),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.bold,
+                  color: reharmonizeColor.withOpacity(0.8),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
+  }
+
+  /// Helper method to get key name from key signature
+  String _getKeyNameFromSignature(KeySignatureType keySignature) {
+    switch (keySignature) {
+      case KeySignatureType.cMajor:
+        return 'C';
+      case KeySignatureType.gMajor:
+        return 'G';
+      case KeySignatureType.dMajor:
+        return 'D';
+      case KeySignatureType.aMajor:
+        return 'A';
+      case KeySignatureType.eMajor:
+        return 'E';
+      case KeySignatureType.bMajor:
+        return 'B';
+      case KeySignatureType.fSharpMajor:
+        return 'F#';
+      case KeySignatureType.cSharpMajor:
+        return 'C#';
+      case KeySignatureType.fMajor:
+        return 'F';
+      case KeySignatureType.bFlatMajor:
+        return 'B♭';
+      case KeySignatureType.eFlatMajor:
+        return 'E♭';
+      case KeySignatureType.aFlatMajor:
+        return 'A♭';
+      case KeySignatureType.dFlatMajor:
+        return 'D♭';
+      case KeySignatureType.gFlatMajor:
+        return 'G♭';
+      case KeySignatureType.cFlatMajor:
+        return 'C♭';
+      case KeySignatureType.aMinor:
+        return 'Am';
+      case KeySignatureType.eMinor:
+        return 'Em';
+      case KeySignatureType.bMinor:
+        return 'Bm';
+      case KeySignatureType.fSharpMinor:
+        return 'F#m';
+      case KeySignatureType.cSharpMinor:
+        return 'C#m';
+      case KeySignatureType.gSharpMinor:
+        return 'G#m';
+      case KeySignatureType.dSharpMinor:
+        return 'D#m';
+      case KeySignatureType.aSharpMinor:
+        return 'A#m';
+      case KeySignatureType.dMinor:
+        return 'Dm';
+      case KeySignatureType.gMinor:
+        return 'Gm';
+      case KeySignatureType.cMinor:
+        return 'Cm';
+      case KeySignatureType.fMinor:
+        return 'Fm';
+      case KeySignatureType.bFlatMinor:
+        return 'B♭m';
+      case KeySignatureType.eFlatMinor:
+        return 'E♭m';
+      case KeySignatureType.aFlatMinor:
+        return 'A♭m';
+      default:
+        return 'C';
+    }
   }
 }

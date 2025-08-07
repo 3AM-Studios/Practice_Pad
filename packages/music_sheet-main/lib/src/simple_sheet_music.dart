@@ -580,6 +580,21 @@ void _resetInteractionState() {
                   // Capture the current globalChordIndex value for this chord symbol
                   final int currentGlobalIndex = globalChordIndex;
                   
+                  // Determine if this chord is the start of a reharmonized sequence
+                  bool isStartOfReharmonizedSequence = false;
+                  if (chordSymbol.modifiedKeySignature != null) {
+                    // Check if previous chord has different or no modifiedKeySignature
+                    if (chordIndex == 0) {
+                      // First chord in measure - need to check previous measure
+                      isStartOfReharmonizedSequence = true; // Assume start for now
+                    } else {
+                      // Check previous chord in same measure
+                      final previousChord = chordSymbols[chordIndex - 1];
+                      isStartOfReharmonizedSequence = previousChord.modifiedKeySignature == null ||
+                          previousChord.modifiedKeySignature != chordSymbol.modifiedKeySignature;
+                    }
+                  }
+                  
                   // Calculate position for this chord symbol - properly centered
                   double chordX;
                   if (chordSymbols.length == 1) {
@@ -628,6 +643,7 @@ void _resetInteractionState() {
                                 false,
                             isAnimating: false,
                             isNewMeasure: false,
+                            isStartOfReharmonizedSequence: isStartOfReharmonizedSequence,
                             // Connect to widget callbacks for interaction
                             onTap: widget.onChordSymbolTap != null
                                 ? () => widget.onChordSymbolTap!(

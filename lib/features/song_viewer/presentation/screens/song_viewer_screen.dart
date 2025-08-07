@@ -72,6 +72,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
   // Dial menu state for non-diatonic chord reharmonization
   bool _showDialMenu = false; // Controls whether the dial menu widget is visible
   List<ChordSymbol>? _selectedChordGroup; // The chord group currently selected for key change
+  List<int>? _selectedChordGroupIndices; // The indices of the selected chord group
 
   // Chord selection state for practice item creation (temporarily disabled for canvas rendering)
   final Set<int> _selectedChordIndices = <int>{}; // Selected chord indices
@@ -123,22 +124,31 @@ class _SongViewerScreenState extends State<SongViewerScreen>
     print('🎵 SHOW DIAL MENU: Called with chord group: $chordGroup');
     
     // Find all consecutive non-diatonic chords starting from the tapped chord
-    final consecutiveGroup = _findConsecutiveNonDiatonicSequence(chordGroup.first);
-    print('🎵 SHOW DIAL MENU: Found consecutive group: $consecutiveGroup');
+    final sequenceResult = _findConsecutiveNonDiatonicSequence(chordGroup.first);
+    final consecutiveGroup = sequenceResult['chords'] as List<ChordSymbol>;
+    final consecutiveIndices = sequenceResult['indices'] as List<int>;
+    print('🎵 SHOW DIAL MENU: Found consecutive group: $consecutiveGroup at indices: $consecutiveIndices');
     
     setState(() {
-      _showDialMenu = true;
       _selectedChordGroup = consecutiveGroup;
+      _selectedChordGroupIndices = consecutiveIndices;
     });
+    
+    // Show the reharmonization dialog
+    _showReharmonizationDialog();
     
     print('🎵 SHOW DIAL MENU: Set _selectedChordGroup to $consecutiveGroup');
   }
 
   /// Finds all consecutive non-diatonic chords starting from a given index
-  List<ChordSymbol> _findConsecutiveNonDiatonicSequence(int startIndex) {
+  /// Returns both the chord sequence and their indices
+  Map<String, List<dynamic>> _findConsecutiveNonDiatonicSequence(int startIndex) {
     final List<ChordSymbol> sequence = [];
+    final List<int> indices = [];
     
-    if (startIndex >= _chordSymbols.length) return sequence;
+    if (startIndex >= _chordSymbols.length) {
+      return {'chords': sequence, 'indices': indices};
+    }
     
     final startChord = _chordSymbols[startIndex];
     final currentKey = _getCurrentKeySignature();
@@ -146,19 +156,21 @@ class _SongViewerScreenState extends State<SongViewerScreen>
     // Only proceed if the start chord is non-diatonic
     if (!startChord.isDiatonicTo(currentKey)) {
       sequence.add(startChord);
+      indices.add(startIndex);
       
       // Look forward for consecutive non-diatonic chords
       for (int i = startIndex + 1; i < _chordSymbols.length; i++) {
         final chord = _chordSymbols[i];
         if (!chord.isDiatonicTo(currentKey)) {
           sequence.add(chord);
+          indices.add(i);
         } else {
           break; // Stop at first diatonic chord
         }
       }
     }
     
-    return sequence;
+    return {'chords': sequence, 'indices': indices};
   }
 
   /// Hides the dial menu widget
@@ -166,22 +178,13 @@ class _SongViewerScreenState extends State<SongViewerScreen>
     setState(() {
       _showDialMenu = false;
       _selectedChordGroup = null;
+      _selectedChordGroupIndices = null;
     });
   }
 
-  /// Builds the dial menu widget that appears below the key indicator
-  Widget _buildDialMenuWidget() {
-    // Disabled when chord symbols are disabled
-    if (_chordSymbols.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    
-    if (!_showDialMenu || _selectedChordGroup == null) {
-      return const SizedBox.shrink(); // Return empty widget when not showing
-    }
-
-    final theme = Theme.of(context);
-    final surfaceColor = theme.colorScheme.surface;
+  /// Shows the reharmonization dialog for non-diatonic chord sequences
+  void _showReharmonizationDialog() {
+    if (_selectedChordGroup == null || _selectedChordGroup!.isEmpty) return;
 
     // Get the current key context for non-diatonic chord
     final currentKey = _getCurrentKeyName();
@@ -190,59 +193,43 @@ class _SongViewerScreenState extends State<SongViewerScreen>
     final outerItems = _createMajorKeyDialItems(currentKey);
     final innerItems = _createMinorKeyDialItems(currentKey);
     
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 16),
-      child: ClayContainer(
-        color: surfaceColor,
-        borderRadius: 20,
-        depth: 12,
-        spread: 4,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              Text(
-                'Reharmonize Sequence',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: theme.colorScheme.primary,
-                ),
-              ),
-              const SizedBox(height: 16),
-              ConcentricDialMenu(
-                size: 250,
-                outerItems: outerItems,
-                innerItems: innerItems,
-                onSelectionChanged: (innerIndex, outerIndex) {
-                  print('🎵 DIAL MENU: Selection changed - innerIndex: $innerIndex, outerIndex: $outerIndex');
-                  
-                  if (outerIndex != null) {
-                    final selectedKey = outerItems[outerIndex].label;
-                    print('🎵 DIAL MENU: Selected major key "$selectedKey"');
-                    _applyKeyChangeToChordGroup(selectedKey, false);
-                    _hideDialMenuWidget();
-                  } else if (innerIndex != null) {
-                    final selectedKey = innerItems[innerIndex].label;
-                    print('🎵 DIAL MENU: Selected minor key "$selectedKey"');
-                    _applyKeyChangeToChordGroup(selectedKey.replaceAll('m', ''), true);
-                    _hideDialMenuWidget();
-                  }
-                },
-                centerText: 'Keys',
-                highlightedOuterIndex: _getCurrentlyModifiedMajorKeyIndex(outerItems),
-                highlightedInnerIndex: _getCurrentlyModifiedMinorKeyIndex(innerItems),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: _hideDialMenuWidget,
-                child: const Text('Cancel'),
-              ),
-            ],
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: ConcentricDialMenu(
+            size: 350,
+            outerItems: outerItems,
+            innerItems: innerItems,
+            centerText: 'Reharmonize\nSequence',
+            onSelectionChanged: (innerIndex, outerIndex) {
+              print('🎵 DIAL MENU: Selection changed - innerIndex: $innerIndex, outerIndex: $outerIndex');
+              
+              if (outerIndex != null) {
+                final selectedKey = outerItems[outerIndex].label;
+                print('🎵 DIAL MENU: Selected major key "$selectedKey"');
+                _applyKeyChangeToChordGroup(selectedKey, false);
+                Navigator.of(context).pop();
+              } else if (innerIndex != null) {
+                final selectedKey = innerItems[innerIndex].label;
+                print('🎵 DIAL MENU: Selected minor key "$selectedKey"');
+                _applyKeyChangeToChordGroup(selectedKey.replaceAll('m', ''), true);
+                Navigator.of(context).pop();
+              }
+            },
+            highlightedOuterIndex: _getCurrentlyModifiedMajorKeyIndex(outerItems),
+            highlightedInnerIndex: _getCurrentlyModifiedMinorKeyIndex(innerItems),
           ),
-        ),
-      ),
+        );
+      },
     );
+  }
+
+  /// Builds the dial menu widget (now empty since we use dialog)
+  Widget _buildDialMenuWidget() {
+    return const SizedBox.shrink(); // No longer needed - using dialog instead
   }
 
   /// Applies a key change to the selected chord group
@@ -301,8 +288,11 @@ class _SongViewerScreenState extends State<SongViewerScreen>
         // Update the chord in the selected group
         _selectedChordGroup![i] = newChord;
         
-        // Find and update this chord in all data structures
-        _updateChordInAllStructures(originalChord, newChord);
+        // Find and update this chord in all data structures using the specific index
+        if (_selectedChordGroupIndices != null && i < _selectedChordGroupIndices!.length) {
+          final chordIndex = _selectedChordGroupIndices![i];
+          _updateChordAtSpecificIndex(chordIndex, newChord);
+        }
         
         print('🎵 APPLY KEY CHANGE: Updated chord: ${newChord.displayText}');
       }
@@ -330,6 +320,57 @@ class _SongViewerScreenState extends State<SongViewerScreen>
     );
     
     print('🎵 APPLY KEY CHANGE: Complete');
+  }
+
+  /// Updates a chord at a specific index in all data structures (_chordSymbols and _chordMeasures)
+  void _updateChordAtSpecificIndex(int chordIndex, ChordSymbol newChord) {
+    print('🎵 UPDATE SPECIFIC INDEX: Updating chord at index $chordIndex to ${newChord.displaySymbol}');
+    
+    if (chordIndex >= 0 && chordIndex < _chordSymbols.length) {
+      // Update in flat _chordSymbols list
+      final oldChord = _chordSymbols[chordIndex];
+      _chordSymbols[chordIndex] = newChord;
+      print('🎵 UPDATE SPECIFIC INDEX: Updated _chordSymbols[$chordIndex] from ${oldChord.displaySymbol} to ${newChord.displaySymbol}');
+    }
+    
+    // Update in _chordMeasures - need to find which measure contains this chord index
+    _updateChordInMeasuresAtIndex(chordIndex, newChord);
+  }
+
+  /// Updates a specific chord in the measures at a given global chord index
+  void _updateChordInMeasuresAtIndex(int targetGlobalIndex, ChordSymbol newChord) {
+    print('🎵 UPDATE MEASURES AT INDEX: Looking for global index $targetGlobalIndex');
+    int globalChordIndex = 0;
+    
+    for (int measureIndex = 0; measureIndex < _chordMeasures.length; measureIndex++) {
+      final chordMeasure = _chordMeasures[measureIndex];
+      final originalChordSymbols = chordMeasure.chordSymbols;
+      
+      // Check if the target index is in this measure
+      if (targetGlobalIndex >= globalChordIndex && targetGlobalIndex < globalChordIndex + originalChordSymbols.length) {
+        // Found the measure containing our target chord
+        final localChordIndex = targetGlobalIndex - globalChordIndex;
+        print('🎵 UPDATE MEASURES AT INDEX: Found target at measure $measureIndex, local index $localChordIndex');
+        
+        // Create a new list with the updated chord at the specific index
+        final updatedChordSymbols = List<ChordSymbol>.from(originalChordSymbols);
+        updatedChordSymbols[localChordIndex] = newChord;
+        
+        // Create a new ChordMeasure with the updated chord symbols
+        _chordMeasures[measureIndex] = ChordMeasure(
+          chordMeasure.musicalSymbols,
+          chordSymbols: updatedChordSymbols,
+          isNewLine: chordMeasure.isNewLine,
+        );
+        
+        print('🎵 UPDATE MEASURES AT INDEX: Updated chord in measure $measureIndex');
+        return; // Found and updated, we're done
+      }
+      
+      globalChordIndex += originalChordSymbols.length;
+    }
+    
+    print('🎵 UPDATE MEASURES AT INDEX: Target index $targetGlobalIndex not found');
   }
 
   /// Updates a chord in all data structures (_chordSymbols and _chordMeasures)
@@ -1152,6 +1193,22 @@ class _SongViewerScreenState extends State<SongViewerScreen>
     final outerItems = majorKeys.map((key) => DialItem(label: key)).toList();
     final innerItems = minorKeys.map((key) => DialItem(label: key)).toList();
     
+    // Find the current original key to highlight
+    int? highlightedOuterIndex;
+    int? highlightedInnerIndex;
+    
+    if (_originalKey.endsWith('m')) {
+      // Minor key - highlight in inner ring
+      highlightedInnerIndex = minorKeys.indexOf(_originalKey);
+      if (highlightedInnerIndex == -1) highlightedInnerIndex = null;
+    } else {
+      // Major key - highlight in outer ring
+      highlightedOuterIndex = majorKeys.indexOf(_originalKey);
+      if (highlightedOuterIndex == -1) highlightedOuterIndex = null;
+    }
+    
+    print('🔧 KEY DIALOG: Highlighting $_originalKey - outerIndex: $highlightedOuterIndex, innerIndex: $highlightedInnerIndex');
+    
     showDialog(
       context: context,
       barrierDismissible: true,
@@ -1163,6 +1220,8 @@ class _SongViewerScreenState extends State<SongViewerScreen>
             outerItems: outerItems,
             innerItems: innerItems,
             centerText: 'Select\nOriginal Key',
+            highlightedOuterIndex: highlightedOuterIndex,
+            highlightedInnerIndex: highlightedInnerIndex,
             onSelectionChanged: (innerIndex, outerIndex) {
               String? selectedKey;
               if (outerIndex != null) {
