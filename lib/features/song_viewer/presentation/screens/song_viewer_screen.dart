@@ -62,7 +62,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
   late ValueNotifier<int> _beatNotifier;
   late ValueNotifier<int> _songBeatNotifier;
   String _keySignature = '';
-  bool _isMinorKey = false; // Toggle between major/minor interpretation
+  String _originalKey = 'C'; // The original key of the song (for transposition)
   String _timeSignature = '';
   int _beatsPerMeasure = 4; // Default
   int _currentBeatInMeasure = 0;
@@ -513,8 +513,9 @@ class _SongViewerScreenState extends State<SongViewerScreen>
       'Am', 'Em', 'Bm', 'F#m', 'C#m', 'G#m', 'D#m', 'Bbm', 'Fm', 'Cm', 'Gm', 'Dm'
     ];
     
-    // Extract minor key from current key context
-    final currentMinorKey = _isMinorKey ? '${currentKey.split(' ')[0]}m' : _getRelativeMinor(currentKey.split(' ')[0]);
+    // Extract minor key from current key context  
+    final isMinorKey = _originalKey.endsWith('m');
+    final currentMinorKey = isMinorKey ? _originalKey : '${_getRelativeMinor(currentKey.split(' ')[0])}m';
     final currentIndex = allMinorKeys.indexOf(currentMinorKey);
     final startIndex = currentIndex != -1 ? currentIndex : 0;
     
@@ -534,7 +535,8 @@ class _SongViewerScreenState extends State<SongViewerScreen>
   String _getCurrentKeyName() {
     final keyParts = _keySignature.split(' / ');
     if (keyParts.length == 2) {
-      return _isMinorKey ? keyParts[1].trim() : keyParts[0].trim();
+      final isMinorKey = _originalKey.endsWith('m');
+      return isMinorKey ? keyParts[1].trim() : keyParts[0].trim();
     }
     return keyParts[0].trim();
   }
@@ -1089,88 +1091,108 @@ class _SongViewerScreenState extends State<SongViewerScreen>
   /// Gets the current effective key signature based on major/minor toggle
   KeySignatureType _getCurrentKeySignature() {
     final fifths = _getKeyFifths(_keySignature.split(' / ')[0].trim());
-    return _getKeySignatureFromFifths(fifths, _isMinorKey);
+    final isMinorKey = _originalKey.endsWith('m');
+    return _getKeySignatureFromFifths(fifths, isMinorKey);
   }
 
-  /// Builds two buttons for major/minor key selection
-  Widget _buildKeyModeButtons() {
+  /// Builds a single button for original key selection
+  Widget _buildOriginalKeyButton() {
     final theme = Theme.of(context);
     final primaryColor = theme.colorScheme.primary;
-    final surfaceColor = theme.colorScheme.surface;
-    final onSurfaceColor = theme.colorScheme.onSurface;
     
-    final keyParts = _keySignature.split(' / ');
-    if (keyParts.length != 2) {
-      return Text(
-        _keySignature,
-        style: TextStyle(
-          fontSize: 16,
-          color: onSurfaceColor,
-        ),
-      );
-    }
-    
-    final majorKey = keyParts[0].trim();
-    final minorKey = keyParts[1].trim();
-    
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // Major key button
-        GestureDetector(
-          onTap: _isMinorKey ? () => _setMajorMode() : null,
-          behavior: HitTestBehavior.opaque, // Block taps from going to parent
-          child: ClayContainer(
-            color: _isMinorKey ? surfaceColor : primaryColor,
-            borderRadius: 18,
-            depth: _isMinorKey ? 5 : 12,
-            spread: _isMinorKey ? 1 : 3,
-            curveType: _isMinorKey ? CurveType.none : CurveType.concave,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Text(
-                '$majorKey Major',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: _isMinorKey ? FontWeight.normal : FontWeight.bold,
-                  color: _isMinorKey ? onSurfaceColor.withOpacity(0.6) : Colors.white,
+    return GestureDetector(
+      onTap: _showKeySelectionDialog,
+      behavior: HitTestBehavior.opaque,
+      child: ClayContainer(
+        color: primaryColor,
+        borderRadius: 18,
+        depth: 12,
+        spread: 3,
+        curveType: CurveType.concave,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.music_note,
+                color: Colors.white,
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Key: $_originalKey',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
                 ),
               ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        // Minor key button
-        GestureDetector(
-          onTap: !_isMinorKey ? () => _setMinorMode() : null,
-          behavior: HitTestBehavior.opaque, // Block taps from going to parent
-          child: ClayContainer(
-            color: !_isMinorKey ? surfaceColor : primaryColor,
-            borderRadius: 18,
-            depth: !_isMinorKey ? 5 : 12,
-            spread: !_isMinorKey ? 1 : 3,
-            curveType: !_isMinorKey ? CurveType.none : CurveType.concave,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Text(
-                '$minorKey Minor',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: !_isMinorKey ? FontWeight.normal : FontWeight.bold,
-                  color: !_isMinorKey ? onSurfaceColor.withOpacity(0.6) : Colors.white,
-                ),
+              const SizedBox(width: 8),
+              const Icon(
+                Icons.keyboard_arrow_down,
+                color: Colors.white,
+                size: 18,
               ),
-            ),
+            ],
           ),
         ),
-      ],
+      ),
     );
   }
 
-  /// Sets the key mode to major
-  void _setMajorMode() {
+  /// Shows dialog to select the original key of the song
+  void _showKeySelectionDialog() {
+    // Major keys for outer ring
+    final majorKeys = ['C', 'G', 'D', 'A', 'E', 'B', 'F#', 'Db', 'Ab', 'Eb', 'Bb', 'F'];
+    // Minor keys for inner ring  
+    final minorKeys = ['Am', 'Em', 'Bm', 'F#m', 'C#m', 'G#m', 'D#m', 'Bbm', 'Fm', 'Cm', 'Gm', 'Dm'];
+    
+    // Create dial items
+    final outerItems = majorKeys.map((key) => DialItem(label: key)).toList();
+    final innerItems = minorKeys.map((key) => DialItem(label: key)).toList();
+    
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: ConcentricDialMenu(
+            size: 350,
+            outerItems: outerItems,
+            innerItems: innerItems,
+            centerText: 'Select\nOriginal Key',
+            onSelectionChanged: (innerIndex, outerIndex) {
+              String? selectedKey;
+              if (outerIndex != null) {
+                selectedKey = majorKeys[outerIndex];
+              } else if (innerIndex != null) {
+                selectedKey = minorKeys[innerIndex];
+              }
+              
+              if (selectedKey != null) {
+                _changeOriginalKey(selectedKey);
+                Navigator.of(context).pop();
+              }
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  /// Changes the original key and transposes all chord symbols
+  void _changeOriginalKey(String newKey) {
     setState(() {
-      _isMinorKey = false;
+      final oldKey = _originalKey;
+      _originalKey = newKey;
+      
+      // Transpose ALL chord symbols to the new key (not just selected group)
+      _transposeAllChordSymbols(oldKey, newKey);
+      
+      // Update the key signature display
+      _updateKeySignatureDisplay(newKey);
       
       // Invalidate sheet music cache since key context changed
       _cachedSheetMusicWidget = null;
@@ -1178,15 +1200,258 @@ class _SongViewerScreenState extends State<SongViewerScreen>
     });
   }
 
-  /// Sets the key mode to minor
-  void _setMinorMode() {
-    setState(() {
-      _isMinorKey = true;
+  /// Updates the key signature display based on the original key
+  void _updateKeySignatureDisplay(String key) {
+    // Remove 'm' suffix if present to get the root
+    final isMinor = key.endsWith('m');
+    final root = isMinor ? key.substring(0, key.length - 1) : key;
+    
+    if (isMinor) {
+      // For minor keys, show relative major / minor format
+      final relativeMajor = _getRelativeMajor(root);
+      _keySignature = '$relativeMajor / $key';
+    } else {
+      // For major keys, show major / relative minor format  
+      final relativeMinor = _getRelativeMinor(root);
+      _keySignature = '$key / ${relativeMinor}m';
+    }
+  }
+
+  /// Gets the relative major key for a minor key root
+  String _getRelativeMajor(String minorRoot) {
+    const minorToMajor = {
+      'A': 'C', 'E': 'G', 'B': 'D', 'F#': 'A', 'C#': 'E', 'G#': 'B',
+      'D#': 'F#', 'Bb': 'Db', 'F': 'Ab', 'C': 'Eb', 'G': 'Bb', 'D': 'F'
+    };
+    return minorToMajor[minorRoot] ?? 'C';
+  }
+
+  /// Converts string key to KeySignatureType
+  KeySignatureType? _stringToKeySignatureType(String key) {
+    const keyMap = {
+      'C': KeySignatureType.cMajor,
+      'Am': KeySignatureType.aMinor,
+      'G': KeySignatureType.gMajor,
+      'Em': KeySignatureType.eMinor,
+      'D': KeySignatureType.dMajor,
+      'Bm': KeySignatureType.bMinor,
+      'A': KeySignatureType.aMajor,
+      'F#m': KeySignatureType.fSharpMinor,
+      'E': KeySignatureType.eMajor,
+      'C#m': KeySignatureType.cSharpMinor,
+      'B': KeySignatureType.bMajor,
+      'G#m': KeySignatureType.gSharpMinor,
+      'F#': KeySignatureType.fSharpMajor,
+      'D#m': KeySignatureType.dSharpMinor,
+      'F': KeySignatureType.fMajor,
+      'Dm': KeySignatureType.dMinor,
+      'Bb': KeySignatureType.bFlatMajor,
+      'Gm': KeySignatureType.gMinor,
+      'Eb': KeySignatureType.eFlatMajor,
+      'Cm': KeySignatureType.cMinor,
+      'Ab': KeySignatureType.aFlatMajor,
+      'Fm': KeySignatureType.fMinor,
+      'Db': KeySignatureType.dFlatMajor,
+      'Bbm': KeySignatureType.bFlatMinor,
+    };
+    return keyMap[key];
+  }
+
+  /// Transposes ALL chord symbols in the song from old key to new key
+  void _transposeAllChordSymbols(String fromKey, String toKey) {
+    print('🔧 TRANSPOSING ALL CHORDS FROM $fromKey TO $toKey');
+    
+    // Calculate the transposition interval
+    final interval = _getTranspositionInterval(fromKey, toKey);
+    if (interval == 0) return; // No transposition needed
+    
+    print('🔧 TRANSPOSITION INTERVAL: $interval semitones');
+    
+    // Transpose each chord symbol in the main list
+    for (int i = 0; i < _chordSymbols.length; i++) {
+      final chord = _chordSymbols[i];
+      final newRoot = _transposeNote(chord.effectiveRootName, interval);
       
-      // Invalidate sheet music cache since key context changed
-      _cachedSheetMusicWidget = null;
-      _lastRenderedMeasures = null;
-    });
+      // Capture the current Roman numeral before transposing (this is what we want to preserve)
+      String originalRomanNumeral = '';
+      final currentKeySignature = _stringToKeySignatureType(fromKey);
+      if (currentKeySignature != null) {
+        originalRomanNumeral = chord.getRomanNumeralWithKey(currentKeySignature);
+        final qualitySuperscript = chord.getQualitySuperscript();
+        if (qualitySuperscript.isNotEmpty) {
+          originalRomanNumeral += qualitySuperscript;
+        }
+      }
+      
+      print('🔧 TRANSPOSING CHORD $i: ${chord.effectiveRootName} (${chord.effectiveQuality}) -> $newRoot (interval: $interval), preserving Roman numeral: $originalRomanNumeral');
+      print('🔧 CHORD $i DEBUG: rootName=${chord.rootName}, rootStep=${chord.rootStep}, rootAlter=${chord.rootAlter}');
+      
+      // Create new chord symbol with transposed root but preserve original roman numeral
+      final newChord = ChordSymbol(
+        newRoot,
+        chord.effectiveQuality,
+        position: chord.position,
+        originalKeySignature: _stringToKeySignatureType(toKey), // Use the new original key
+        modifiedKeySignature: null, // Reset any key modifications
+        preservedRomanNumeral: originalRomanNumeral, // Preserve the original Roman numeral
+      );
+      
+      _chordSymbols[i] = newChord;
+    }
+    
+    // Also update chord symbols in all measures
+    for (int measureIndex = 0; measureIndex < _chordMeasures.length; measureIndex++) {
+      final measure = _chordMeasures[measureIndex];
+      if (measure.chordSymbols.isNotEmpty) {
+        final updatedChordSymbols = <ChordSymbol>[];
+        
+        for (int k = 0; k < measure.chordSymbols.length; k++) {
+          final chord = measure.chordSymbols[k];
+          final newRoot = _transposeNote(chord.effectiveRootName, interval);
+          
+          // Capture the current Roman numeral before transposing
+          String originalRomanNumeral = '';
+          final currentKeySignature = _stringToKeySignatureType(fromKey);
+          if (currentKeySignature != null) {
+            originalRomanNumeral = chord.getRomanNumeralWithKey(currentKeySignature);
+            final qualitySuperscript = chord.getQualitySuperscript();
+            if (qualitySuperscript.isNotEmpty) {
+              originalRomanNumeral += qualitySuperscript;
+            }
+          }
+          
+          // Create new chord symbol with transposed root but preserve original roman numeral
+          final newChord = ChordSymbol(
+            newRoot,
+            chord.effectiveQuality,
+            position: chord.position,
+            originalKeySignature: _stringToKeySignatureType(toKey),
+            modifiedKeySignature: null,
+            preservedRomanNumeral: originalRomanNumeral,
+          );
+          
+          updatedChordSymbols.add(newChord);
+        }
+        
+        _chordMeasures[measureIndex] = ChordMeasure(
+          measure.musicalSymbols,
+          isNewLine: measure.isNewLine,
+          chordSymbols: updatedChordSymbols,
+        );
+        
+        print('🔧 UPDATED _chordMeasures[$measureIndex] with ${updatedChordSymbols.length} transposed chords');
+      }
+    }
+    
+    print('🔧 TRANSPOSITION COMPLETE: Updated ${_chordSymbols.length} chord symbols and ${_chordMeasures.length} measures');
+  }
+
+  /// Transposes all chord symbols from old key to new key (for selected chord group only)
+  void _transposeChords(String fromKey, String toKey) {
+    if (_selectedChordGroup == null) return;
+    
+    // Calculate the transposition interval
+    final interval = _getTranspositionInterval(fromKey, toKey);
+    if (interval == 0) return; // No transposition needed
+    
+    // Transpose each chord symbol - only change the root, preserve roman numeral
+    for (int i = 0; i < _selectedChordGroup!.length; i++) {
+      final chord = _selectedChordGroup![i];
+      final newRoot = _transposeNote(chord.effectiveRootName, interval);
+      
+      // Capture the current Roman numeral before transposing (this is what we want to preserve)
+      String originalRomanNumeral = '';
+      final currentKeySignature = _stringToKeySignatureType(fromKey);
+      if (currentKeySignature != null) {
+        originalRomanNumeral = chord.getRomanNumeralWithKey(currentKeySignature);
+        final qualitySuperscript = chord.getQualitySuperscript();
+        if (qualitySuperscript.isNotEmpty) {
+          originalRomanNumeral += qualitySuperscript;
+        }
+      }
+      
+      print('🔧 TRANSPOSING: ${chord.effectiveRootName} from $fromKey to $toKey, preserving Roman numeral: $originalRomanNumeral');
+      print('🔧 INTERVAL: $interval semitones, NEW ROOT: $newRoot');
+      
+      // Create new chord symbol with transposed root but preserve original roman numeral
+      final newChord = ChordSymbol(
+        newRoot,
+        chord.effectiveQuality,
+        position: chord.position,
+        originalKeySignature: _stringToKeySignatureType(_originalKey), // Use the new original key
+        modifiedKeySignature: null, // Reset any key modifications
+        preservedRomanNumeral: originalRomanNumeral, // Preserve the original Roman numeral
+      );
+      
+      print('🔧 NEW CHORD: ${newChord.effectiveRootName}${newChord.effectiveQuality} with Roman numeral: ${newChord.getRomanNumeral()}');
+      
+      // Update the chord in the selected group
+      _selectedChordGroup![i] = newChord;
+      
+      // Also update this chord in the main _chordSymbols list
+      final originalChord = chord;
+      for (int j = 0; j < _chordSymbols.length; j++) {
+        if (_chordsMatch(_chordSymbols[j], originalChord)) {
+          _chordSymbols[j] = newChord;
+          print('🔧 UPDATED _chordSymbols[$j] from ${originalChord.effectiveRootName} to ${newChord.effectiveRootName}');
+          break;
+        }
+      }
+      
+      // Also update this chord in the chord measures
+      for (int measureIndex = 0; measureIndex < _chordMeasures.length; measureIndex++) {
+        final measure = _chordMeasures[measureIndex];
+        for (int k = 0; k < measure.chordSymbols.length; k++) {
+          if (_chordsMatch(measure.chordSymbols[k], originalChord)) {
+            // Create new measure with updated chord symbols
+            final updatedChordSymbols = List<ChordSymbol>.from(measure.chordSymbols);
+            updatedChordSymbols[k] = newChord;
+            _chordMeasures[measureIndex] = ChordMeasure(
+              measure.musicalSymbols,
+              isNewLine: measure.isNewLine,
+              chordSymbols: updatedChordSymbols,
+            );
+            print('🔧 UPDATED _chordMeasures[$measureIndex].chordSymbols[$k] from ${originalChord.effectiveRootName} to ${newChord.effectiveRootName}');
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  /// Gets the transposition interval (in semitones) between two keys
+  int _getTranspositionInterval(String fromKey, String toKey) {
+    const keyToSemitone = {
+      'C': 0, 'C#': 1, 'Db': 1, 'D♭': 1, 'D': 2, 'D#': 3, 'Eb': 3, 'E♭': 3, 'E': 4,
+      'F': 5, 'F#': 6, 'Gb': 6, 'G♭': 6, 'G': 7, 'G#': 8, 'Ab': 8, 'A♭': 8, 'A': 9,
+      'A#': 10, 'Bb': 10, 'B♭': 10, 'B': 11,
+      // Minor keys (treat as their relative majors for transposition)
+      'Am': 0, 'A#m': 1, 'Bbm': 1, 'B♭m': 1, 'Bm': 2, 'Cm': 3, 'C#m': 4, 'Dm': 5,
+      'D#m': 6, 'Ebm': 6, 'E♭m': 6, 'Em': 7, 'Fm': 8, 'F#m': 9, 'Gm': 10, 'G#m': 11
+    };
+    
+    final fromSemitone = keyToSemitone[fromKey] ?? 0;
+    final toSemitone = keyToSemitone[toKey] ?? 0;
+    
+    return (toSemitone - fromSemitone + 12) % 12;
+  }
+
+  /// Transposes a single note by the given interval (in semitones)
+  String _transposeNote(String note, int interval) {
+    const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const noteToIndex = {
+      'C': 0, 'C#': 1, 'Db': 1, 'D♭': 1, 'D': 2, 'D#': 3, 'Eb': 3, 'E♭': 3, 'E': 4,
+      'F': 5, 'F#': 6, 'Gb': 6, 'G♭': 6, 'G': 7, 'G#': 8, 'Ab': 8, 'A♭': 8, 'A': 9,
+      'A#': 10, 'Bb': 10, 'B♭': 10, 'B': 11, 'Cb': 11, 'C♭': 11
+    };
+    
+    final currentIndex = noteToIndex[note] ?? 0;
+    final newIndex = (currentIndex + interval) % 12;
+    final result = notes[newIndex];
+    
+    print('🔧 TRANSPOSE NOTE: $note (index $currentIndex) + $interval semitones -> $result (index $newIndex)');
+    
+    return result;
   }
 
   /// Builds the current key indicator text below the buttons
@@ -1202,7 +1467,8 @@ class _SongViewerScreenState extends State<SongViewerScreen>
     
     final majorKey = keyParts[0].trim();
     final minorKey = keyParts[1].trim();
-    final currentKey = _isMinorKey ? '$minorKey Minor' : '$majorKey Major';
+    final isMinorKey = _originalKey.endsWith('m');
+    final currentKey = isMinorKey ? '$minorKey Minor' : '$majorKey Major';
     
     return ClayContainer(
       color: surfaceColor,
@@ -1526,7 +1792,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
       id: 'cp_${DateTime.now().millisecondsSinceEpoch}',
       name: name,
       chords: romanNumerals, // Store Roman numerals with qualities
-      key: _isMinorKey ? _keySignature.split(' / ')[1].trim() : _keySignature.split(' / ')[0].trim(),
+      key: _originalKey,
       tempo: _currentBpm,
       timeSignature: _timeSignature,
       romanNumerals: romanNumerals, // Also store in the romanNumerals field for consistency
@@ -1854,7 +2120,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                   _currentMousePosition = event.position;
                 },
                 child: music_sheet.SimpleSheetMusic(
-                height: 300,
+                height: 600,
                 width: MediaQuery.of(context).size.width - 64, // Fit container width minus padding (32*2)
                 measures: _chordMeasures.cast<music_sheet.Measure>(),
                 debug: false, // Disable debug mode for performance
@@ -2317,7 +2583,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                           children: [
                             Column(
                               children: [
-                                _buildKeyModeButtons(),
+                                _buildOriginalKeyButton(),
                                 const SizedBox(height: 8),
                                 _buildCurrentKeyIndicator(),
                               ],

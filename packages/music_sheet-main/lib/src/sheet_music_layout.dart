@@ -47,9 +47,9 @@ class SheetMusicLayout with ChangeNotifier {
     for (var i = 0; i < metrics.staffsMetricses.length; i++) {
       final staffMetrics = metrics.staffsMetricses[i];
       if (i > 0) {
-        currentY += Constants.staffLineSpacing * 2;
+        currentY += Constants.measureLineSpacing * 2;
       } else {
-        currentY += Constants.staffLineSpacing;
+        currentY += Constants.firstMeasureLineSpacing;
       }
 
       currentY += staffMetrics.upperHeight;

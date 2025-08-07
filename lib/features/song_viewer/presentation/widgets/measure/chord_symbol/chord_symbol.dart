@@ -53,6 +53,10 @@ class ChordSymbol {
   /// Used when analyzing chords in a different key context
   final KeySignatureType? modifiedKeySignature;
   
+  /// Preserved Roman numeral from original analysis (used during transposition)
+  /// When this is set, it overrides the calculated Roman numeral
+  final String? preservedRomanNumeral;
+  
   /// The generated chord notes based on the root and quality
   late final List<Pitch> chordNotes;
 
@@ -66,7 +70,7 @@ class ChordSymbol {
   /// [position] - Beat position in the measure (default: 0)
   /// [originalKeySignature] - Original key context for Roman numeral analysis (optional)
   /// [modifiedKeySignature] - Modified key context for Roman numeral analysis (optional)
-  ChordSymbol(String rootName, String quality, {this.position = 0, this.originalKeySignature, this.modifiedKeySignature})
+  ChordSymbol(String rootName, String quality, {this.position = 0, this.originalKeySignature, this.modifiedKeySignature, this.preservedRomanNumeral})
       : rootName = rootName,
         quality = quality,
         rootStep = null,
@@ -96,6 +100,7 @@ class ChordSymbol {
     this.position = 0,
     this.originalKeySignature,
     this.modifiedKeySignature,
+    this.preservedRomanNumeral,
   })  : rootStep = rootStep,
         rootAlter = rootAlter,
         kind = kind,
@@ -612,11 +617,19 @@ class ChordSymbol {
   /// Get the Roman numeral representation of this chord relative to the given key
   /// [original] - If true, use originalKeySignature; if false, use modifiedKeySignature
   String getRomanNumeral({bool original = true}) {
+    // Use preserved Roman numeral if available (for transposed chords)
+    if (preservedRomanNumeral != null && preservedRomanNumeral!.isNotEmpty) {
+      print('🎵 USING PRESERVED ROMAN NUMERAL: $preservedRomanNumeral for chord $effectiveRootName$effectiveQuality');
+      return preservedRomanNumeral!;
+    }
+    
     final keySignature = original ? originalKeySignature : modifiedKeySignature;
-    print('🎵 GET ROMAN NUMERAL: $effectiveRootName$effectiveQuality - original=$original, keySignature=$keySignature');
+    print('🎵 CALCULATING ROMAN NUMERAL: $effectiveRootName$effectiveQuality - original=$original, keySignature=$keySignature');
     if (keySignature == null) return '';
     
-    return getRomanNumeralWithKey(keySignature);
+    final result = getRomanNumeralWithKey(keySignature);
+    print('🎵 CALCULATED ROMAN NUMERAL RESULT: $result');
+    return result;
   }
 
   /// Get the Roman numeral representation of this chord relative to a specific key
@@ -1036,8 +1049,8 @@ class ChordSymbol {
                 children: [
                   TextSpan(
                     text: modifiedKeySignature != null 
-                        ? getRomanNumeralWithKey(modifiedKeySignature!)
-                        : getRomanNumeralWithKey(currentKeySignature),
+                        ? getRomanNumeral(original: false)
+                        : getRomanNumeral(original: true),
                     style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
