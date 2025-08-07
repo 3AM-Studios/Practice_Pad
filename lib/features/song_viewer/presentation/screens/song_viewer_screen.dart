@@ -2331,95 +2331,95 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                   _buildDialMenuWidget(),
                   const SizedBox(height: 20),
                   // Playback controls
-                  Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 16),
-                    child: ClayContainer(
-                      color: surfaceColor,
-                      borderRadius: 20,
-                      depth: 10,
-                      spread: 3,
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: [
-                            // BPM Controls
-                            ClayContainer(
-                              color: surfaceColor,
-                              borderRadius: 15,
-                              depth: 5,
-                              spread: 1,
-                              curveType: CurveType.concave,
-                              child: IconButton(
-                                icon: Icon(Icons.remove, color: primaryColor),
-                                onPressed: () => _changeBpm(-5),
-                              ),
-                            ),
-                            Text(
-                              '$_currentBpm BPM',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: onSurfaceColor,
-                              ),
-                            ),
-                            ClayContainer(
-                              color: surfaceColor,
-                              borderRadius: 15,
-                              depth: 5,
-                              spread: 1,
-                              curveType: CurveType.concave,
-                              child: IconButton(
-                                icon: Icon(Icons.add, color: primaryColor),
-                                onPressed: () => _changeBpm(5),
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Text(
-                              _timeSignature,
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: onSurfaceColor,
-                              ),
-                            ),
-                            const Spacer(),
-                            // Playback Controls
-                            ClayContainer(
-                              color: surfaceColor,
-                              borderRadius: 20,
-                              depth: 8,
-                              spread: 2,
-                              curveType: CurveType.concave,
-                              child: IconButton(
-                                icon: Icon(Icons.replay, color: primaryColor),
-                                iconSize: 32,
-                                onPressed: _restartPlayback,
-                              ),
-                            ),
-                            ClayContainer(
-                              color: primaryColor,
-                              borderRadius: 25,
-                              depth: 12,
-                              spread: 3,
-                              curveType: _isPlaying ? CurveType.concave : CurveType.none,
-                              child: IconButton(
-                                icon: Icon(
-                                  _isPlaying
-                                      ? Icons.pause_circle_filled
-                                      : Icons.play_circle_filled,
-                                  color: Colors.white,
-                                ),
-                                iconSize: 48,
-                                onPressed: _togglePlayback,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
+                  // Container(
+                  //   margin: const EdgeInsets.symmetric(horizontal: 16),
+                  //   child: ClayContainer(
+                  //     color: surfaceColor,
+                  //     borderRadius: 20,
+                  //     depth: 10,
+                  //     spread: 3,
+                  //     child: Padding(
+                  //       padding: const EdgeInsets.all(16),
+                  //       child: Row(
+                  //         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  //         children: [
+                  //           // BPM Controls
+                  //           ClayContainer(
+                  //             color: surfaceColor,
+                  //             borderRadius: 15,
+                  //             depth: 5,
+                  //             spread: 1,
+                  //             curveType: CurveType.concave,
+                  //             child: IconButton(
+                  //               icon: Icon(Icons.remove, color: primaryColor),
+                  //               onPressed: () => _changeBpm(-5),
+                  //             ),
+                  //           ),
+                  //           Text(
+                  //             '$_currentBpm BPM',
+                  //             style: TextStyle(
+                  //               fontSize: 18,
+                  //               fontWeight: FontWeight.bold,
+                  //               color: onSurfaceColor,
+                  //             ),
+                  //           ),
+                  //           ClayContainer(
+                  //             color: surfaceColor,
+                  //             borderRadius: 15,
+                  //             depth: 5,
+                  //             spread: 1,
+                  //             curveType: CurveType.concave,
+                  //             child: IconButton(
+                  //               icon: Icon(Icons.add, color: primaryColor),
+                  //               onPressed: () => _changeBpm(5),
+                  //             ),
+                  //           ),
+                  //           const SizedBox(width: 16),
+                  //           Text(
+                  //             _timeSignature,
+                  //             style: TextStyle(
+                  //               fontSize: 18,
+                  //               fontWeight: FontWeight.bold,
+                  //               color: onSurfaceColor,
+                  //             ),
+                  //           ),
+                  //           const Spacer(),
+                  //           // Playback Controls
+                  //           ClayContainer(
+                  //             color: surfaceColor,
+                  //             borderRadius: 20,
+                  //             depth: 8,
+                  //             spread: 2,
+                  //             curveType: CurveType.concave,
+                  //             child: IconButton(
+                  //               icon: Icon(Icons.replay, color: primaryColor),
+                  //               iconSize: 32,
+                  //               onPressed: _restartPlayback,
+                  //             ),
+                  //           ),
+                  //           ClayContainer(
+                  //             color: primaryColor,
+                  //             borderRadius: 25,
+                  //             depth: 12,
+                  //             spread: 3,
+                  //             curveType: _isPlaying ? CurveType.concave : CurveType.none,
+                  //             child: IconButton(
+                  //               icon: Icon(
+                  //                 _isPlaying
+                  //                     ? Icons.pause_circle_filled
+                  //                     : Icons.play_circle_filled,
+                  //                 color: Colors.white,
+                  //               ),
+                  //               iconSize: 48,
+                  //               onPressed: _togglePlayback,
+                  //             ),
+                  //           ),
+                  //         ],
+                  //       ),
+                  //     ),
+                  //   ),
+                  // ),
+                  // const SizedBox(height: 20),
                   // Sheet Music Display with Canvas-based Chord Symbols
                   if (_chordMeasures.isNotEmpty)
                     Container(
@@ -2433,7 +2433,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                           padding: const EdgeInsets.all(16),
                           child: SizedBox(
                             width: MediaQuery.of(context).size.width - 64, // Match SimpleSheetMusic width
-                            height: 300, // Increased height to match SimpleSheetMusic
+                            height: 700, // Increased height to match SimpleSheetMusic
                             child: _buildCachedSheetMusic(),
                           ),
                         ),
@@ -2481,18 +2481,18 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                       ),
                     ),
                   // Beat timeline - positioned right after sheet music
-                  Center(
-                    child: SizedBox(
-                      width: MediaQuery.of(context).size.width * 0.8,
-                      child: BeatTimeline(
-                        beatsPerMeasure: _beatsPerMeasure,
-                        currentProgress:
-                            _currentBeatInMeasure + 1, // Convert to 1-indexed
-                        userInputMarkers: _userInputBeats,
-                        textColor: Theme.of(context).colorScheme.onSurface,
-                      ),
-                    ),
-                  ),
+                  // Center(
+                  //   child: SizedBox(
+                  //     width: MediaQuery.of(context).size.width * 0.8,
+                  //     child: BeatTimeline(
+                  //       beatsPerMeasure: _beatsPerMeasure,
+                  //       currentProgress:
+                  //           _currentBeatInMeasure + 1, // Convert to 1-indexed
+                  //       userInputMarkers: _userInputBeats,
+                  //       textColor: Theme.of(context).colorScheme.onSurface,
+                  //     ),
+                  //   ),
+                  // ),
                   const SizedBox(height: 16),
                   const ActiveSessionBanner(),
                   // Practice items widget
