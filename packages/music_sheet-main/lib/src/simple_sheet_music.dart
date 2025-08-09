@@ -41,6 +41,8 @@ class SimpleSheetMusic extends StatefulWidget {
     this.customSoundFontPath,
     this.highlightColor = Colors.red,
     this.debug = false,
+    this.canvasScale = 0.7,
+    this.extensionNumbersRelativeToChords = true,
     this.onTap,
     this.onSymbolAdd,
     this.onSymbolUpdate,
@@ -94,6 +96,12 @@ class SimpleSheetMusic extends StatefulWidget {
 
   /// Whether to render outline boxes around music objects
   final bool debug;
+
+  /// The scale factor for the canvas (zoom level)
+  final double canvasScale;
+
+  /// Whether extension numbers should be relative to chords (true) or key (false)
+  final bool extensionNumbersRelativeToChords;
 
   /// Callback function that is called when a musical symbol is tapped
   final OnTapMusicObjectCallback? onTap;
@@ -224,6 +232,9 @@ class SimpleSheetMusicState extends State<SimpleSheetMusic>
       widgetHeight: widget.height,
       symbolPositionCallback: registerSymbolPosition,
       debug: widget.debug,
+      canvasScale: widget.canvasScale,
+      extensionNumbersRelativeToChords: widget.extensionNumbersRelativeToChords,
+      initialKeySignatureType: widget.initialKeySignatureType,
     );
 
     chordSymbolOverlays = _buildChordSymbolOverlays(context, _layout!);

@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:music_sheet/src/glyph_metadata.dart';
 import 'package:music_sheet/src/glyph_path.dart';
@@ -358,16 +359,34 @@ class NoteRenderer with DebugRenderMixin implements MusicalSymbolRenderer {
   }
 
   void _renderChordExtension(Canvas canvas) {
-    // Only render chord extension if we have an associated chord symbol
-    if (_associatedChordSymbol == null) return;
-    
     final note = musicalSymbol as Note;
-    final extension = getChordExtension(note, _associatedChordSymbol!);
+    String extension = '';
+    
+    // Determine which extension number to show based on the layout setting
+    if (layout.extensionNumbersRelativeToChords) {
+      // Show chord-relative numbers (original behavior)
+      if (_associatedChordSymbol == null) return;
+      extension = getChordExtension(note, _associatedChordSymbol!);
+    } else {
+      // Show key-relative numbers 
+      if (layout.initialKeySignatureType == null) return;
+      
+      // Get the effective key signature for this chord (modified key if available)
+      String effectiveKey;
+      if (_associatedChordSymbol?.modifiedKeySignature != null) {
+        effectiveKey = convertKeySignatureTypeToString(_associatedChordSymbol!.modifiedKeySignature);
+      } else {
+        effectiveKey = convertKeySignatureTypeToString(layout.initialKeySignatureType);
+      }
+      
+      extension = getKeyExtension(note, effectiveKey);
+    }
+    
     if (extension.isEmpty) return;
 
     // Create a paint for the clay container background
     final containerPaint = Paint()
-      ..color = Colors.grey.shade200
+      ..color = CupertinoColors.systemBlue.withOpacity(0.8)
       ..style = PaintingStyle.fill;
 
     // Create a paint for the container border
@@ -381,7 +400,7 @@ class NoteRenderer with DebugRenderMixin implements MusicalSymbolRenderer {
       text: TextSpan(
         text: extension,
         style: TextStyle(
-          color: Colors.black87,
+          color: Colors.white,
           fontSize: 12 / layout.canvasScale,
           fontWeight: FontWeight.w600,
         ),

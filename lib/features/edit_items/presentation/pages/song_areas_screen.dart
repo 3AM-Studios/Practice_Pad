@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:clay_containers/clay_containers.dart';
 import 'package:practice_pad/features/edit_items/presentation/pages/practice_item_screen.dart';
 import 'package:practice_pad/features/edit_items/presentation/viewmodels/edit_items_viewmodel.dart';
 import 'package:practice_pad/features/song_viewer/presentation/screens/song_list_screen.dart';
@@ -132,37 +133,91 @@ class _SongAreasScreenState extends State<SongAreasScreen> {
               ),
             ),
           ),
+        const SliverToBoxAdapter(
+          child: SizedBox(height: 50),
+        ),  
         if (viewModel.songAreas.isEmpty &&
             !viewModel.isLoadingAreas &&
             viewModel.error == null)
-          const SliverFillRemaining(
+          SliverFillRemaining(
             child: Center(
-              child: Padding(
-                padding: EdgeInsets.all(16.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      CupertinoIcons.music_note_2,
-                      size: 64,
-                      color: CupertinoColors.systemGrey,
-                    ),
-                    SizedBox(height: 16),
-                    Text(
-                      'No songs found.',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
+              child: Container(
+                margin: const EdgeInsets.all(24),
+                child: ClayContainer(
+                  color: CupertinoTheme.of(context).scaffoldBackgroundColor,
+                  borderRadius: 24,
+                  depth: 20,
+                  spread: 2,
+                  curveType: CurveType.concave,
+                  child: DefaultTextStyle(
+                    style: CupertinoTheme.of(context).textTheme.textStyle,
+                    child: Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ClayContainer(
+                            color: CupertinoTheme.of(context).scaffoldBackgroundColor,
+                            borderRadius: 20,
+                            depth: 15,
+                            spread: 1,
+                            curveType: CurveType.none,
+                            child: Container(
+                              width: 80,
+                              height: 80,
+                              alignment: Alignment.center,
+                              child: const Icon(
+                                CupertinoIcons.music_note_list,
+                                size: 40,
+                                color: CupertinoColors.systemBlue,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          Text(
+                            'Your Song Library',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w700,
+                              color: CupertinoTheme.of(context).textTheme.textStyle.color,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'No songs added yet',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                              color: CupertinoTheme.of(context).textTheme.textStyle.color?.withOpacity(0.6),
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 20),
+                          ClayContainer(
+                            color: CupertinoTheme.of(context).scaffoldBackgroundColor,
+                            borderRadius: 16,
+                            depth: 8,
+                            spread: 0,
+                            curveType: CurveType.concave,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                              child: Text(
+                                'Tap the + button to add your first song\n\nDefault practice items will be created automatically including:\n• Full Song\n• Verse & Chorus sections\n• Chord Changes',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w500,
+                                  color: CupertinoTheme.of(context).textTheme.textStyle.color,
+                                  height: 1.4,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      textAlign: TextAlign.center,
                     ),
-                    SizedBox(height: 8),
-                    Text(
-                      'Tap the + button to add your first song.\nDefault practice items will be created automatically.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: CupertinoColors.secondaryLabel),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),

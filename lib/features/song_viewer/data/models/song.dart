@@ -37,4 +37,22 @@ class Song {
 
   @override
   int get hashCode => title.hashCode ^ composer.hashCode ^ path.hashCode;
+
+  /// Convert Song to JSON
+  Map<String, dynamic> toJson() {
+    return {
+      'title': title,
+      'composer': composer,
+      'path': path,
+    };
+  }
+
+  /// Create Song from JSON
+  factory Song.fromJson(Map<String, dynamic> json) {
+    return Song(
+      title: json['title'] as String,
+      composer: json['composer'] as String,
+      path: json['path'] as String,
+    );
+  }
 }

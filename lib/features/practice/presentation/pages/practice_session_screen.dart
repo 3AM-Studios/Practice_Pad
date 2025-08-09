@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:clay_containers/clay_containers.dart';
 import 'package:practice_pad/models/practice_item.dart';
 import 'package:practice_pad/models/statistics.dart';
 import 'package:practice_pad/services/practice_session_manager.dart';
@@ -210,11 +211,6 @@ class _PracticeSessionScreenState extends State<PracticeSessionScreen> {
     }
   }
   
-  void _updateGlobalManager() {
-    if (_sessionManager == null) return;
-    _sessionManager!.updateTimer(_elapsedSeconds, _isTimerRunning);
-  }
-  
   String _formatTime(int seconds) {
     final minutes = seconds ~/ 60;
     final remainingSeconds = seconds % 60;
@@ -242,43 +238,78 @@ class _PracticeSessionScreenState extends State<PracticeSessionScreen> {
           },
         ),
       ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Item description
-              if (widget.practiceItem.description.isNotEmpty) ...[
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: CupertinoColors.systemGrey6,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    widget.practiceItem.description,
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                ),
-                const SizedBox(height: 24),
-              ],
-              
-              // Practice interface
-              Expanded(
-                child: _build12KeysInterface(),
+      child: DefaultTextStyle(
+        style: CupertinoTheme.of(context).textTheme.textStyle,
+        child: SafeArea(
+          child: CustomScrollView(
+            slivers: [
+              // Add padding for navigation bar
+              const SliverToBoxAdapter(
+                child: SizedBox(height: 20),
               ),
               
-              // Complete session button
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: CupertinoButton.filled(
-                  onPressed: _hasAnyReps() || _elapsedSeconds > 0
-                      ? _completePracticeSession
-                      : null,
-                  child: const Text('Complete Session'),
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                sliver: SliverList(
+                  delegate: SliverChildListDelegate([
+                    // Item description (if exists)
+                    if (widget.practiceItem.description.isNotEmpty) ...[
+                      ClayContainer(
+                        color: CupertinoTheme.of(context).scaffoldBackgroundColor,
+                        borderRadius: 16,
+                        depth: 8,
+                        spread: 1,
+                        curveType: CurveType.concave,
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(20),
+                          child: Text(
+                            widget.practiceItem.description,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                              color: CupertinoTheme.of(context).textTheme.textStyle.color,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                    ],
+                    
+                    // Main practice interface
+                    _buildPracticeInterface(),
+                    
+                    const SizedBox(height: 32),
+                    
+                    // Complete session button
+                    ClayContainer(
+                      color: CupertinoTheme.of(context).scaffoldBackgroundColor,
+                      borderRadius: 16,
+                      depth: 8,
+                      spread: 1,
+                      curveType: CurveType.concave,
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(4),
+                        child: CupertinoButton.filled(
+                          onPressed: _hasAnyReps() || _elapsedSeconds > 0
+                              ? _completePracticeSession
+                              : null,
+                          borderRadius: BorderRadius.circular(12),
+                          child: const Text(
+                            'Complete Session',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    
+                    const SizedBox(height: 40),
+                  ]),
                 ),
               ),
             ],
@@ -292,101 +323,200 @@ class _PracticeSessionScreenState extends State<PracticeSessionScreen> {
     return _keysPracticed.values.any((reps) => reps > 0);
   }
   
-  Widget _build12KeysInterface() {
+  Widget _buildPracticeInterface() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'Practice in All 12 Keys',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        // Title and timer section
+        ClayContainer(
+          color: CupertinoTheme.of(context).scaffoldBackgroundColor,
+          borderRadius: 20,
+          depth: 15,
+          spread: 2,
+          curveType: CurveType.concave,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              children: [
+                Text(
+                  'Practice in All 12 Keys',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w700,
+                    color: CupertinoTheme.of(context).textTheme.textStyle.color,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                
+                // Timer display
+                ClayContainer(
+                  color: CupertinoTheme.of(context).scaffoldBackgroundColor,
+                  borderRadius: 16,
+                  depth: 8,
+                  spread: 1,
+                  curveType: CurveType.none,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    child: Text(
+                      _formatTime(_elapsedSeconds),
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w800,
+                        color: CupertinoTheme.of(context).primaryColor,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+                
+                const SizedBox(height: 20),
+                
+                // Timer controls
+                Row(
+                  children: [
+                    Expanded(
+                      child: ClayContainer(
+                        color: CupertinoTheme.of(context).scaffoldBackgroundColor,
+                        borderRadius: 12,
+                        depth: 6,
+                        spread: 1,
+                        curveType: CurveType.concave,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          child: CupertinoButton.filled(
+                            onPressed: !_isTimerRunning ? _startTimer : _stopTimer,
+                            borderRadius: BorderRadius.circular(10),
+                            child: Text(
+                              _isTimerRunning ? 'Stop' : 'Start',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: ClayContainer(
+                        color: CupertinoTheme.of(context).scaffoldBackgroundColor,
+                        borderRadius: 12,
+                        depth: 6,
+                        spread: 1,
+                        curveType: CurveType.concave,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          child: CupertinoButton.filled(
+                            onPressed: _resetTimer,
+                            borderRadius: BorderRadius.circular(10),
+                            child: const Text(
+                              'Reset',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-            Text(
-              _formatTime(_elapsedSeconds),
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        
-        // Timer controls
-        Row(
-          children: [
-            Expanded(
-              child: CupertinoButton.filled(
-                onPressed: !_isTimerRunning ? _startTimer : _stopTimer,
-                child: Text(_isTimerRunning ? 'Stop' : 'Start'),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: CupertinoButton.filled(
-                onPressed: _resetTimer,
-                child: const Text('Reset'),
-              ),
-            ),
-          ],
+          ),
         ),
         
         const SizedBox(height: 32),
         
-        // 12 Keys Dial and Bar Graph
-        Expanded(
-          child: Row(
-            children: [
-              // Left side - Concentric Dial
-              Expanded(
-                flex: 2,
-                child: Center(
-                  child: ConcentricDialMenu(
-                    size: 300,
-                    ringSpacing: 0.25, // Keep inner buttons close to outer ones
-                    enableInnerHighlight: false, // Don't highlight inner minus buttons
-                    enableOuterHighlight: true, // Keep outer highlighting
-                    innerButtonScale: 0.3, // Make inner minus buttons much smaller
-                    centerText: 'Keys Practiced',
-                    outerItems: _majorKeys.map((key) => DialItem(
-                      label: key,
-                      outerText: '${_keysPracticed[key] ?? 0}',
-                    )).toList(),
-                    innerItems: _majorKeys.map((key) => DialItem(
-                      label: '-', // This will be overridden in the painter
-                    )).toList(),
-                    onSelectionChanged: (innerIndex, outerIndex) {
-                      if (outerIndex != null) {
-                        _incrementKeyReps(_majorKeys[outerIndex]);
-                      } else if (innerIndex != null) {
-                        _decrementKeyReps(_majorKeys[innerIndex]);
-                      }
-                    },
+        // Practice tracking section
+        ClayContainer(
+          color: CupertinoTheme.of(context).scaffoldBackgroundColor,
+          borderRadius: 20,
+          depth: 15,
+          spread: 2,
+          curveType: CurveType.concave,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              children: [
+                // Concentric dial and bar graph
+                SizedBox(
+                  height: 400,
+                  child: Row(
+                    children: [
+                      // Left side - Concentric Dial
+                      Expanded(
+                        child: Center(
+                          child: ConcentricDialMenu(
+                            size: 280,
+                            ringSpacing: 0.25,
+                            enableInnerHighlight: false, // Hide inner button highlights
+                            enableOuterHighlight: true,
+                            innerButtonScale: 0.0, // Hide inner buttons completely
+                            centerText: 'Keys\nPracticed',
+                            outerItems: _majorKeys.map((key) => DialItem(
+                              label: key,
+                              outerText: '${_keysPracticed[key] ?? 0}',
+                            )).toList(),
+                            innerItems: _majorKeys.map((key) => DialItem(
+                              label: '', // Empty to hide completely
+                            )).toList(),
+                            onSelectionChanged: (innerIndex, outerIndex) {
+                              if (outerIndex != null) {
+                                _incrementKeyReps(_majorKeys[outerIndex]);
+                              }
+                              // Ignore inner button taps since they're hidden
+                            },
+                          ),
+                        ),
+                      ),
+                      
+                      const SizedBox(width: 24),
+                      
+                      // Right side - Bar Graph
+                      Expanded(
+                        child: _buildStylizedBarGraph(),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-              
-              // Right side - Bar Graph
-              Expanded(
-                flex: 2,
-                child: _buildBarGraph(),
-              ),
-            ],
+                
+                const SizedBox(height: 24),
+                
+                // Instructions
+                ClayContainer(
+                  color: CupertinoTheme.of(context).scaffoldBackgroundColor,
+                  borderRadius: 12,
+                  depth: 4,
+                  spread: 0,
+                  curveType: CurveType.concave,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    child: Text(
+                      'Tap a key to add a rep',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: CupertinoTheme.of(context).textTheme.textStyle.color?.withOpacity(0.7),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-        
-        const SizedBox(height: 16),
-        
-        // Instructions
-        const Text(
-          'Tap a key to add a rep • Tap the small minus button to subtract a rep',
-          style: TextStyle(fontSize: 14, color: CupertinoColors.systemGrey),
-          textAlign: TextAlign.center,
         ),
       ],
     );
   }
   
-  Widget _buildBarGraph() {
+  Widget _buildStylizedBarGraph() {
     // Find the maximum reps for scaling
     final maxReps = _keysPracticed.values.isNotEmpty 
         ? _keysPracticed.values.reduce((a, b) => a > b ? a : b)
@@ -394,102 +524,125 @@ class _PracticeSessionScreenState extends State<PracticeSessionScreen> {
     
     // Use a minimum height for visualization even when maxReps is 0
     final effectiveMaxReps = maxReps > 0 ? maxReps : 1;
-    const maxBarHeight = 300.0; // Increased max height for bigger graph
+    const maxBarHeight = 200.0;
     
-    return Center(
-      child: Container(
-        height: 500, // Increased container height
-        width: 500, // Increased width for bigger graph
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Title
-            const Text(
-              'Reps by Key',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            
-            // Bar graph - use Flexible to prevent overflow
-            Flexible(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: _majorKeys.map((key) {
-                  final reps = _keysPracticed[key] ?? 0;
-                  final heightRatio = reps / effectiveMaxReps;
-                  
-                  return Flexible(
-                    child: Container(
-                      width: 18, // Increased bar width
-                      margin: const EdgeInsets.symmetric(horizontal: 1),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min, // Prevent overflow
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          // Bar
-                          Container(
-                            width: 30, // Increased actual bar width
-                            height: reps > 0 ? (heightRatio * maxBarHeight) : 2,
-                            decoration: BoxDecoration(
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        // Title
+        Text(
+          'Reps by Key',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: CupertinoTheme.of(context).textTheme.textStyle.color,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        
+        const SizedBox(height: 20),
+        
+        // Bar graph container
+        ClayContainer(
+          color: CupertinoTheme.of(context).scaffoldBackgroundColor,
+          borderRadius: 16,
+          depth: 8,
+          spread: 1,
+          curveType: CurveType.none,
+          child: Container(
+            height: 280,
+            padding: const EdgeInsets.all(16),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                // Calculate responsive sizing
+                final availableWidth = constraints.maxWidth;
+                final barSpacing = availableWidth / _majorKeys.length;
+                final maxBarWidth = (barSpacing * 0.6).clamp(8.0, 20.0);
+                final fontSize = (barSpacing * 0.2).clamp(8.0, 12.0);
+                
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: _majorKeys.map((key) {
+                    final reps = _keysPracticed[key] ?? 0;
+                    final heightRatio = reps / effectiveMaxReps;
+                    
+                    return Expanded(
+                      child: Container(
+                        margin: EdgeInsets.symmetric(horizontal: (barSpacing * 0.05).clamp(1.0, 4.0)),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            // Reps count (above bar)
+                            if (reps > 0)
+                              Container(
+                                margin: const EdgeInsets.only(bottom: 4),
+                                child: Text(
+                                  reps.toString(),
+                                  style: TextStyle(
+                                    fontSize: fontSize,
+                                    fontWeight: FontWeight.w600,
+                                    color: CupertinoTheme.of(context).primaryColor,
+                                  ),
+                                ),
+                              ),
+                            
+                            // Bar
+                            ClayContainer(
                               color: reps > 0 
-                                  ? CupertinoColors.systemBlue 
-                                  : CupertinoColors.systemGrey4,
-                              borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(2),
+                                  ? CupertinoTheme.of(context).primaryColor.withOpacity(0.2)
+                                  : CupertinoTheme.of(context).scaffoldBackgroundColor,
+                              borderRadius: 8,
+                              depth: reps > 0 ? 4 : 2,
+                              spread: 1,
+                              curveType: reps > 0 ? CurveType.convex : CurveType.none,
+                              child: Container(
+                                width: maxBarWidth,
+                                height: reps > 0 ? (heightRatio * maxBarHeight) : 4,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(8),
+                                  gradient: reps > 0 ? LinearGradient(
+                                    begin: Alignment.bottomCenter,
+                                    end: Alignment.topCenter,
+                                    colors: [
+                                      CupertinoTheme.of(context).primaryColor,
+                                      CupertinoTheme.of(context).primaryColor.withOpacity(0.7),
+                                    ],
+                                  ) : null,
+                                ),
                               ),
                             ),
-                            child: reps > 0 && (heightRatio * maxBarHeight) > 20 // Show text if bar is tall enough
-                                ? Center(
-                                    child: Text(
-                                      reps.toString(),
-                                      style: const TextStyle(
-                                        color: CupertinoColors.white,
-                                        fontSize: 10, // Increased font size
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  )
-                                : null,
-                          ),
-                          
-                          const SizedBox(height: 4),
-                          
-                          // Key label
-                          Text(
-                            key,
-                            style: const TextStyle(
-                              fontSize: 11, // Increased font size
-                              fontWeight: FontWeight.w500,
+                            
+                            const SizedBox(height: 8),
+                            
+                            // Key label
+                            Text(
+                              key,
+                              style: TextStyle(
+                                fontSize: fontSize,
+                                fontWeight: FontWeight.w600,
+                                color: reps > 0 
+                                    ? CupertinoTheme.of(context).primaryColor
+                                    : CupertinoTheme.of(context).textTheme.textStyle.color?.withOpacity(0.6),
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                  );
-                }).toList(),
-              ),
+                    );
+                  }).toList(),
+                );
+              },
             ),
-          ],
+          ),
         ),
-      ),
+      ],
     );
   }
 
   void _incrementKeyReps(String key) {
     setState(() {
       _keysPracticed[key] = (_keysPracticed[key] ?? 0) + 1;
-    });
-    // Update the practice item immediately
-    widget.practiceItem.keysPracticed[key] = _keysPracticed[key]!;
-  }
-  
-  void _decrementKeyReps(String key) {
-    setState(() {
-      if ((_keysPracticed[key] ?? 0) > 0) {
-        _keysPracticed[key] = (_keysPracticed[key] ?? 1) - 1;
-      }
     });
     // Update the practice item immediately
     widget.practiceItem.keysPracticed[key] = _keysPracticed[key]!;

@@ -3,6 +3,7 @@ import 'package:practice_pad/features/edit_items/presentation/viewmodels/edit_it
 import 'package:practice_pad/features/routines/models/day_of_week.dart';
 import 'package:practice_pad/models/practice_item.dart';
 import 'package:practice_pad/models/practice_area.dart';
+import 'package:practice_pad/services/local_storage_service.dart';
 import 'dart:developer' as developer;
 
 class RoutinesViewModel extends ChangeNotifier {
@@ -36,7 +37,14 @@ class RoutinesViewModel extends ChangeNotifier {
     for (var day in DayOfWeek.values) {
       _routines[day] = [];
     }
-    // Potentially load routines from a service here
+    
+    // Listen for when practice areas are loaded, then load weekly schedule
+    _editItemsViewModel.addListener(_onPracticeAreasChanged);
+    
+    // If practice areas are already loaded, load schedule immediately
+    if (_editItemsViewModel.areas.isNotEmpty) {
+      _loadWeeklySchedule();
+    }
   }
 
   // Getter to access practice areas from EditItemsViewModel
@@ -57,6 +65,7 @@ class RoutinesViewModel extends ChangeNotifier {
     // Ensure area is not already in the routine for that day to avoid duplicates
     if (!(_routines[day]?.any((a) => a.recordName == area.recordName) ?? false)) {
       _routines[day]?.add(area);
+      _saveWeeklySchedule();
       notifyListeners();
     }
   }
@@ -64,6 +73,7 @@ class RoutinesViewModel extends ChangeNotifier {
   // UPDATED: Remove practice area from routine
   void removePracticeAreaFromRoutine(DayOfWeek day, PracticeArea area) {
     _routines[day]?.removeWhere((a) => a.recordName == area.recordName);
+    _saveWeeklySchedule();
     notifyListeners();
   }
 
@@ -85,6 +95,7 @@ class RoutinesViewModel extends ChangeNotifier {
         name: 'RoutinesVM'); // DEBUG
     developer.log('[RoutinesViewModel] Full routines map: $_routines',
         name: 'RoutinesVM'); // DEBUG
+    _saveWeeklySchedule();
     notifyListeners();
   }
 
@@ -101,6 +112,7 @@ class RoutinesViewModel extends ChangeNotifier {
         newIndex < dayRoutine.length) {
       final PracticeArea area = dayRoutine.removeAt(oldIndex);
       dayRoutine.insert(newIndex, area);
+      _saveWeeklySchedule();
       notifyListeners();
     }
   }
@@ -115,6 +127,7 @@ class RoutinesViewModel extends ChangeNotifier {
       // Create a new list from sourceAreas to avoid modifying the same list instance
       _routines[targetDay] = List<PracticeArea>.from(sourceAreas);
     }
+    _saveWeeklySchedule();
     notifyListeners(); // Notify to update UI for potentially multiple days
   }
 
@@ -139,6 +152,96 @@ class RoutinesViewModel extends ChangeNotifier {
   // NEW: Get today's practice areas
   List<PracticeArea> getTodaysPracticeAreas() {
     return _routines[today] ?? [];
+  }
+
+  /// Load weekly schedule from local storage
+  Future<void> _loadWeeklySchedule() async {
+    try {
+      developer.log('Loading weekly schedule from local storage', name: 'RoutinesVM');
+      final schedule = await LocalStorageService.loadWeeklySchedule();
+      
+      // Convert the schedule map from area record names to PracticeArea objects
+      for (final dayEntry in schedule.entries) {
+        final dayString = dayEntry.key;
+        final areaRecordNames = dayEntry.value;
+        
+        // Find the matching DayOfWeek enum
+        final day = DayOfWeek.values.firstWhere(
+          (d) => d.toString().split('.').last == dayString,
+          orElse: () => DayOfWeek.sunday,
+        );
+        
+        // Clear existing routine for this day
+        _routines[day]?.clear();
+        
+        // Convert record names back to PracticeArea objects
+        for (final recordName in areaRecordNames) {
+          final area = _editItemsViewModel.getPracticeAreaByRecordName(recordName);
+          if (area != null) {
+            _routines[day]?.add(area);
+          } else {
+            developer.log('Warning: Practice area with record name $recordName not found', name: 'RoutinesVM');
+          }
+        }
+      }
+      
+      developer.log('Loaded weekly schedule with ${schedule.length} days', name: 'RoutinesVM');
+      notifyListeners();
+    } catch (e) {
+      developer.log('Error loading weekly schedule: $e', error: e);
+    }
+  }
+
+  /// Save weekly schedule to local storage
+  Future<void> _saveWeeklySchedule() async {
+    try {
+      // Convert the routines map to a schedule map with area record names
+      final schedule = <String, List<String>>{};
+      
+      for (final dayEntry in _routines.entries) {
+        final day = dayEntry.key;
+        final areas = dayEntry.value;
+        
+        final dayString = day.toString().split('.').last;
+        schedule[dayString] = areas.map((area) => area.recordName).toList();
+      }
+      
+      await LocalStorageService.saveWeeklySchedule(schedule);
+      developer.log('Saved weekly schedule to local storage', name: 'RoutinesVM');
+    } catch (e) {
+      developer.log('Error saving weekly schedule: $e', error: e);
+    }
+  }
+
+  /// Check if target day already contains all practice areas from source day
+  bool dayContainsAllAreasFrom(DayOfWeek sourceDay, DayOfWeek targetDay) {
+    final sourceAreas = _routines[sourceDay] ?? [];
+    final targetAreas = _routines[targetDay] ?? [];
+    
+    if (sourceAreas.isEmpty) return true; // Nothing to check
+    if (targetAreas.isEmpty) return false; // Target has no areas but source does
+    
+    // Compare by record names to check if target contains all source areas
+    final sourceRecordNames = sourceAreas.map((area) => area.recordName).toSet();
+    final targetRecordNames = targetAreas.map((area) => area.recordName).toSet();
+    
+    // Target day contains all areas from source day if all source record names are in target
+    return sourceRecordNames.every((recordName) => targetRecordNames.contains(recordName));
+  }
+
+  /// Listen for practice areas changes to reload schedule when they're available
+  void _onPracticeAreasChanged() {
+    // Load schedule whenever practice areas are available
+    if (_editItemsViewModel.areas.isNotEmpty) {
+      developer.log('Practice areas changed, reloading weekly schedule', name: 'RoutinesVM');
+      _loadWeeklySchedule();
+    }
+  }
+
+  @override
+  void dispose() {
+    _editItemsViewModel.removeListener(_onPracticeAreasChanged);
+    super.dispose();
   }
 
   // More methods will be added here for loading, saving, reordering items, etc.

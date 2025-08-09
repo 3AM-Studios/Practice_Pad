@@ -195,7 +195,7 @@ class _DialPainter extends CustomPainter {
       text: TextSpan(
         text: text,
         style: const TextStyle(
-          color: Colors.white,
+          color: Colors.black,
           fontSize: 16,
           fontWeight: FontWeight.bold,
         ),
@@ -267,7 +267,7 @@ class _DialPainter extends CustomPainter {
           text: TextSpan(
             text: items[i].outerText!,
             style: const TextStyle(
-              color: Colors.white,
+              color: Colors.black,
               fontSize: 12,
               fontWeight: FontWeight.bold,
             ),

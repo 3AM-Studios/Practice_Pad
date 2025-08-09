@@ -1,8 +1,10 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:practice_pad/features/edit_items/presentation/viewmodels/edit_items_viewmodel.dart';
+import 'package:practice_pad/features/chord_progressions/chord_progression_input_screen.dart';
 import 'package:practice_pad/models/practice_area.dart';
 import 'package:practice_pad/models/practice_item.dart';
+import 'package:practice_pad/models/chord_progression.dart';
 import 'package:provider/provider.dart';
 import 'dart:developer' as developer;
 
@@ -36,6 +38,34 @@ class _PracticeItemScreenState extends State<PracticeItemScreen> {
         _items = fetchedItems;
       });
     }
+  }
+
+  void _showChordProgressionDialog(BuildContext context, {PracticeItem? item}) {
+    Navigator.of(context).push(
+      CupertinoPageRoute(
+        builder: (context) => ChordProgressionInputScreen(
+          initialProgression: item?.chordProgression,
+        ),
+      ),
+    ).then((value) async {
+      if (value is ChordProgression) {
+        final practiceItem = PracticeItem(
+          id: item?.id ?? '',
+          name: value.name,
+          description: 'Chord progression: ${value.chords.join(' - ')}',
+          chordProgression: value,
+        );
+        
+        if (item != null) {
+          // Update existing item
+          await _viewModel.updatePracticeItem(widget.practiceArea.recordName, practiceItem);
+        } else {
+          // Add new item
+          await _viewModel.addPracticeItem(widget.practiceArea.recordName, practiceItem);
+        }
+        _loadItems();
+      }
+    });
   }
 
   void _showAddEditPracticeItemDialog(BuildContext context,
@@ -126,7 +156,13 @@ class _PracticeItemScreenState extends State<PracticeItemScreen> {
         trailing: CupertinoButton(
           padding: EdgeInsets.zero,
           child: const Icon(CupertinoIcons.add),
-          onPressed: () => _showAddEditPracticeItemDialog(context),
+          onPressed: () {
+            if (widget.practiceArea.type == PracticeAreaType.chordProgression) {
+              _showChordProgressionDialog(context);
+            } else {
+              _showAddEditPracticeItemDialog(context);
+            }
+          },
         ),
       ),
       child: _buildItemList(context),
@@ -157,7 +193,13 @@ class _PracticeItemScreenState extends State<PracticeItemScreen> {
               const SizedBox(height: 16),
               CupertinoButton.filled(
                 child: const Text('Add Item'),
-                onPressed: () => _showAddEditPracticeItemDialog(context),
+                onPressed: () {
+                  if (widget.practiceArea.type == PracticeAreaType.chordProgression) {
+                    _showChordProgressionDialog(context);
+                  } else {
+                    _showAddEditPracticeItemDialog(context);
+                  }
+                },
               )
             ],
           ),
@@ -170,6 +212,9 @@ class _PracticeItemScreenState extends State<PracticeItemScreen> {
         CupertinoSliverRefreshControl(
           onRefresh: _loadItems,
         ),
+                const SliverToBoxAdapter(
+          child: SizedBox(height: 50),
+        ),
         SliverList(
           delegate: SliverChildBuilderDelegate(
             (context, index) {
@@ -180,7 +225,11 @@ class _PracticeItemScreenState extends State<PracticeItemScreen> {
                     child: const Text('Edit Item'),
                     onPressed: () {
                       Navigator.pop(context); // Close context menu
-                      _showAddEditPracticeItemDialog(context, item: item);
+                      if (widget.practiceArea.type == PracticeAreaType.chordProgression || item.chordProgression != null) {
+                        _showChordProgressionDialog(context, item: item);
+                      } else {
+                        _showAddEditPracticeItemDialog(context, item: item);
+                      }
                     },
                   ),
                   CupertinoContextMenuAction(
@@ -202,12 +251,22 @@ class _PracticeItemScreenState extends State<PracticeItemScreen> {
                     subtitle: Text(item.description.isNotEmpty
                         ? item.description
                         : 'No description'),
-                    leading: const Icon(CupertinoIcons.doc_text),
+                    leading: Icon(
+                      (widget.practiceArea.type == PracticeAreaType.chordProgression || item.chordProgression != null)
+                          ? CupertinoIcons.music_note_2
+                          : CupertinoIcons.doc_text,
+                      color: (widget.practiceArea.type == PracticeAreaType.chordProgression || item.chordProgression != null)
+                          ? CupertinoColors.systemPurple
+                          : CupertinoColors.systemBlue,
+                    ),
                     onTap: () {
                       developer.log("Tapped on item: ${item.name} (LOCAL)",
                           name: 'PracticeItemScreen');
-                      _showAddEditPracticeItemDialog(context,
-                          item: item); // Or navigate to a detail view
+                      if (widget.practiceArea.type == PracticeAreaType.chordProgression || item.chordProgression != null) {
+                        _showChordProgressionDialog(context, item: item);
+                      } else {
+                        _showAddEditPracticeItemDialog(context, item: item);
+                      }
                     },
                   ),
                 ),

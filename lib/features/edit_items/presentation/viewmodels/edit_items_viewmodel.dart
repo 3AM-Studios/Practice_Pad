@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:practice_pad/models/practice_area.dart';
 import 'package:practice_pad/models/practice_item.dart';
 import 'package:practice_pad/features/song_viewer/data/models/song.dart';
+import 'package:practice_pad/services/local_storage_service.dart';
 // import 'package:practice_pad/services/cloud_kit_service.dart'; // SIDELINED
 import 'dart:developer' as developer; // For logging
 import 'dart:math'; // For random ID generation
@@ -15,6 +16,39 @@ class EditItemsViewModel extends ChangeNotifier {
   // NEW: Type-based getters
   List<PracticeArea> get songAreas => _areas.where((area) => area.type == PracticeAreaType.song).toList();
   List<PracticeArea> get exerciseAreas => _areas.where((area) => area.type == PracticeAreaType.exercise).toList();
+  List<PracticeArea> get chordProgressionAreas => _areas.where((area) => area.type == PracticeAreaType.chordProgression).toList();
+  
+  // Get all exercise-type areas (includes both exercises and chord progressions)
+  List<PracticeArea> get allExerciseAreas => _areas.where((area) => 
+    area.type == PracticeAreaType.exercise || area.type == PracticeAreaType.chordProgression).toList();
+  
+  // Get the main Chord Progressions practice area (always exists)
+  PracticeArea get chordProgressionsArea {
+    var chordProgressionArea = _areas.firstWhere(
+      (area) => area.type == PracticeAreaType.chordProgression && area.name == 'Chord Progressions',
+      orElse: () => _createDefaultChordProgressionsArea(),
+    );
+    return chordProgressionArea;
+  }
+  
+  PracticeArea _createDefaultChordProgressionsArea() {
+    final area = PracticeArea(
+      recordName: 'chord_progressions_default',
+      name: 'Chord Progressions',
+      type: PracticeAreaType.chordProgression,
+    );
+    _areas.add(area);
+    return area;
+  }
+  
+  void _ensureChordProgressionsAreaExists() {
+    final exists = _areas.any(
+      (area) => area.type == PracticeAreaType.chordProgression && area.name == 'Chord Progressions'
+    );
+    if (!exists) {
+      _createDefaultChordProgressionsArea();
+    }
+  }
 
   bool _isLoadingAreas = false;
   bool get isLoadingAreas => _isLoadingAreas;
@@ -39,49 +73,67 @@ class EditItemsViewModel extends ChangeNotifier {
     return "local_item_${_nextItemId++}_${_random.nextInt(99999)}";
   }
 
+  /// Auto-save all data to local storage
+  Future<void> _autoSave() async {
+    try {
+      // Save practice areas
+      await LocalStorageService.savePracticeAreas(_areas);
+      
+      // Prepare items by area map
+      final itemsByArea = <String, List<PracticeItem>>{};
+      for (final area in _areas) {
+        itemsByArea[area.recordName] = area.practiceItems;
+      }
+      
+      // Save practice items
+      await LocalStorageService.savePracticeItems(itemsByArea);
+      
+      developer.log('Auto-saved all data to local storage');
+    } catch (e) {
+      developer.log('Error in auto-save: $e', error: e);
+    }
+  }
+
   Future<void> fetchPracticeAreas() async {
-    developer.log("ViewModel: Starting fetchPracticeAreas (LOCAL DATA)",
+    developer.log("ViewModel: Starting fetchPracticeAreas (LOCAL STORAGE)",
         name: 'EditItemsViewModel');
     _isLoadingAreas = true;
     _error = null;
-    // notifyListeners(); // Avoid notifying before the simulated delay if it causes quick flashes
-
-    await Future.delayed(
-        const Duration(milliseconds: 100)); // Simulate network delay
-
-    // REMOVED: Default data generation
-    // if (_areas.isEmpty) {
-    //   final area1Id = _generateLocalAreaRecordName();
-    //   final area2Id = _generateLocalAreaRecordName();
-    //   _areas = [
-    //     PracticeArea(recordName: area1Id, name: 'Scales'),
-    //     PracticeArea(recordName: area2Id, name: 'Chords'),
-    //   ];
-    //   _itemsByArea[area1Id] = [
-    //     PracticeItem(
-    //         id: _generateLocalItemId(),
-    //         practiceAreaRecordName: area1Id,
-    //         name: 'C Major Scale',
-    //         description: '2 octaves, ascending and descending'),
-    //     PracticeItem(
-    //         id: _generateLocalItemId(),
-    //         practiceAreaRecordName: area1Id,
-    //         name: 'A Minor Pentatonic',
-    //         description: 'Focus on alternate picking.'),
-    //   ];
-    //   _itemsByArea[area2Id] = [
-    //     PracticeItem(
-    //         id: _generateLocalItemId(),
-    //         practiceAreaRecordName: area2Id,
-    //         name: 'Basic Chord Voicings (C, G, Am, F)',
-    //         description: 'Practice clean transitions.'),
-    //   ];
-    // }
-    _isLoadingAreas = false;
-    developer.log(
-        "ViewModel: Fetched ${_areas.length} areas (LOCAL DATA) - No default data added.",
-        name: 'EditItemsViewModel');
     notifyListeners();
+
+    try {
+      // Load practice areas from local storage
+      final loadedAreas = await LocalStorageService.loadPracticeAreas();
+      _areas.clear();
+      _areas.addAll(loadedAreas);
+      
+      // Load practice items for each area
+      final loadedItems = await LocalStorageService.loadPracticeItems();
+      
+      // Ensure each area has its practice items populated
+      for (final area in _areas) {
+        final items = loadedItems[area.recordName] ?? [];
+        area.practiceItems.clear();
+        area.practiceItems.addAll(items);
+      }
+
+      // Ensure Chord Progressions area always exists
+      _ensureChordProgressionsAreaExists();
+      
+      _isLoadingAreas = false;
+      developer.log(
+          "ViewModel: Loaded ${_areas.length} areas from local storage - Chord Progressions area ensured.",
+          name: 'EditItemsViewModel');
+      notifyListeners();
+    } catch (e) {
+      _isLoadingAreas = false;
+      _error = 'Failed to load practice areas: $e';
+      developer.log("ViewModel: Error loading practice areas: $e", error: e);
+      
+      // Ensure Chord Progressions area exists even on error
+      _ensureChordProgressionsAreaExists();
+      notifyListeners();
+    }
   }
 
   Future<void> addPracticeArea(String name, PracticeAreaType type) async {
@@ -102,6 +154,9 @@ class EditItemsViewModel extends ChangeNotifier {
     developer.log(
         "ViewModel: Practice area '$name' added locally with ID: $newAreaRecordName",
         name: 'EditItemsViewModel');
+    
+    // Auto-save to local storage
+    await _autoSave();
     notifyListeners();
   }
 
@@ -126,6 +181,9 @@ class EditItemsViewModel extends ChangeNotifier {
     developer.log(
         "ViewModel: Song practice area '$name' added locally with ID: $newAreaRecordName",
         name: 'EditItemsViewModel');
+    
+    // Auto-save to local storage
+    await _autoSave();
     notifyListeners();
   }
 
@@ -141,6 +199,9 @@ class EditItemsViewModel extends ChangeNotifier {
       developer.log(
           "ViewModel: Practice area '${areaToUpdate.name}' updated locally",
           name: 'EditItemsViewModel');
+      
+      // Auto-save to local storage
+      await _autoSave();
     } else {
       developer.log(
           "ViewModel: Practice area not found for update (LOCAL DATA): ${areaToUpdate.recordName}",
@@ -156,6 +217,9 @@ class EditItemsViewModel extends ChangeNotifier {
     _areas.removeWhere((area) => area.recordName == recordName);
     developer.log("ViewModel: Practice area $recordName deleted locally",
         name: 'EditItemsViewModel');
+    
+    // Auto-save to local storage
+    await _autoSave();
     notifyListeners();
   }
 
@@ -206,6 +270,9 @@ class EditItemsViewModel extends ChangeNotifier {
     developer.log(
         "ViewModel: Item '${newItem.name}' added locally with ID: ${newItem.id}",
         name: 'EditItemsViewModel');
+    
+    // Auto-save to local storage
+    await _autoSave();
     notifyListeners();
   }
 
@@ -223,6 +290,9 @@ class EditItemsViewModel extends ChangeNotifier {
     
     developer.log("ViewModel: Item '${itemToUpdate.name}' updated locally",
         name: 'EditItemsViewModel');
+    
+    // Auto-save to local storage
+    await _autoSave();
     notifyListeners();
   }
 
@@ -241,6 +311,9 @@ class EditItemsViewModel extends ChangeNotifier {
     developer.log(
         "ViewModel: Item $itemId deleted locally from area $areaRecordName",
         name: 'EditItemsViewModel');
+    
+    // Auto-save to local storage
+    await _autoSave();
     notifyListeners();
   }
 

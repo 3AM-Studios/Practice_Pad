@@ -54,54 +54,141 @@ class _EditRoutinesScreenState extends State<EditRoutinesScreen> {
       return;
     }
 
+    // Create a map to track selected days for copying
+    Map<DayOfWeek, bool> selectedDays = {};
+    for (final day in DayOfWeek.values) {
+      if (day != sourceDay) {
+        // Pre-check days that already contain all practice areas from source
+        selectedDays[day] = viewModel.dayContainsAllAreasFrom(sourceDay, day);
+      }
+    }
+
     showCupertinoDialog(
       context: context,
-      builder: (dialogContext) => CupertinoAlertDialog(
-        title: const Text('Copy Routine'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-                'Copy the routine from ${_dayOfWeekToFullName(sourceDay)} to which day?'),
-            const SizedBox(height: 16),
-            ...DayOfWeek.values
-                .where((day) => day != sourceDay)
-                .map((targetDay) => Container(
-                      width: double.infinity,
-                      margin: const EdgeInsets.symmetric(vertical: 4),
-                      child: CupertinoButton(
-                        padding: const EdgeInsets.all(12),
-                        color: CupertinoColors.activeBlue,
-                        borderRadius: BorderRadius.circular(8),
-                        child: Text(_dayOfWeekToFullName(targetDay)),
-                        onPressed: () {
-                          Navigator.of(dialogContext).pop();
-                          viewModel.copyRoutineToDays(sourceDay, [targetDay]);
-                          _showCopyConfirmation(context, sourceDay, targetDay);
-                        },
-                      ),
-                    ))
-                ,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setState) => CupertinoAlertDialog(
+          title: const Text('Copy Routine'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                    'Select days to copy the routine from ${_dayOfWeekToFullName(sourceDay)}:'),
+                const SizedBox(height: 16),
+                ...DayOfWeek.values
+                    .where((day) => day != sourceDay)
+                    .map((day) {
+                  final isSelected = selectedDays[day] ?? false;
+                  final alreadyContainsAreas = viewModel.dayContainsAllAreasFrom(sourceDay, day);
+                  
+                  return Container(
+                    margin: const EdgeInsets.symmetric(vertical: 2),
+                    child: Row(
+                      children: [
+                        CupertinoButton(
+                          padding: EdgeInsets.zero,
+                          onPressed: () {
+                            setState(() {
+                              selectedDays[day] = !isSelected;
+                            });
+                          },
+                          child: Icon(
+                            isSelected 
+                                ? CupertinoIcons.checkmark_circle_fill 
+                                : CupertinoIcons.circle,
+                            color: isSelected 
+                                ? (alreadyContainsAreas ? CupertinoColors.systemGreen : CupertinoColors.activeBlue)
+                                : CupertinoColors.systemGrey,
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                selectedDays[day] = !isSelected;
+                              });
+                            },
+                            child: Text(
+                              _dayOfWeekToFullName(day),
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: alreadyContainsAreas 
+                                    ? CupertinoColors.systemGreen 
+                                    : CupertinoColors.label.resolveFrom(context),
+                              ),
+                            ),
+                          ),
+                        ),
+                        if (alreadyContainsAreas)
+                          const Icon(
+                            CupertinoIcons.checkmark_shield_fill,
+                            color: CupertinoColors.systemGreen,
+                            size: 16,
+                          ),
+                      ],
+                    ),
+                  );
+                }),
+                const SizedBox(height: 8),
+                Text(
+                  '✓ Green = Already contains these practice areas',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: CupertinoColors.systemGrey.resolveFrom(context),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            CupertinoDialogAction(
+              child: const Text('Cancel'),
+              onPressed: () => Navigator.of(dialogContext).pop(),
+            ),
+            CupertinoDialogAction(
+              isDefaultAction: true,
+              child: const Text('Copy'),
+              onPressed: () {
+                final selectedDaysList = selectedDays.entries
+                    .where((entry) => entry.value)
+                    .map((entry) => entry.key)
+                    .toList();
+                
+                if (selectedDaysList.isNotEmpty) {
+                  Navigator.of(dialogContext).pop();
+                  viewModel.copyRoutineToDays(sourceDay, selectedDaysList);
+                  _showCopyConfirmation(context, sourceDay, selectedDaysList);
+                } else {
+                  Navigator.of(dialogContext).pop();
+                }
+              },
+            ),
           ],
         ),
-        actions: [
-          CupertinoDialogAction(
-            child: const Text('Cancel'),
-            onPressed: () => Navigator.of(dialogContext).pop(),
-          ),
-        ],
       ),
     );
   }
 
   void _showCopyConfirmation(
-      BuildContext context, DayOfWeek sourceDay, DayOfWeek targetDay) {
+      BuildContext context, DayOfWeek sourceDay, List<DayOfWeek> targetDays) {
+    if (targetDays.isEmpty) return;
+    
+    String message;
+    if (targetDays.length == 1) {
+      message = 'The routine from ${_dayOfWeekToFullName(sourceDay)} has been copied to ${_dayOfWeekToFullName(targetDays.first)}.';
+    } else {
+      final dayNames = targetDays.map(_dayOfWeekToFullName).join(', ');
+      message = 'The routine from ${_dayOfWeekToFullName(sourceDay)} has been copied to: $dayNames.';
+    }
+    
     showCupertinoDialog(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('Routine Copied'),
-        content: Text(
-            'The routine from ${_dayOfWeekToFullName(sourceDay)} has been copied to ${_dayOfWeekToFullName(targetDay)}.'),
+        content: Text(message),
         actions: [
           CupertinoDialogAction(
             child: const Text('OK'),

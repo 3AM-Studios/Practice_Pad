@@ -33,7 +33,7 @@ class _EditItemsScreenState extends State<EditItemsScreen> {
       child: Column(
         children: [
           // Header section
-          const SizedBox(height: 20),
+          const SizedBox(height: 50),
           const Text(
             'Choose Practice Type',
             style: TextStyle(
@@ -77,7 +77,7 @@ class _EditItemsScreenState extends State<EditItemsScreen> {
                   child: _buildTypeButton(
                     context: context,
                     title: 'Exercises',
-                    subtitle: '${viewModel.exerciseAreas.length} exercises',
+                    subtitle: '${viewModel.allExerciseAreas.length} exercises',
                     icon: CupertinoIcons.chart_bar_square,
                     color: CupertinoColors.systemOrange,
                     description: 'Scales, arpeggios,\nand custom exercises',
@@ -88,25 +88,9 @@ class _EditItemsScreenState extends State<EditItemsScreen> {
             ),
           ),
           
-          const SizedBox(height: 40),
+          const SizedBox(height: 100),
           
           // Quick stats section
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: CupertinoColors.systemGrey6,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildStatItem('Total Areas', '${viewModel.areas.length}'),
-                _buildStatItem('Total Items', '${viewModel.getAllPracticeItems().length}'),
-                _buildStatItem('Songs', '${viewModel.songAreas.length}'),
-                _buildStatItem('Exercises', '${viewModel.exerciseAreas.length}'),
-              ],
-            ),
-          ),
         ],
       ),
     );

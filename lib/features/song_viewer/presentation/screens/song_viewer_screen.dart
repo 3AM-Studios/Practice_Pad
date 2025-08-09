@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui';
 import 'dart:math' as math;
+import 'dart:developer' as developer;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
@@ -20,6 +21,8 @@ import 'package:practice_pad/models/practice_item.dart';
 import 'package:practice_pad/models/chord_progression.dart';
 import 'package:practice_pad/widgets/active_session_banner.dart';
 import 'package:practice_pad/features/practice/presentation/pages/practice_session_screen.dart';
+import 'package:practice_pad/features/edit_items/presentation/viewmodels/edit_items_viewmodel.dart';
+import 'package:provider/provider.dart';
 import 'package:music_sheet/index.dart';
 import 'package:music_sheet/src/music_objects/interface/musical_symbol.dart';
 
@@ -87,6 +90,12 @@ class _SongViewerScreenState extends State<SongViewerScreen>
   Timer? _autoScrollTimer;
   Offset? _currentMousePosition;
   final GlobalKey _sheetMusicKey = GlobalKey();
+
+  // Sheet music zoom control
+  double _sheetMusicScale = 0.7;
+  
+  // Extension numbering control
+  bool _extensionNumbersRelativeToChords = true;
 
   @override
   void initState() {
@@ -1844,20 +1853,17 @@ class _SongViewerScreenState extends State<SongViewerScreen>
 
   /// Creates a chord progression practice item
   void _createChordProgressionPracticeItem(String name, String description, List<String> romanNumerals) {
-    if (widget.practiceArea == null) return;
+    // Get the EditItemsViewModel to access the chord progressions area
+    final editItemsViewModel = Provider.of<EditItemsViewModel>(context, listen: false);
 
     // Create chord progression with Roman numerals
     final chordProgression = ChordProgression(
       id: 'cp_${DateTime.now().millisecondsSinceEpoch}',
       name: name,
       chords: romanNumerals, // Store Roman numerals with qualities
-      key: _originalKey,
-      tempo: _currentBpm,
-      timeSignature: _timeSignature,
-      romanNumerals: romanNumerals, // Also store in the romanNumerals field for consistency
     );
 
-    // Create practice item
+    // Create practice item with chord progression
     final practiceItem = PracticeItem(
       id: 'pi_${DateTime.now().millisecondsSinceEpoch}',
       name: name,
@@ -1865,13 +1871,16 @@ class _SongViewerScreenState extends State<SongViewerScreen>
       chordProgression: chordProgression,
     );
 
-    // Add to practice area
-    widget.practiceArea!.addPracticeItem(practiceItem);
+    // Add to the chord progressions area instead of the current practice area
+    editItemsViewModel.addPracticeItem(
+      editItemsViewModel.chordProgressionsArea.recordName, 
+      practiceItem
+    );
 
     // Show success message
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Practice item "$name" created successfully!'),
+        content: Text('Chord progression "$name" added to Chord Progressions!'),
         backgroundColor: Colors.green,
       ),
     );
@@ -2155,6 +2164,29 @@ class _SongViewerScreenState extends State<SongViewerScreen>
     });
   }
 
+  /// Calculate the proper width for sheet music to ensure full staff line rendering
+  double _calculateSheetMusicWidth() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final measureCount = _chordMeasures.length;
+    
+    // Minimum width for proper rendering
+    const double minWidth = 800.0;
+    
+    // Calculate width based on measure count
+    // Each measure needs adequate space for chord symbols and staff lines
+    const double pixelsPerMeasure = 200.0;
+    final calculatedWidth = measureCount * pixelsPerMeasure;
+    
+    // Add padding for staff line extension
+    const double extraPadding = 100.0;
+    
+    // Use the larger of: calculated width + padding, minimum width, or screen width
+    final finalWidth = math.max(minWidth, math.max(calculatedWidth + extraPadding, screenWidth));
+    
+    developer.log('Sheet music width calculated: $finalWidth (measures: $measureCount, screen: $screenWidth)', name: 'SheetMusicWidth');
+    return finalWidth;
+  }
+
   /// Builds cached sheet music widget to prevent expensive rebuilds
   Widget _buildCachedSheetMusic() {
     // Only rebuild sheet music if measures actually changed
@@ -2180,10 +2212,12 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                 },
                 child: music_sheet.SimpleSheetMusic(
                 height: 600,
-                width: MediaQuery.of(context).size.width - 64, // Fit container width minus padding (32*2)
+                width: _calculateSheetMusicWidth(), // Calculate proper width for all measures
                 measures: _chordMeasures.cast<music_sheet.Measure>(),
-                debug: false, // Disable debug mode for performance
+                debug: false, // Disable debug mode for clean rendering
                 initialKeySignatureType: _getCurrentKeySignature(), // Pass current key signature
+                canvasScale: _sheetMusicScale,
+                extensionNumbersRelativeToChords: _extensionNumbersRelativeToChords,
                 onSymbolAdd: _insertSymbolAtPosition,
                 onSymbolUpdate: _updateSymbolAtPosition,
                 onSymbolDelete: _deleteSymbolAtPosition,
@@ -2370,6 +2404,36 @@ class _SongViewerScreenState extends State<SongViewerScreen>
   void _stopAutoScroll() {
     _autoScrollTimer?.cancel();
     _autoScrollTimer = null;
+  }
+
+  /// Increase sheet music scale (zoom in)
+  void _zoomIn() {
+    setState(() {
+      _sheetMusicScale = (_sheetMusicScale + 0.1).clamp(0.3, 2.0);
+      // Invalidate sheet music cache to force rebuild with new scale
+      _cachedSheetMusicWidget = null;
+      _lastRenderedMeasures = null;
+    });
+  }
+
+  /// Decrease sheet music scale (zoom out)
+  void _zoomOut() {
+    setState(() {
+      _sheetMusicScale = (_sheetMusicScale - 0.1).clamp(0.3, 2.0);
+      // Invalidate sheet music cache to force rebuild with new scale
+      _cachedSheetMusicWidget = null;
+      _lastRenderedMeasures = null;
+    });
+  }
+
+  /// Toggle extension numbering between chord-relative and key-relative
+  void _toggleExtensionNumbering(bool relativeToChords) {
+    setState(() {
+      _extensionNumbersRelativeToChords = relativeToChords;
+      // Invalidate sheet music cache to force rebuild with new numbering mode
+      _cachedSheetMusicWidget = null;
+      _lastRenderedMeasures = null;
+    });
   }
 
   void _onTick(int tick) {
@@ -2748,7 +2812,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                   // Sheet Music Display with Canvas-based Chord Symbols
                   if (_chordMeasures.isNotEmpty)
                     Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 16),
+                      margin: const EdgeInsets.symmetric(vertical: 8),
                       child: ClayContainer(
                         color: surfaceColor,
                         borderRadius: 20,
@@ -2756,10 +2820,142 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                         spread: 3,
                         child: Padding(
                           padding: const EdgeInsets.all(16),
-                          child: SizedBox(
-                            width: MediaQuery.of(context).size.width - 64, // Match SimpleSheetMusic width
-                            height: 700, // Increased height to match SimpleSheetMusic
-                            child: _buildCachedSheetMusic(),
+                          child: Stack(
+                            children: [
+                              SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: SizedBox(
+                                  width: _calculateSheetMusicWidth(), // Allow full width for all measures
+                                  height: 700, // Increased height to match SimpleSheetMusic
+                                  child: _buildCachedSheetMusic(),
+                                ),
+                              ),
+                              // Zoom controls positioned at top left
+                              Positioned(
+                                top: 8,
+                                left: 8,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    ClayContainer(
+                                      color: surfaceColor,
+                                      borderRadius: 8,
+                                      depth: 4,
+                                      spread: 1,
+                                      child: IconButton(
+                                        icon: const Icon(Icons.zoom_in, size: 20),
+                                        onPressed: _zoomIn,
+                                        tooltip: 'Zoom In',
+                                        constraints: const BoxConstraints(
+                                          minWidth: 36,
+                                          minHeight: 36,
+                                        ),
+                                        padding: const EdgeInsets.all(4),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    ClayContainer(
+                                      color: surfaceColor,
+                                      borderRadius: 8,
+                                      depth: 4,
+                                      spread: 1,
+                                      child: IconButton(
+                                        icon: const Icon(Icons.zoom_out, size: 20),
+                                        onPressed: _zoomOut,
+                                        tooltip: 'Zoom Out',
+                                        constraints: const BoxConstraints(
+                                          minWidth: 36,
+                                          minHeight: 36,
+                                        ),
+                                        padding: const EdgeInsets.all(4),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              // Extension numbering toggle buttons positioned at top right
+                              Positioned(
+                                top: 8,
+                                right: 8,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    // Header text with number widget styling
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey.shade200,
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(color: Colors.grey.shade400),
+                                      ),
+                                      child: Text(
+                                        '# relative to:',
+                                        style: TextStyle(
+                                          color: Colors.black87,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        ClayContainer(
+                                          color: _extensionNumbersRelativeToChords ? 
+                                                 CupertinoColors.systemBlue.withOpacity(0.8) : 
+                                                 surfaceColor,
+                                          borderRadius: 8,
+                                          depth: _extensionNumbersRelativeToChords ? 2 : 4,
+                                          spread: 1,
+                                          child: GestureDetector(
+                                            onTap: () => _toggleExtensionNumbering(true),
+                                            child: Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                              child: Text(
+                                                'chords',
+                                                style: TextStyle(
+                                                  color: _extensionNumbersRelativeToChords ? 
+                                                         Colors.white : 
+                                                         Colors.black87,
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        ClayContainer(
+                                          color: !_extensionNumbersRelativeToChords ? 
+                                                 CupertinoColors.systemBlue.withOpacity(0.8) : 
+                                                 surfaceColor,
+                                          borderRadius: 8,
+                                          depth: !_extensionNumbersRelativeToChords ? 2 : 4,
+                                          spread: 1,
+                                          child: GestureDetector(
+                                            onTap: () => _toggleExtensionNumbering(false),
+                                            child: Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                              child: Text(
+                                                'key',
+                                                style: TextStyle(
+                                                  color: !_extensionNumbersRelativeToChords ? 
+                                                         Colors.white : 
+                                                         Colors.black87,
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),

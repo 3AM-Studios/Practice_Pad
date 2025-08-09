@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:clay_containers/clay_containers.dart';
 import 'package:practice_pad/features/edit_items/presentation/pages/practice_item_screen.dart';
 import 'package:practice_pad/features/edit_items/presentation/viewmodels/edit_items_viewmodel.dart';
 import 'package:practice_pad/models/practice_area.dart';
@@ -168,42 +169,124 @@ class _ExerciseAreasScreenState extends State<ExerciseAreasScreen> {
               ),
             ),
           ),
+        // Add padding for navigation bar
+        const SliverToBoxAdapter(
+          child: SizedBox(height: 50),
+        ),
+        
+        // Always show Chord Progressions area at the top
+        SliverToBoxAdapter(
+          child: Material(
+            color: CupertinoTheme.of(context).scaffoldBackgroundColor,
+            child: CupertinoListTile.notched(
+              title: const Text('Chord Progressions'),
+              subtitle: Text('${viewModel.chordProgressionsArea.practiceItems.length} chord progressions'),
+              leading: const Icon(
+                CupertinoIcons.music_note_2,
+                color: CupertinoColors.systemPurple,
+              ),
+              trailing: const Icon(CupertinoIcons.right_chevron),
+              onTap: () {
+                developer.log(
+                    "Tapped on Chord Progressions - Navigating",
+                    name: 'ExerciseAreasScreen');
+                Navigator.of(context).push(CupertinoPageRoute(
+                  builder: (_) => ChangeNotifierProvider.value(
+                    value: viewModel,
+                    child: PracticeItemScreen(practiceArea: viewModel.chordProgressionsArea),
+                  ),
+                ));
+              },
+            ),
+          ),
+        ),
+        
         if (viewModel.exerciseAreas.isEmpty &&
             !viewModel.isLoadingAreas &&
             viewModel.error == null)
-          const SliverFillRemaining(
-            child: Center(
-              child: Padding(
-                padding: EdgeInsets.all(16.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      CupertinoIcons.chart_bar_square,
-                      size: 64,
-                      color: CupertinoColors.systemGrey,
+          SliverToBoxAdapter(
+            child: Container(
+              margin: const EdgeInsets.all(24),
+              child: ClayContainer(
+                color: CupertinoTheme.of(context).scaffoldBackgroundColor,
+                borderRadius: 24,
+                depth: 20,
+                spread: 2,
+                curveType: CurveType.concave,
+                child: DefaultTextStyle(
+                  style: CupertinoTheme.of(context).textTheme.textStyle,
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Column(
+                      children: [
+                        ClayContainer(
+                          color: CupertinoTheme.of(context).scaffoldBackgroundColor,
+                          borderRadius: 20,
+                          depth: 15,
+                          spread: 1,
+                          curveType: CurveType.none,
+                          child: Container(
+                            width: 80,
+                            height: 80,
+                            alignment: Alignment.center,
+                            child: const Icon(
+                              CupertinoIcons.music_albums,
+                              size: 40,
+                              color: CupertinoColors.systemOrange,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        Text(
+                          'Ready to Practice?',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w700,
+                            color: CupertinoTheme.of(context).textTheme.textStyle.color,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'No custom exercises yet',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: CupertinoTheme.of(context).textTheme.textStyle.color?.withOpacity(0.6),
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 20),
+                        ClayContainer(
+                          color: CupertinoTheme.of(context).scaffoldBackgroundColor,
+                          borderRadius: 16,
+                          depth: 8,
+                          spread: 0,
+                          curveType: CurveType.concave,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                            child: Text(
+                              'Tap the + button above to create exercises for:\n• Scales & Arpeggios\n• Technical Studies\n• Sight Reading',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w500,
+                                color: CupertinoTheme.of(context).textTheme.textStyle.color,
+                                height: 1.4,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    SizedBox(height: 16),
-                    Text(
-                      'No exercises found.',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      'Tap the + button to add your first exercise.\nCreate custom practice items for scales, arpeggios, etc.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: CupertinoColors.secondaryLabel),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
-          )
-        else
+          ),
+        
+        // Show regular exercise areas
+        if (viewModel.exerciseAreas.isNotEmpty)
           SliverList(
             delegate: SliverChildBuilderDelegate(
               (context, index) {

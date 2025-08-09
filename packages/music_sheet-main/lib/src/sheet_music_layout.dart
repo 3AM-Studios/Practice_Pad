@@ -24,6 +24,13 @@ class SheetMusicLayout with ChangeNotifier {
   final double widgetWidth;
   final SymbolPositionCallback? symbolPositionCallback;
   final bool debug;
+  double _canvasScale;
+  
+  /// Whether extension numbers should be relative to chords (true) or key (false)
+  final bool extensionNumbersRelativeToChords;
+  
+  /// The initial key signature type for key-relative numbering
+  final dynamic initialKeySignatureType;
 
   /// The final, stateful list of staff renderers. This is the source of truth for drawing.
   late List<StaffRenderer> staffRenderers;
@@ -35,7 +42,10 @@ class SheetMusicLayout with ChangeNotifier {
     required this.widgetWidth,
     this.symbolPositionCallback,
     this.debug = false,
-  }) {
+    double canvasScale = 0.7,
+    this.extensionNumbersRelativeToChords = true,
+    this.initialKeySignatureType,
+  }) : _canvasScale = canvasScale {
     // The entire layout and renderer creation logic now lives here, in the constructor.
     // This work is done only ONCE when the layout is created.
     _buildRenderers();
@@ -109,8 +119,15 @@ class SheetMusicLayout with ChangeNotifier {
   // The sum of all staff heights.
   double get _staffsHeightsSum => metrics.staffsHeightSum;
 
-  // NO SCALING: Since we're handling width distribution manually, use 1:1 scaling
-  double get canvasScale => 0.7;
+  // Canvas scale for zooming in/out
+  double get canvasScale => _canvasScale;
+  
+  /// Update the canvas scale and rebuild the layout
+  void updateCanvasScale(double newScale) {
+    _canvasScale = newScale.clamp(0.3, 2.0); // Limit scale between 30% and 200%
+    _buildRenderers();
+    notifyListeners();
+  }
 
   // Minimal left padding
   double get _leftPaddingOnCanvas => (_kHorizontalScreenPadding / 2);

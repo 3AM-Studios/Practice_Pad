@@ -34,11 +34,12 @@ class StaffRenderer {
     if (measureRendereres.isEmpty) return;
     
     final firstMeasure = measureRendereres.first;
+    final lastMeasure = measureRendereres.last;
     final staffLineCenterY = firstMeasure.staffLineCenterY;
     
-    // Calculate full width - staff lines should extend to screen edge  
+    // Calculate full width - staff lines should extend to the end of the last measure
     final startX = firstMeasure.measureOriginX;
-    final endX = firstMeasure.layout.widgetWidth - 5.0; // Use actual widget width with small padding
+    final endX = lastMeasure.measureOriginX + lastMeasure.measureMetrics.width + 48;
     
     final staffLineHeights = [
       staffLineCenterY - Constants.staffSpace * 2,

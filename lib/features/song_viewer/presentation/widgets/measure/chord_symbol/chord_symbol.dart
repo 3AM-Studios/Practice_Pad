@@ -256,6 +256,7 @@ class ChordSymbol {
     // Order matters: handle more specific patterns before general ones
     return quality
         // Handle diminished chords first (most specific)
+        
         .replaceAll('m7b5', 'ø')    // Half-diminished (just the symbol, no 7)
         .replaceAll('half-diminished', 'ø')
         .replaceAll('dim7', '°')    // Fully diminished (just the symbol, no 7) 

@@ -30,6 +30,62 @@ ChordSymbol? getChordSymbolForNote(
   return chordIndex < chordSymbols.length ? chordSymbols[chordIndex] : chordSymbols.last;
 }
 
+/// Gets the extension number (scale degree) for a note relative to a key signature.
+/// Returns scale degrees relative to the key center.
+String getKeyExtension(Note note, String keySignature) {
+  String accidental = '';
+  if (note.accidental.toString() == 'Accidental.flat') {
+    accidental = 'b';
+  }
+  if (note.accidental.toString() == 'Accidental.sharp') {
+    accidental = '#';
+  }
+  
+  final String noteName = note.pitch.name.replaceAll(RegExp(r'\d'), '').trim().toUpperCase() + accidental;
+
+  final int noteMidi = _getMidiValueFromNoteName(noteName);
+  
+  // Extract key root from key signature (e.g., "C major" -> "C", "A minor" -> "A")
+  String keyRoot = keySignature.split(' ')[0].toUpperCase();
+  final int keyRootPitchClass = _getMidiValueFromNoteName(keyRoot);
+  
+  // Get the pitch class of the note (0-11) to compare with key root
+  final int notePitchClass = noteMidi % 12;
+  
+  // Calculate how many semitones the note is ABOVE the key root
+  int interval = (notePitchClass - keyRootPitchClass + 12) % 12;
+  
+  // Convert semitone interval to scale degree
+  switch (interval) {
+    case 0:
+      return '1';   // Root (tonic)
+    case 1:
+      return 'b2';  // Minor second
+    case 2:
+      return '2';   // Major second
+    case 3:
+      return 'b3';  // Minor third
+    case 4:
+      return '3';   // Major third
+    case 5:
+      return '4';   // Perfect fourth
+    case 6:
+      return 'b5';  // Tritone (diminished fifth)
+    case 7:
+      return '5';   // Perfect fifth
+    case 8:
+      return 'b6';  // Minor sixth
+    case 9:
+      return '6';   // Major sixth
+    case 10:
+      return 'b7';  // Minor seventh
+    case 11:
+      return '7';   // Major seventh
+    default:
+      return '';
+  }
+}
+
 /// Gets the extension number (scale degree) for a note relative to its chord symbol.
 /// Returns common chord extensions like '1', '3', '5', '7', '9', '11', '13', etc.
 String getChordExtension(Note note, ChordSymbol chordSymbol) {
@@ -85,6 +141,16 @@ String getChordExtension(Note note, ChordSymbol chordSymbol) {
     default:
       return '';
   }
+}
+
+/// Converts KeySignatureType enum to readable key name
+String convertKeySignatureTypeToString(dynamic keySignatureType) {
+  if (keySignatureType == null) return 'C major';
+  
+  final keyType = keySignatureType.toString().split('.').last;
+  // Convert enum name to readable key name (e.g., cMajor -> C major)
+  String result = keyType.replaceAllMapped(RegExp(r'([a-z])([A-Z])'), (match) => '${match[1]} ${match[2]}');
+  return result[0].toUpperCase() + result.substring(1);
 }
 
 /// Converts a note name to its MIDI pitch class (0-11, ignoring octave)

@@ -9,6 +9,8 @@ import 'package:practice_pad/features/practice/presentation/pages/today_screen.d
 import 'package:practice_pad/features/routines/presentation/viewmodels/routines_viewmodel.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:practice_pad/widgets/wooden_border_wrapper.dart';
+import 'package:practice_pad/widgets/wooden_icon_background.dart';
 
 import 'package:practice_pad/services/cloud_kit_service.dart';
 import 'package:practice_pad/features/edit_items/presentation/pages/edit_items_screen.dart';
@@ -40,7 +42,7 @@ class PracticeLoverApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => EditItemsViewModel()),
+        ChangeNotifierProvider(create: (_) => EditItemsViewModel()..fetchPracticeAreas()),
         ChangeNotifierProvider(create: (_) => PracticeSessionManager()),
         ChangeNotifierProxyProvider<EditItemsViewModel, RoutinesViewModel>(
           create: (context) => RoutinesViewModel(
@@ -61,7 +63,7 @@ class PracticeLoverApp extends StatelessWidget {
         title: 'PracticeLover',
         debugShowCheckedModeBanner: false,
         theme: FlexThemeData.light(
-          scheme: FlexScheme.indigoM3,
+          scheme: FlexScheme.bigStone,
           surfaceMode: FlexSurfaceMode.levelSurfacesLowScaffold,
           blendLevel: 7,
           subThemesData: const FlexSubThemesData(
@@ -75,7 +77,7 @@ class PracticeLoverApp extends StatelessWidget {
           swapLegacyOnMaterial3: true,
         ),
         darkTheme: FlexThemeData.dark(
-          scheme: FlexScheme.indigo,
+          scheme: FlexScheme.indigoM3,
           surfaceMode: FlexSurfaceMode.levelSurfacesLowScaffold,
           blendLevel: 13,
           subThemesData: const FlexSubThemesData(
@@ -96,7 +98,9 @@ class PracticeLoverApp extends StatelessWidget {
         supportedLocales: const [
           Locale('en', ''),
         ],
-        home: const MainAppScaffold(),
+        home: const WoodenBorderWrapper(
+          child: MainAppScaffold(),
+        ),
       ),
     );
   }
@@ -112,14 +116,20 @@ class MainAppScaffold extends StatefulWidget {
 class MainAppScaffoldState extends State<MainAppScaffold> {
   int _currentIndex = 0;
 
-  final List<Widget> _tabs = [
+  List<Widget> get _tabs => [
     ChangeNotifierProxyProvider<RoutinesViewModel, TodayViewModel>(
       create: (context) => TodayViewModel(
           routinesViewModel:
               Provider.of<RoutinesViewModel>(context, listen: false)),
       update: (context, routinesViewModel, previousTodayViewModel) =>
           TodayViewModel(routinesViewModel: routinesViewModel),
-      child: const TodayScreen(),
+      child: TodayScreen(
+        onStatsPressed: () {
+          setState(() {
+            _currentIndex = 3; // Switch to Stats tab
+          });
+        },
+      ),
     ),
     const EditRoutinesScreen(),
     const EditItemsScreen(),
@@ -143,11 +153,7 @@ class MainAppScaffoldState extends State<MainAppScaffold> {
     TabItem(
       icon: CupertinoIcons.chart_bar_square,
       label: 'Stats',
-    ),
-    TabItem(
-      icon: CupertinoIcons.settings,
-      label: 'Settings',
-    ),
+    )
   ];
 
   @override

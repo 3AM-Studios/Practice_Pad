@@ -1,7 +1,7 @@
 import 'package:practice_pad/models/practice_item.dart';
 import 'package:practice_pad/features/song_viewer/data/models/song.dart';
 
-enum PracticeAreaType { song, exercise }
+enum PracticeAreaType { song, exercise, chordProgression }
 
 class PracticeArea {
   final String recordName; // CloudKit record name (unique ID)
@@ -23,7 +23,11 @@ class PracticeArea {
     // Assuming the plugin provides the fields directly, not nested under 'fields' then 'value'
     // This might need adjustment based on actual CloudKitRecord structure from the plugin
     final typeString = record['type'] as String? ?? 'exercise'; // Default to exercise for existing records
-    final type = typeString == 'song' ? PracticeAreaType.song : PracticeAreaType.exercise;
+    final type = typeString == 'song' 
+        ? PracticeAreaType.song 
+        : typeString == 'chordProgression'
+            ? PracticeAreaType.chordProgression
+            : PracticeAreaType.exercise;
     
     // Parse song data if available
     Song? song;
@@ -49,7 +53,11 @@ class PracticeArea {
   Map<String, dynamic> toCloudKitRecordFields() {
     final fields = <String, dynamic>{
       'name': name, // Simplified: direct value
-      'type': type == PracticeAreaType.song ? 'song' : 'exercise',
+      'type': type == PracticeAreaType.song 
+          ? 'song' 
+          : type == PracticeAreaType.chordProgression
+              ? 'chordProgression'
+              : 'exercise',
       // Note: practiceItems are not stored in CloudKit for PracticeArea anymore
     };
     
