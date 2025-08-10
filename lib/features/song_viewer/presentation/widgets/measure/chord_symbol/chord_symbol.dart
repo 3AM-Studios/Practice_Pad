@@ -904,7 +904,7 @@ class ChordSymbol {
       text: TextSpan(
         text: chordText,
         style: const TextStyle(
-          fontSize: 36, // Much larger font
+          fontSize: 50, // Much larger font
           fontWeight: FontWeight.bold,
           color: Colors.black,
         ),
@@ -919,7 +919,7 @@ class ChordSymbol {
       text: TextSpan(
         text: romanText + getQualitySuperscript(),
         style: const TextStyle(
-          fontSize: 28, // Much larger font
+          fontSize: 45, // Much larger font
           fontWeight: FontWeight.w600,
           color: Colors.black,
         ),
@@ -988,6 +988,7 @@ class ChordSymbol {
     bool isAnimating = false,
     bool isNewMeasure = false,
     bool isStartOfReharmonizedSequence = false,
+    double canvasScale = 1.0,
     GlobalKey? globalKey,
     VoidCallback? onTap,
     VoidCallback? onLongPress,
@@ -998,8 +999,9 @@ class ChordSymbol {
     final primaryColor = theme.colorScheme.primary;
     final surfaceColor = theme.colorScheme.surface;
     final onSurfaceColor = theme.colorScheme.onSurface;
+    // Use canvasScale parameter for font scaling
     
-  final isNonDiatonic = originalKeySignature != null 
+    final isNonDiatonic = originalKeySignature != null 
       ? !isDiatonicTo(originalKeySignature!)
       : !isDiatonicTo(currentKeySignature);
     final isCurrentChord = index != null && currentChordIndex != null && index == currentChordIndex;
@@ -1025,6 +1027,7 @@ class ChordSymbol {
             onSurfaceColor: onSurfaceColor,
             currentKeySignature: currentKeySignature,
             isStartOfReharmonizedSequence: isStartOfReharmonizedSequence,
+            canvasScale: canvasScale,
           ),
         ),
       ),
@@ -1042,6 +1045,7 @@ class ChordSymbol {
     required Color onSurfaceColor,
     required KeySignatureType currentKeySignature,
     required bool isStartOfReharmonizedSequence,
+    required double canvasScale,
   }) {
     final bool isReharmonized = modifiedKeySignature != null;
     final Color reharmonizeColor = Colors.purple; // Color for reharmonized chords
@@ -1070,7 +1074,7 @@ class ChordSymbol {
                   ? CurveType.convex
                   : CurveType.none,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
               border: isNewMeasure
@@ -1094,7 +1098,7 @@ class ChordSymbol {
                         ? getRomanNumeral(original: false)
                         : getRomanNumeral(original: true),
                     style: TextStyle(
-                        fontSize: 14,
+                        fontSize: 23 * canvasScale,
                         fontWeight: FontWeight.w600,
                         color: isSelected 
                             ? Colors.white
@@ -1108,7 +1112,7 @@ class ChordSymbol {
                     TextSpan(
                       text: getQualitySuperscript(),
                       style: TextStyle(
-                          fontSize: 12,
+                          fontSize: 22 * canvasScale,
                           fontWeight: FontWeight.w600,
                           color: isSelected 
                               ? Colors.white
@@ -1127,7 +1131,7 @@ class ChordSymbol {
                   return TextSpan(
                     text: span.text,
                     style: TextStyle(
-                      fontSize: 18,
+                      fontSize: 30 * canvasScale,
                       fontWeight: FontWeight.bold,
                       color: isSelected 
                           ? Colors.white
@@ -1165,7 +1169,7 @@ class ChordSymbol {
                 _getKeyNameFromSignature(modifiedKeySignature!),
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 9,
+                  fontSize: 9 * canvasScale,
                   fontWeight: FontWeight.bold,
                   color: reharmonizeColor.withOpacity(0.8),
                 ),

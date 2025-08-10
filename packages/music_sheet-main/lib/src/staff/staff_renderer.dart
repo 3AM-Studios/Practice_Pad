@@ -39,7 +39,7 @@ class StaffRenderer {
     
     // Calculate full width - staff lines should extend to the end of the last measure
     final startX = firstMeasure.measureOriginX;
-    final endX = lastMeasure.measureOriginX + lastMeasure.measureMetrics.width + 48;
+    final endX = lastMeasure.measureOriginX + lastMeasure.width;
     
     final staffLineHeights = [
       staffLineCenterY - Constants.staffSpace * 2,

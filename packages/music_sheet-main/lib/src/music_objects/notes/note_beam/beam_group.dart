@@ -46,9 +46,52 @@ class BeamGroup {
   }
 }
 
-/// Analyzes a list of notes and groups them into beam groups based on music theory rules
+/// Analyzes a list of musical symbols and groups notes into beam groups based on music theory rules
 class BeamGroupAnalyzer {
-  /// Creates beam groups from a list of notes
+  /// Creates beam groups from a list of musical symbols (Notes, Rests, etc.)
+  /// This considers the full sequence to properly break beams at rests or other symbols
+  static List<BeamGroup> createBeamGroupsFromSymbols(List<dynamic> musicalSymbols) {
+    final groups = <BeamGroup>[];
+    var currentGroup = <Note>[];
+
+    for (var i = 0; i < musicalSymbols.length; i++) {
+      final symbol = musicalSymbols[i];
+
+      if (symbol is Note && BeamGroup._canBeBeamed(symbol)) {
+        // Check stem direction compatibility
+        if (currentGroup.isNotEmpty && !_hasSameStemDirection(currentGroup.first, symbol)) {
+          // Stem direction changed, end current group
+          if (currentGroup.length >= 2) {
+            groups.add(BeamGroup(List.from(currentGroup)));
+          }
+          currentGroup.clear();
+          currentGroup.add(symbol);
+        } else {
+          currentGroup.add(symbol);
+        }
+        
+        // Check if we should end the current group based on music theory rules
+        final shouldEndGroup = _shouldEndBeamGroupFromSymbols(musicalSymbols, i, currentGroup);
+        
+        if (shouldEndGroup || i == musicalSymbols.length - 1) {
+          if (currentGroup.length >= 2) {
+            groups.add(BeamGroup(List.from(currentGroup)));
+          }
+          currentGroup.clear();
+        }
+      } else {
+        // Non-Note symbol (Rest, etc.) or non-beamable note encountered, end current group
+        if (currentGroup.length >= 2) {
+          groups.add(BeamGroup(List.from(currentGroup)));
+        }
+        currentGroup.clear();
+      }
+    }
+
+    return groups;
+  }
+
+  /// Creates beam groups from a list of notes (legacy method for backward compatibility)
   static List<BeamGroup> createBeamGroups(List<Note> notes) {
     final groups = <BeamGroup>[];
     var currentGroup = <Note>[];
@@ -107,7 +150,32 @@ class BeamGroupAnalyzer {
     return note.pitch.position < 29; // true = stems up, false = stems down
   }
 
-  /// Determines if a beam group should end at the current position
+  /// Determines if a beam group should end at the current position when analyzing musical symbols
+  static bool _shouldEndBeamGroupFromSymbols(List<dynamic> symbols, int currentIndex, List<Note> currentGroup) {
+    if (currentGroup.isEmpty) return false;
+    
+    final nextSymbol = currentIndex + 1 < symbols.length ? symbols[currentIndex + 1] : null;
+    
+    // End group if next symbol is not a beamable note
+    if (nextSymbol != null) {
+      if (nextSymbol is! Note || !BeamGroup._canBeBeamed(nextSymbol)) {
+        return true;
+      }
+    }
+    
+    // Don't group more than 4 consecutive notes for readability
+    if (currentGroup.length >= 4) {
+      return true;
+    }
+    
+    // Additional music theory rules could be added here:
+    // - Beat boundary detection (don't beam across strong beats)
+    // - Time signature awareness
+    
+    return false;
+  }
+
+  /// Determines if a beam group should end at the current position (legacy method)
   static bool _shouldEndBeamGroup(List<Note> notes, int currentIndex, List<Note> currentGroup) {
     if (currentGroup.isEmpty) return false;
     

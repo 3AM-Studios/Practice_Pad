@@ -64,6 +64,7 @@ class _SymbolEditorDialogState extends State<SymbolEditorDialog> {
     Navigator.of(context).pop(result);
   }
 
+
   @override
   Widget build(BuildContext context) {
     return SizedBox(
@@ -136,13 +137,26 @@ class _SymbolEditorDialogState extends State<SymbolEditorDialog> {
               label: Text(duration.name),
               selected: _selectedDuration == duration,
               onSelected: (selected) {
-                if (widget.initialNote is Note) {
-                  final newNote = Note(
-                    (widget.initialNote as Note).pitch,
+                if (selected) {
+                  // Create the note immediately when duration is selected
+                  MusicalSymbol newSymbol;
+                  
+                  // Get the pitch - use original note's pitch if available, or default to middle C
+                  Pitch pitch;
+                  if (widget.initialNote is Note) {
+                    pitch = (widget.initialNote as Note).pitch;
+                  } else {
+                    // Default to middle C if converting from Rest to Note
+                    pitch = Pitch.c4;
+                  }
+                  
+                  newSymbol = Note(
+                    pitch,
                     noteDuration: duration,
                     accidental: _selectedAccidental,
                   );
-                  _popWithResult(SymbolEditResult(musicalSymbol: newNote));
+                  
+                  _popWithResult(SymbolEditResult(musicalSymbol: newSymbol));
                 }
               },
             );
@@ -166,7 +180,9 @@ class _SymbolEditorDialogState extends State<SymbolEditorDialog> {
               label: Text(restType.name),
               selected: _selectedRestType == restType,
               onSelected: (selected) {
-                _popWithResult(SymbolEditResult(musicalSymbol: Rest(restType)));
+                if (selected) {
+                  _popWithResult(SymbolEditResult(musicalSymbol: Rest(restType)));
+                }
               },
             );
           }).toList(),

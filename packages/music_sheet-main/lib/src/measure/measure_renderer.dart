@@ -43,6 +43,7 @@ class MeasureRenderer {
 
   final double? targetWidth;
   final double stretchFactor;
+  final double measurePadding;
 
   MeasureRenderer(
     MeasureMetrics initialMeasureMetrics,
@@ -55,7 +56,8 @@ class MeasureRenderer {
     required this.glyphPaths,
     this.symbolPositionCallback,
     this.targetWidth,
-    this.stretchFactor = 1.0
+    this.stretchFactor = 1.0,
+    this.measurePadding = 6.0
   }) {
     // Set the initial metrics and build the renderers for the first time
     measureMetrics = initialMeasureMetrics;
@@ -116,7 +118,7 @@ class MeasureRenderer {
     // Get chord symbols for this measure
     final measureChordSymbols = chordSymbols;
 
-    var currentX = 0.0;
+    var currentX = measurePadding * stretchFactor; // Start with left padding
     int noteIndex = 0; // Track note index for chord association
     final notePositions = <double>[];
     final noteMetricsList = <NoteMetrics>[];
@@ -139,10 +141,11 @@ class MeasureRenderer {
     }
     
     // Create beam groups and calculate adjusted stem positions
-    _createBeamRenderers(notes, notePositions, noteMetricsList);
+    // Pass the full list of musical symbols so beams are broken by rests
+    _createBeamRenderers(measure.musicalSymbols, notes, notePositions, noteMetricsList);
     
     // Second pass: create renderers with adjusted stem positions for beamed notes
-    currentX = 0.0;
+    currentX = measurePadding * stretchFactor; // Start with left padding
     noteIndex = 0;
     for (int i = 0; i < measureMetrics.symbolMetricsList.length; i++) {
       final symbolMetric = measureMetrics.symbolMetricsList[i];
@@ -187,11 +190,11 @@ class MeasureRenderer {
   }
 
   /// Creates beam renderers for grouped notes
-  void _createBeamRenderers(List<Note> notes, List<double> notePositions, List<NoteMetrics> noteMetricsList) {
+  void _createBeamRenderers(List<MusicalSymbol> musicalSymbols, List<Note> notes, List<double> notePositions, List<NoteMetrics> noteMetricsList) {
     if (notes.isEmpty) return;
     
-    // Create beam groups
-    final beamGroups = BeamGroupAnalyzer.createBeamGroups(notes);
+    // Create beam groups using the full musical symbol sequence to respect rests
+    final beamGroups = BeamGroupAnalyzer.createBeamGroupsFromSymbols(musicalSymbols);
     
     final beamCalculator = BeamCalculator(glyphMetadata);
     
@@ -327,13 +330,10 @@ class MeasureRenderer {
   // now-updated internal state (symbolRenderers, measureMetrics, etc.).
 
   Rect getBounds() {
-    if (symbolRenderers.isEmpty) {
-      final y = staffLineCenterY - (2 * Constants.staffSpace);
-      return Rect.fromLTWH(measureOriginX, y, width, 4 * Constants.staffSpace);
-    }
-    final firstSymbol = symbolRenderers.first.getBounds();
-    return symbolRenderers.skip(1).fold(
-        firstSymbol, (prev, element) => prev.expandToInclude(element.getBounds()));
+    // The measure bounds should always be the full measure width, not just the union of symbol bounds
+    // This ensures that empty spaces in the measure are clickable for adding new notes
+    final y = staffLineCenterY - (2 * Constants.staffSpace);
+    return Rect.fromLTWH(measureOriginX, y, width, 4 * Constants.staffSpace);
   }
 
   MusicalSymbol? getSymbolAt(Offset position) {
@@ -378,7 +378,7 @@ class MeasureRenderer {
     return Rect.fromLTRB(left, top, right, bottom);
   }
   
-  double get width => measureMetrics.width * stretchFactor;
+  double get width => (measureMetrics.width + (2 * measurePadding)) * stretchFactor;
 
   // Drawing helpers
 

@@ -31,6 +31,9 @@ class SheetMusicLayout with ChangeNotifier {
   
   /// The initial key signature type for key-relative numbering
   final dynamic initialKeySignatureType;
+  
+  /// The padding between measure barlines and musical symbols
+  final double measurePadding;
 
   /// The final, stateful list of staff renderers. This is the source of truth for drawing.
   late List<StaffRenderer> staffRenderers;
@@ -45,6 +48,7 @@ class SheetMusicLayout with ChangeNotifier {
     double canvasScale = 0.7,
     this.extensionNumbersRelativeToChords = true,
     this.initialKeySignatureType,
+    this.measurePadding = 10.0,
   }) : _canvasScale = canvasScale {
     // The entire layout and renderer creation logic now lives here, in the constructor.
     // This work is done only ONCE when the layout is created.
@@ -78,7 +82,7 @@ class SheetMusicLayout with ChangeNotifier {
 
       // 3. Calculate the stretch factor
       // Always stretch measures to use more of the available width
-      double stretchFactor = 1.5; // Much more aggressive stretch for proper spacing
+      double stretchFactor = 2.5; // Much more aggressive stretch for proper spacing
       if (naturalTotalWidth > 0) {
         final calculatedStretch = availableWidthForMeasures / naturalTotalWidth;
         // Use the larger of calculated stretch or minimum stretch
@@ -101,6 +105,7 @@ class SheetMusicLayout with ChangeNotifier {
           symbolPositionCallback: symbolPositionCallback,
           // PASS THE STRETCH FACTOR, NOT targetWidth
           stretchFactor: stretchFactor,
+          measurePadding: measurePadding,
         );
         measureRenderers.add(measureRenderer);
         // The new origin is based on the measure's NEW stretched width

@@ -43,6 +43,7 @@ class SimpleSheetMusic extends StatefulWidget {
     this.debug = false,
     this.canvasScale = 0.7,
     this.extensionNumbersRelativeToChords = true,
+    this.measurePadding = 6.0,
     this.onTap,
     this.onSymbolAdd,
     this.onSymbolUpdate,
@@ -102,6 +103,9 @@ class SimpleSheetMusic extends StatefulWidget {
 
   /// Whether extension numbers should be relative to chords (true) or key (false)
   final bool extensionNumbersRelativeToChords;
+
+  /// The padding between measure barlines and musical symbols
+  final double measurePadding;
 
   /// Callback function that is called when a musical symbol is tapped
   final OnTapMusicObjectCallback? onTap;
@@ -235,11 +239,52 @@ class SimpleSheetMusicState extends State<SimpleSheetMusic>
       canvasScale: widget.canvasScale,
       extensionNumbersRelativeToChords: widget.extensionNumbersRelativeToChords,
       initialKeySignatureType: widget.initialKeySignatureType,
+      measurePadding: widget.measurePadding,
     );
 
     chordSymbolOverlays = _buildChordSymbolOverlays(context, _layout!);
     setState(() {});
   }
+
+/// Determines if a tap should be treated as hitting a symbol or empty space
+/// Uses a combination of distance-based and position-based logic
+MusicalSymbol? _getSymbolAtWithSmartHitTesting(MeasureRenderer measureRenderer, Offset tapPosition) {
+  final symbolRenderers = measureRenderer.symbolRenderers;
+  if (symbolRenderers.isEmpty) return null;
+  
+  // Find the closest symbol to the tap position
+  MusicalSymbolRenderer? closestRenderer;
+  double closestDistance = double.infinity;
+  
+  for (final renderer in symbolRenderers) {
+    final bounds = renderer.getBounds();
+    final centerX = bounds.center.dx;
+    final distance = (tapPosition.dx - centerX).abs();
+    
+    if (distance < closestDistance) {
+      closestDistance = distance;
+      closestRenderer = renderer;
+    }
+  }
+  
+  if (closestRenderer == null) return null;
+  
+  final closestBounds = closestRenderer.getBounds();
+  
+  // Define a reasonable hit radius around each symbol (smaller than the full bounds)
+  final hitRadius = closestBounds.width * 0.3; // Only 30% of symbol width for hit area
+  
+  // Check if we're close enough to the symbol center
+  if (closestDistance <= hitRadius) {
+    // Also check if we're within the vertical bounds of the symbol
+    if (tapPosition.dy >= closestBounds.top && tapPosition.dy <= closestBounds.bottom) {
+      return closestRenderer.musicalSymbol;
+    }
+  }
+  
+  // If we're not close enough to any symbol, treat as empty space
+  return null;
+}
 
 void _handleTapDown(TapDownDetails details) {
   if (_layout == null) return;
@@ -247,18 +292,45 @@ void _handleTapDown(TapDownDetails details) {
 
   for (var staffIndex = 0; staffIndex < _layout!.staffRenderers.length; staffIndex++) {
     final staff = _layout!.staffRenderers[staffIndex];
+    
+    // First check if the tap is within this staff's Y bounds
+    if (staff.measureRendereres.isNotEmpty) {
+      final firstMeasure = staff.measureRendereres.first;
+      // Use generous Y bounds to include staff lines, ledger lines, and some space for chord symbols
+      // Each staff has 5 lines spanning 4 staff spaces (2 * staffSpace = 50), plus extra space above/below
+      final staffYMin = firstMeasure.staffLineCenterY - (3 * Constants.staffSpace);
+      final staffYMax = firstMeasure.staffLineCenterY + (3 * Constants.staffSpace);
+      
+      // Skip this staff if tap is outside its Y bounds
+      if (tapPosition.dy < staffYMin || tapPosition.dy > staffYMax) {
+        continue;
+      }
+    }
+    
     for (var measureIndex = 0; measureIndex < staff.measureRendereres.length; measureIndex++) {
       final measureRenderer = staff.measureRendereres[measureIndex];
+      
+      // Calculate global measure index by accounting for all previous staff lines
+      int globalMeasureIndex = measureIndex;
+      for (int prevStaffIndex = 0; prevStaffIndex < staffIndex; prevStaffIndex++) {
+        globalMeasureIndex += _layout!.staffRenderers[prevStaffIndex].measureRendereres.length;
+      }
+
+      // First check if we're in the measure bounds at all
+      if (!measureRenderer.getBounds().contains(tapPosition)) {
+        continue; // Not in this measure
+      }
 
       // Use hit-testing to find if an existing symbol was tapped
-      final symbol = measureRenderer.getSymbolAt(tapPosition);
+      // Make symbol hit-testing more precise by checking if we're close to the symbol center
+      final symbol = _getSymbolAtWithSmartHitTesting(measureRenderer, tapPosition);
 
       // --- SCENARIO 1: Tapped an existing symbol ---
       if (symbol != null) {
         // Prepare the state needed AFTER the gesture ends
         _isAddingNewSymbol = false;
         _draggedClef = Clef.treble(); // Replace with logic to find the current clef if needed
-        _draggedSymbolMeasureIndex = measureIndex;
+        _draggedSymbolMeasureIndex = globalMeasureIndex;
         _draggedSymbolPositionIndex =
             measureRenderer.measure.musicalSymbols.indexWhere((s) => s.id == symbol.id);
 
@@ -267,45 +339,51 @@ void _handleTapDown(TapDownDetails details) {
         setState(() {
           _selectedSymbol = symbol;
         });
-        final pitch = measureRenderer.getPitchForY(tapPosition.dy, _draggedClef!);
-        final highlightRect = measureRenderer.getHighlightRectForPitch(pitch, _draggedClef!);
+        
+        // Handle Notes and Rests differently
+        Rect? highlightRect;
+        if (symbol is Note) {
+          final pitch = measureRenderer.getPitchForY(tapPosition.dy, _draggedClef!);
+          highlightRect = measureRenderer.getHighlightRectForPitch(pitch, _draggedClef!);
+        }
+        // For Rests, we don't need pitch highlighting
+        
         // Update the notifier to draw the dynamic overlay. This is fast and does NOT cause a rebuild.
         _interactionNotifier.value = InteractionState(
           draggedSymbol: symbol,
           dragPosition: details.localPosition,
-          pitchHighlightRect: highlightRect, // No line highlight when editing an existing note
+          pitchHighlightRect: highlightRect, // Only show highlight for notes
         );
         return; // Found our target, exit all loops
       }
 
-      // --- SCENARIO 2: Tapped an empty space ---
-      if (measureRenderer.getBounds().contains(tapPosition)) {
-        // Prepare the state needed AFTER the gesture ends
-        _isAddingNewSymbol = true;
-        _draggedClef = Clef.treble(); // Replace with logic to find the current clef
-        _draggedSymbolMeasureIndex = measureIndex;
-        _draggedSymbolPositionIndex = measureRenderer.getInsertionIndexForX(tapPosition.dx);
-        
-        // Clear any previous persistent selection without a full rebuild if possible
-        if (_selectedSymbol != null) {
-          setState(() {
-            _selectedSymbol = null;
-          });
-        }
-
-        // Create temporary objects for the dynamic overlay
-        final pitch = measureRenderer.getPitchForY(tapPosition.dy, _draggedClef!);
-        final tempNote = Note(pitch); // A new temporary note for dragging
-        print(_draggedClef);
-        final newHighlightRect = measureRenderer.getHighlightRectForPitch(pitch, _draggedClef!);
-        // Update the notifier to draw the dynamic overlay.
-        _interactionNotifier.value = InteractionState(
-          draggedSymbol: tempNote,
-          dragPosition: details.localPosition,
-          pitchHighlightRect: newHighlightRect,
-        );
-        return; // Found our target, exit all loops
+      // --- SCENARIO 2: Tapped an empty space in this measure ---
+      // We already checked that we're in the measure bounds above
+      // Prepare the state needed AFTER the gesture ends
+      _isAddingNewSymbol = true;
+      _draggedClef = Clef.treble(); // Replace with logic to find the current clef
+      _draggedSymbolMeasureIndex = globalMeasureIndex;
+      _draggedSymbolPositionIndex = measureRenderer.getInsertionIndexForX(tapPosition.dx);
+      
+      // Clear any previous persistent selection without a full rebuild if possible
+      if (_selectedSymbol != null) {
+        setState(() {
+          _selectedSymbol = null;
+        });
       }
+
+      // Create temporary objects for the dynamic overlay
+      final pitch = measureRenderer.getPitchForY(tapPosition.dy, _draggedClef!);
+      final tempNote = Note(pitch); // A new temporary note for dragging
+      print(_draggedClef);
+      final newHighlightRect = measureRenderer.getHighlightRectForPitch(pitch, _draggedClef!);
+      // Update the notifier to draw the dynamic overlay.
+      _interactionNotifier.value = InteractionState(
+        draggedSymbol: tempNote,
+        dragPosition: details.localPosition,
+        pitchHighlightRect: newHighlightRect,
+      );
+      return; // Found our target, exit all loops
     }
   }
 }
@@ -313,15 +391,31 @@ void _handleTapDown(TapDownDetails details) {
 
 void _handlePanUpdate(DragUpdateDetails details) {
   final currentState = _interactionNotifier.value;
-  // Ensure there's an active interaction and we are dragging a note
-  if (currentState == null || currentState.draggedSymbol is! Note || _layout == null) {
+  // Ensure there's an active interaction
+  if (currentState == null || currentState.draggedSymbol == null || _layout == null) {
+    return;
+  }
+  
+  // Only handle pan updates for Notes (Rests don't need pitch dragging)
+  if (currentState.draggedSymbol is! Note) {
     return;
   }
 
   // Retrieve the state we set in _handleTapDown
   final clef = _draggedClef ?? Clef.treble();
-  final measureRenderer =
-      _layout!.staffRenderers.first.measureRendereres[_draggedSymbolMeasureIndex!];
+  
+  // Find the correct measure renderer using global measure index
+  MeasureRenderer? measureRenderer;
+  int globalMeasureIndex = _draggedSymbolMeasureIndex!;
+  for (final staff in _layout!.staffRenderers) {
+    if (globalMeasureIndex < staff.measureRendereres.length) {
+      measureRenderer = staff.measureRendereres[globalMeasureIndex];
+      break;
+    }
+    globalMeasureIndex -= staff.measureRendereres.length;
+  }
+  
+  if (measureRenderer == null) return;
 
   // Calculate new state based on the current drag position
   final newDragPosition = details.localPosition;
@@ -655,6 +749,7 @@ void _resetInteractionState() {
                             isAnimating: false,
                             isNewMeasure: false,
                             isStartOfReharmonizedSequence: isStartOfReharmonizedSequence,
+                            canvasScale: layout.canvasScale,
                             // Connect to widget callbacks for interaction
                             onTap: widget.onChordSymbolTap != null
                                 ? () => widget.onChordSymbolTap!(
