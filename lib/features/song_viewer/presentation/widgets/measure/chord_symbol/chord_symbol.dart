@@ -1066,8 +1066,8 @@ class ChordSymbol {
                           ? Colors.orange.withOpacity(0.8) // Orange for non-diatonic
                           : surfaceColor, // Clean surface for diatonic
           borderRadius: 12,
-          depth: isSelected ? 15 : (isReharmonized || isNonDiatonic ? 10 : 8),
-          spread: isSelected ? 4 : 2,
+          depth: isSelected ?  5: (isReharmonized || isNonDiatonic ? 6 : 8),
+          spread: isSelected ? 0.5:0.5,
           curveType: isSelected
               ? CurveType.concave
               : isCurrentChord

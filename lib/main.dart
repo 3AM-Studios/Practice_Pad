@@ -243,10 +243,11 @@ class ClayNavigationBar extends StatelessWidget {
                     height: 150,
                     borderRadius: 70, // Perfect circle (half of 70)
                     depth: 10,
-                    spread: 5,
-                    emboss: false,
+                    spread: 15,
+                    emboss: false, // Emboss when selected
                     // Concave when pressed (selected), none when not selected
                     curveType: isSelected ? CurveType.concave : CurveType.none,
+
                     child: SizedBox(
                       height: 70,
                       width: 70, // Make it square for perfect circle

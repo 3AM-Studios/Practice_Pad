@@ -10,8 +10,10 @@ class SymbolEditResult {
 }
 
 /// Displays the note editor dialog as a popup.
-Future<SymbolEditResult?> showNoteEditorPopup(BuildContext context, Offset position, MusicalSymbol? initialNote) {
-  final RenderBox overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+Future<SymbolEditResult?> showNoteEditorPopup(
+    BuildContext context, Offset position, MusicalSymbol? initialNote) {
+  final RenderBox overlay =
+      Overlay.of(context).context.findRenderObject() as RenderBox;
 
   return showMenu<SymbolEditResult>(
     context: context,
@@ -64,7 +66,6 @@ class _SymbolEditorDialogState extends State<SymbolEditorDialog> {
     Navigator.of(context).pop(result);
   }
 
-
   @override
   Widget build(BuildContext context) {
     return SizedBox(
@@ -79,20 +80,30 @@ class _SymbolEditorDialogState extends State<SymbolEditorDialog> {
                 _isNote = index == 0;
               });
             },
-            children: const [Text('Note'), Text('Rest')],
+            children: const [
+              Padding(
+                padding: EdgeInsets.symmetric(
+                    horizontal: 16.0), // Adjust this value as needed
+                child: Text('Note'),
+              ),
+              Padding(
+                padding: EdgeInsets.symmetric(
+                    horizontal: 16.0), // Adjust this value as needed
+                child: Text('Rest'),
+              ),
+            ],
           ),
           const Divider(),
-          if (_isNote)
-            _buildSymbolEditor()
-          else
-            _buildRestEditor(),
+          if (_isNote) _buildSymbolEditor() else _buildRestEditor(),
           const Divider(),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
               TextButton(
-                onPressed: () => _popWithResult(SymbolEditResult(isDelete: true)),
-                child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                onPressed: () =>
+                    _popWithResult(SymbolEditResult(isDelete: true)),
+                child:
+                    const Text('Delete', style: TextStyle(color: Colors.red)),
               ),
               TextButton(
                 onPressed: () => Navigator.of(context).pop(), // Cancel
@@ -119,8 +130,13 @@ class _SymbolEditorDialogState extends State<SymbolEditorDialog> {
           ],
           onPressed: (index) {
             setState(() {
-              final newAccidental = [Accidental.sharp, Accidental.flat, Accidental.natural][index];
-              _selectedAccidental = (_selectedAccidental == newAccidental) ? null : newAccidental;
+              final newAccidental = [
+                Accidental.sharp,
+                Accidental.flat,
+                Accidental.natural
+              ][index];
+              _selectedAccidental =
+                  (_selectedAccidental == newAccidental) ? null : newAccidental;
             });
           },
           children: const [Text('♯'), Text('♭'), Text('♮')],
@@ -132,32 +148,39 @@ class _SymbolEditorDialogState extends State<SymbolEditorDialog> {
           spacing: 4.0,
           runSpacing: 4.0,
           alignment: WrapAlignment.center,
-          children: NoteDuration.values.where((d) => [NoteDuration.whole, NoteDuration.half, NoteDuration.quarter, NoteDuration.eighth, NoteDuration.sixteenth].contains(d)).map((duration) {
+          children: NoteDuration.values
+              .where((d) => [
+                    NoteDuration.whole,
+                    NoteDuration.half,
+                    NoteDuration.quarter,
+                    NoteDuration.eighth,
+                    NoteDuration.sixteenth
+                  ].contains(d))
+              .map((duration) {
             return ChoiceChip(
               label: Text(duration.name),
               selected: _selectedDuration == duration,
               onSelected: (selected) {
-                if (selected) {
-                  // Create the note immediately when duration is selected
-                  MusicalSymbol newSymbol;
-                  
-                  // Get the pitch - use original note's pitch if available, or default to middle C
-                  Pitch pitch;
-                  if (widget.initialNote is Note) {
-                    pitch = (widget.initialNote as Note).pitch;
-                  } else {
-                    // Default to middle C if converting from Rest to Note
-                    pitch = Pitch.c4;
-                  }
-                  
-                  newSymbol = Note(
-                    pitch,
-                    noteDuration: duration,
-                    accidental: _selectedAccidental,
-                  );
-                  
-                  _popWithResult(SymbolEditResult(musicalSymbol: newSymbol));
+                // Create the note when duration is selected (regardless of whether it was already selected)
+                // This allows moving notes by selecting the same duration at a different position
+                MusicalSymbol newSymbol;
+
+                // Get the pitch - use original note's pitch if available, or default to middle C
+                Pitch pitch;
+                if (widget.initialNote is Note) {
+                  pitch = (widget.initialNote as Note).pitch;
+                } else {
+                  // Default to middle C if converting from Rest to Note
+                  pitch = Pitch.c4;
                 }
+
+                newSymbol = Note(
+                  pitch,
+                  noteDuration: duration,
+                  accidental: _selectedAccidental,
+                );
+
+                _popWithResult(SymbolEditResult(musicalSymbol: newSymbol));
               },
             );
           }).toList(),
@@ -175,13 +198,22 @@ class _SymbolEditorDialogState extends State<SymbolEditorDialog> {
           spacing: 4.0,
           runSpacing: 4.0,
           alignment: WrapAlignment.center,
-          children: RestType.values.where((r) => [RestType.whole, RestType.half, RestType.quarter, RestType.eighth, RestType.sixteenth].contains(r)).map((restType) {
+          children: RestType.values
+              .where((r) => [
+                    RestType.whole,
+                    RestType.half,
+                    RestType.quarter,
+                    RestType.eighth,
+                    RestType.sixteenth
+                  ].contains(r))
+              .map((restType) {
             return ChoiceChip(
               label: Text(restType.name),
               selected: _selectedRestType == restType,
               onSelected: (selected) {
                 if (selected) {
-                  _popWithResult(SymbolEditResult(musicalSymbol: Rest(restType)));
+                  _popWithResult(
+                      SymbolEditResult(musicalSymbol: Rest(restType)));
                 }
               },
             );

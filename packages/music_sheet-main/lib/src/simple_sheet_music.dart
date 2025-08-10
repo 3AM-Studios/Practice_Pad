@@ -298,8 +298,9 @@ void _handleTapDown(TapDownDetails details) {
       final firstMeasure = staff.measureRendereres.first;
       // Use generous Y bounds to include staff lines, ledger lines, and some space for chord symbols
       // Each staff has 5 lines spanning 4 staff spaces (2 * staffSpace = 50), plus extra space above/below
-      final staffYMin = firstMeasure.staffLineCenterY - (3 * Constants.staffSpace);
-      final staffYMax = firstMeasure.staffLineCenterY + (3 * Constants.staffSpace);
+      // Extended to ±4 staff spaces to ensure ledger line notes like middle C are clickable
+      final staffYMin = firstMeasure.staffLineCenterY - (4 * Constants.staffSpace);
+      final staffYMax = firstMeasure.staffLineCenterY + (4 * Constants.staffSpace);
       
       // Skip this staff if tap is outside its Y bounds
       if (tapPosition.dy < staffYMin || tapPosition.dy > staffYMax) {

@@ -332,8 +332,9 @@ class MeasureRenderer {
   Rect getBounds() {
     // The measure bounds should always be the full measure width, not just the union of symbol bounds
     // This ensures that empty spaces in the measure are clickable for adding new notes
-    final y = staffLineCenterY - (2 * Constants.staffSpace);
-    return Rect.fromLTWH(measureOriginX, y, width, 4 * Constants.staffSpace);
+    // Extended Y bounds to include ledger line notes like middle C (±4 staff spaces)
+    final y = staffLineCenterY - (4 * Constants.staffSpace);
+    return Rect.fromLTWH(measureOriginX, y, width, 8 * Constants.staffSpace);
   }
 
   MusicalSymbol? getSymbolAt(Offset position) {

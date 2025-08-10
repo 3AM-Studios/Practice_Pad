@@ -1263,10 +1263,10 @@ class _SongViewerScreenState extends State<SongViewerScreen>
       onTap: _showKeySelectionDialog,
       behavior: HitTestBehavior.opaque,
       child: ClayContainer(
-        color: primaryColor,
+        color: CupertinoColors.black,
         borderRadius: 18,
         depth: 12,
-        spread: 3,
+        spread: 0,
         curveType: CurveType.concave,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -2090,9 +2090,6 @@ class _SongViewerScreenState extends State<SongViewerScreen>
       return const SizedBox.shrink();
     }
 
-    final theme = Theme.of(context);
-    final tertiaryColor = theme.colorScheme.tertiary;
-
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.all(16),
@@ -2103,9 +2100,9 @@ class _SongViewerScreenState extends State<SongViewerScreen>
         },
         behavior: HitTestBehavior.opaque, // Block taps from going to parent
         child: ClayContainer(
-          color: tertiaryColor,
+          color: CupertinoColors.black,
           borderRadius: 20,
-    
+          spread: 1,
           curveType: CurveType.convex,
           child: const Padding(
             padding: EdgeInsets.symmetric(vertical: 12),
@@ -2695,7 +2692,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                       width: 200,
                       margin: const EdgeInsets.only(right: 12, bottom: 12),
                       child: ClayContainer(
-                        color: secondaryColor,
+                        color: CupertinoColors.systemBlue.withOpacity(0.8),
                         borderRadius: 12,
                         depth: 8,
                         spread: 2,
@@ -2711,7 +2708,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                                 style: const TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.black,
+                                  color: Colors.white,
                                 ),
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
@@ -3011,11 +3008,11 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                                 children: [
                                   ClayContainer(
                                     color: _extensionNumbersRelativeToChords ? 
-                                           CupertinoColors.systemBlue.withOpacity(0.8) : 
+                                           CupertinoColors.systemBlue.withOpacity(0.2) : 
                                            surfaceColor,
                                     borderRadius: 8,
                                     depth: _extensionNumbersRelativeToChords ? 2 : 4,
-                                    spread: 1,
+                                    spread: 0,
                                     child: GestureDetector(
                                       onTap: () => _toggleExtensionNumbering(true),
                                       child: Container(
@@ -3036,11 +3033,11 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                                   const SizedBox(width: 4),
                                   ClayContainer(
                                     color: !_extensionNumbersRelativeToChords ? 
-                                           CupertinoColors.systemBlue.withOpacity(0.8) : 
+                                           CupertinoColors.systemBlue.withOpacity(0.2) : 
                                            Colors.white70,
                                     borderRadius: 8,
                                     depth: !_extensionNumbersRelativeToChords ? 2 : 4,
-                                    spread: 1,
+                                    spread: 0,
                                     child: GestureDetector(
                                       onTap: () => _toggleExtensionNumbering(false),
                                       child: Container(
@@ -3094,12 +3091,12 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                   if (_selectedChordIndices.isEmpty && !_isLongPressing)
                     Container(
                       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      child: ClayContainer(
-                        color: primaryColor.withOpacity(0.1),
+                      child: const ClayContainer(
+                        color: CupertinoColors.lightBackgroundGray,
                         borderRadius: 12,
                         depth: 8,
                         spread: 2,
-                        child: const Padding(
+                        child: Padding(
                           padding: EdgeInsets.all(12),
                           child: Column(
                             children: [
@@ -3107,15 +3104,15 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                                 children: [
                                   Icon(
                                     Icons.info_outline,
-                                    color: Colors.white70,
+                                    color: Colors.black,
                                     size: 20,
                                   ),
                                   SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
-                                      'Chord symbols are displayed above each measure in the sheet music',
+                                      'Hold and drag on chord symbols to select and add progression to practice items.',
                                       style: TextStyle(
-                                        color: Colors.white70,
+                                        color: Colors.black,
                                         fontSize: 14,
                                         fontWeight: FontWeight.w500,
                                       ),
