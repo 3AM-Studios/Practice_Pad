@@ -1,6 +1,5 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'dart:ui';
 import 'package:clay_containers/clay_containers.dart';
 import 'package:flex_color_scheme/flex_color_scheme.dart';
 import 'package:practice_pad/features/edit_items/presentation/viewmodels/edit_items_viewmodel.dart';
@@ -10,7 +9,6 @@ import 'package:practice_pad/features/routines/presentation/viewmodels/routines_
 import 'package:provider/provider.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:practice_pad/widgets/wooden_border_wrapper.dart';
-import 'package:practice_pad/widgets/wooden_icon_background.dart';
 
 import 'package:practice_pad/services/cloud_kit_service.dart';
 import 'package:practice_pad/features/edit_items/presentation/pages/edit_items_screen.dart';

@@ -52,7 +52,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
 
   List<ChordSymbol> _chordSymbols = [];
   List<ChordMeasure> _chordMeasures = []; // Combined measures with chord symbols
-  Map<int, int> _globalToLocalIndexMap = {}; // Maps sheet music globalChordIndex to _chordSymbols index
+  final Map<int, int> _globalToLocalIndexMap = {}; // Maps sheet music globalChordIndex to _chordSymbols index
   int _currentChordIndex = 0;
   double _totalSongDurationInBeats = 0;
   int _currentBpm = 0;
@@ -2099,12 +2099,12 @@ class _SongViewerScreenState extends State<SongViewerScreen>
           _showCreateGeneralPracticeItemDialog();
         },
         behavior: HitTestBehavior.opaque, // Block taps from going to parent
-        child: ClayContainer(
+        child: const ClayContainer(
           color: CupertinoColors.black,
           borderRadius: 20,
           spread: 1,
           curveType: CurveType.convex,
-          child: const Padding(
+          child: Padding(
             padding: EdgeInsets.symmetric(vertical: 12),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -3075,7 +3075,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                           padding: const EdgeInsets.all(16),
                           child: SingleChildScrollView(
                             scrollDirection: Axis.horizontal,
-                            child: Container(
+                            child: SizedBox(
                               width: _calculateSheetMusicWidth(), // Allow full width for all measures
                               height: 700, // Increased height to match SimpleSheetMusic// Add substantial vertical padding
                               child: _buildCachedSheetMusic(),
@@ -3092,7 +3092,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                     Container(
                       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       child: const ClayContainer(
-                        color: CupertinoColors.lightBackgroundGray,
+                        color: CupertinoColors.extraLightBackgroundGray,
                         borderRadius: 12,
                         depth: 8,
                         spread: 2,

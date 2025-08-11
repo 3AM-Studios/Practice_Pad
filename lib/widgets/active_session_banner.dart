@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:clay_containers/clay_containers.dart';
 import 'package:practice_pad/services/practice_session_manager.dart';
+import 'package:practice_pad/features/practice/presentation/pages/practice_session_screen.dart';
 import 'package:provider/provider.dart';
 
 /// Widget that shows an active practice session banner at the top of screens
@@ -11,7 +12,7 @@ class ActiveSessionBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final primaryColor = theme.colorScheme.primary;
+    const primaryColor = Colors.black;
     final surfaceColor = theme.colorScheme.surface;
     final onPrimaryColor = theme.colorScheme.onPrimary;
     
@@ -21,20 +22,33 @@ class ActiveSessionBanner extends StatelessWidget {
           return const SizedBox.shrink();
         }
 
-        return Container(
-          margin: const EdgeInsets.all(12),
-          child: ClayContainer(
-            color: primaryColor,
-            borderRadius: 20,
-            depth: 15,
-            spread: 1,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Row(
+        return GestureDetector(
+          onTap: () {
+            if (sessionManager.activePracticeItem != null) {
+              Navigator.push(
+                context,
+                CupertinoPageRoute(
+                  builder: (_) => PracticeSessionScreen(
+                    practiceItem: sessionManager.activePracticeItem!,
+                  ),
+                ),
+              );
+            }
+          },
+          child: Container(
+            margin: const EdgeInsets.all(12),
+            child: ClayContainer(
+              color: primaryColor,
+              borderRadius: 20,
+              depth: 15,
+              spread: 0.3,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Row(
                 children: [
                   // Session icon and name
                   Icon(
-                    CupertinoIcons.play_circle_fill,
+                    CupertinoIcons.arrow_right,
                     color: onPrimaryColor,
                     size: 20,
                   ),
@@ -68,7 +82,7 @@ class ActiveSessionBanner extends StatelessWidget {
                             depth: 8,
                             spread: 0,
                             curveType: CurveType.concave,
-                            child: SizedBox(
+                            child: const SizedBox(
                               width: 32,
                               height: 32,
                               child: Icon(
@@ -99,7 +113,7 @@ class ActiveSessionBanner extends StatelessWidget {
                             depth: 8,
                             spread: 2,
                             curveType: CurveType.none,
-                            child: SizedBox(
+                            child: const SizedBox(
                               width: 32,
                               height: 32,
                               child: Icon(
@@ -159,7 +173,7 @@ class ActiveSessionBanner extends StatelessWidget {
               ),
             ),
           ),
-        );
+        ));
       },
     );
   }

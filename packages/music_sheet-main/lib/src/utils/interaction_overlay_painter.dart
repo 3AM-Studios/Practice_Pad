@@ -1,7 +1,6 @@
 
 // Place this new painter class in your widget file.
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
 import 'package:music_sheet/src/simple_sheet_music.dart';
 
 

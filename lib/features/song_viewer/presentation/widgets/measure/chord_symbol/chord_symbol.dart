@@ -1048,7 +1048,7 @@ class ChordSymbol {
     required double canvasScale,
   }) {
     final bool isReharmonized = modifiedKeySignature != null;
-    final Color reharmonizeColor = Colors.purple; // Color for reharmonized chords
+    const Color reharmonizeColor = Colors.purple; // Color for reharmonized chords
     
     return Stack(
       clipBehavior: Clip.none,

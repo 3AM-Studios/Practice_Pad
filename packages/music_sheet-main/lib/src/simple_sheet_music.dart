@@ -1,20 +1,13 @@
 import 'dart:convert';
 import 'dart:core';
 
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:music_sheet/index.dart';
-import 'package:music_sheet/simple_sheet_music.dart';
 import 'package:music_sheet/src/midi/midi_playback_mixin.dart';
-import 'package:music_sheet/src/music_objects/interface/musical_symbol.dart';
-import 'package:music_sheet/src/sheet_music_metrics.dart';
-import 'package:music_sheet/src/sheet_music_renderer.dart';
 import 'package:music_sheet/src/utils/interaction_overlay_painter.dart';
 import 'package:xml/xml.dart';
 
-import 'music_objects/key_signature/keysignature_type.dart';
-import 'sheet_music_layout.dart';
 import 'widgets/note_editor_popup.dart';
 
 typedef OnTapMusicObjectCallback = void Function(

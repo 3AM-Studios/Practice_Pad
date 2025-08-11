@@ -1,9 +1,11 @@
+import 'dart:math';
 import 'package:flutter/cupertino.dart';
 import 'package:clay_containers/clay_containers.dart';
+import 'package:flutter/material.dart';
 import 'package:practice_pad/models/practice_item.dart';
 import 'package:practice_pad/models/statistics.dart';
 import 'package:practice_pad/services/practice_session_manager.dart';
-import 'package:practice_pad/features/song_viewer/presentation/widgets/concentric_dial_menu.dart';
+import 'package:practice_pad/services/local_storage_service.dart';
 import 'package:provider/provider.dart';
 
 /// Screen for conducting a practice session with a specific practice item
@@ -21,35 +23,53 @@ class PracticeSessionScreen extends StatefulWidget {
 
 class _PracticeSessionScreenState extends State<PracticeSessionScreen> {
   // Practice type selection - now only time-based
-  
+
   // Time-based practice state
   final int _targetMinutes = 1;
   int _targetSeconds = 0;
   int _elapsedSeconds = 0;
   bool _isTimerRunning = false;
-  
+
   // Keys practice state
-  final List<String> _majorKeys = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
+  final List<String> _majorKeys = [
+    'C',
+    'C#',
+    'D',
+    'Eb',
+    'E',
+    'F',
+    'F#',
+    'G',
+    'Ab',
+    'A',
+    'Bb',
+    'B'
+  ];
   late Map<String, int> _keysPracticed;
-  
+  late Map<String, int> _todaysReps; // Track today's additions
+
   // Timer for time-based practice
   // Removed - now using global session manager timer
-  
+
   // Reference to session manager for safe disposal
   PracticeSessionManager? _sessionManager;
-  
+
   @override
   void initState() {
     super.initState();
-    
+
     // Initialize keys practiced from the practice item
     _keysPracticed = Map.from(widget.practiceItem.keysPracticed);
-    
+
+    // Initialize today's reps (starts at 0 for all keys)
+    _todaysReps = Map.fromIterable(_majorKeys, value: (key) => 0);
+
     // Check if there's already an active session for this item
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _sessionManager = Provider.of<PracticeSessionManager>(context, listen: false);
-      
-      if (_sessionManager!.hasActiveSession && 
+      _sessionManager =
+          Provider.of<PracticeSessionManager>(context, listen: false);
+
+      if (_sessionManager!.hasActiveSession &&
           _sessionManager!.activePracticeItem?.id == widget.practiceItem.id) {
         // Resume existing session
         setState(() {
@@ -66,21 +86,23 @@ class _PracticeSessionScreenState extends State<PracticeSessionScreen> {
           targetSeconds: _getTotalTargetSeconds(),
         );
       }
-      
+
       // Add listener to sync with global session manager
       _sessionManager!.addListener(_syncWithGlobalManager);
     });
   }
-  
+
   @override
   void dispose() {
     // Use the stored reference instead of Provider.of(context)
     _sessionManager?.removeListener(_syncWithGlobalManager);
     super.dispose();
   }
-  
+
   void _syncWithGlobalManager() {
-    if (mounted && _sessionManager != null && _sessionManager!.hasActiveSession && 
+    if (mounted &&
+        _sessionManager != null &&
+        _sessionManager!.hasActiveSession &&
         _sessionManager!.activePracticeItem?.id == widget.practiceItem.id) {
       setState(() {
         _elapsedSeconds = _sessionManager!.elapsedSeconds;
@@ -88,60 +110,61 @@ class _PracticeSessionScreenState extends State<PracticeSessionScreen> {
       });
     }
   }
-  
+
   int _getTotalTargetSeconds() {
     return (_targetMinutes * 60) + _targetSeconds;
   }
-  
+
   void _startTimer() {
     setState(() {
       _isTimerRunning = true;
     });
-    
+
     // Use the global session manager's timer instead of local timer
     _sessionManager?.startTimer();
   }
-  
+
   void _stopTimer() {
     setState(() {
       _isTimerRunning = false;
     });
-    
+
     // Use the global session manager's timer instead of local timer
     _sessionManager?.stopTimer();
   }
-  
+
   void _resetTimer() {
     setState(() {
       _isTimerRunning = false;
       _elapsedSeconds = 0;
     });
-    
+
     // Reset the global manager timer as well
     _sessionManager?.updateTimer(0, false);
   }
-  
+
   void _completePracticeSession() async {
     if (_sessionManager == null) return;
-    
+
     try {
       print('DEBUG: Starting practice session completion');
-      
+
       // Update the practice item with the new keys practiced counts
       widget.practiceItem.keysPracticed.clear();
       widget.practiceItem.keysPracticed.addAll(_keysPracticed);
-      
+
       // Calculate total reps across all keys
-      final totalReps = _keysPracticed.values.fold(0, (sum, reps) => sum + reps);
-      
+      final totalReps =
+          _keysPracticed.values.fold(0, (sum, reps) => sum + reps);
+
       print('DEBUG: Total reps calculated: $totalReps');
-      
+
       Map<String, dynamic> practiceAmount = {
         'time': _elapsedSeconds,
         'keysPracticed': Map.from(_keysPracticed),
         'totalReps': totalReps,
       };
-      
+
       // Create and save the practice session as statistics
       final statistics = Statistics(
         practiceItemId: widget.practiceItem.id,
@@ -150,19 +173,19 @@ class _PracticeSessionScreenState extends State<PracticeSessionScreen> {
         totalTime: Duration(seconds: _elapsedSeconds),
         metadata: practiceAmount,
       );
-      
+
       print('DEBUG: Statistics object created');
-      
+
       // Save to statistics
       await statistics.save();
-      
+
       print('DEBUG: Statistics saved successfully');
-      
+
       // Complete the session in the global manager
       _sessionManager!.completeSession();
-      
+
       print('DEBUG: Session completed in manager');
-      
+
       // Show success message
       if (mounted) {
         print('DEBUG: Showing success dialog');
@@ -180,8 +203,10 @@ class _PracticeSessionScreenState extends State<PracticeSessionScreen> {
                 child: const Text('Continue'),
                 onPressed: () {
                   print('DEBUG: Dialog continue pressed');
-                  Navigator.of(dialogContext).pop(); // Close dialog using dialog context
-                  Navigator.of(context).pop(true); // Return to previous screen using original context
+                  Navigator.of(dialogContext)
+                      .pop(); // Close dialog using dialog context
+                  Navigator.of(context).pop(
+                      true); // Return to previous screen using original context
                 },
               ),
             ],
@@ -191,7 +216,7 @@ class _PracticeSessionScreenState extends State<PracticeSessionScreen> {
     } catch (e, stackTrace) {
       print('DEBUG: Error in _completePracticeSession: $e');
       print('DEBUG: Stack trace: $stackTrace');
-      
+
       // Show error message
       if (mounted) {
         showCupertinoDialog(
@@ -210,104 +235,84 @@ class _PracticeSessionScreenState extends State<PracticeSessionScreen> {
       }
     }
   }
-  
+
   String _formatTime(int seconds) {
     final minutes = seconds ~/ 60;
     final remainingSeconds = seconds % 60;
     return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
   }
-  
+
   @override
   Widget build(BuildContext context) {
-    return CupertinoPageScaffold(
-      navigationBar: CupertinoNavigationBar(
-        middle: Text('Practice: ${widget.practiceItem.name}'),
-        leading: CupertinoButton(
-          padding: EdgeInsets.zero,
-          child: const Text('Back'),
-          onPressed: () {
-            // Don't cancel the session, just go back - session continues running
-            Navigator.of(context).pop(false);
-          },
-        ),
-        trailing: CupertinoButton(
-          padding: EdgeInsets.zero,
-          child: const Text('End'),
-          onPressed: () {
-            _showEndSessionDialog();
-          },
-        ),
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Practice Session', style: TextStyle(
+              fontSize: 18,
+              color: Theme.of(context).colorScheme.onSurface,
+              fontWeight: FontWeight.w600,
+            ),),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        elevation: 0,
       ),
-      child: DefaultTextStyle(
+      body: DefaultTextStyle(
         style: CupertinoTheme.of(context).textTheme.textStyle,
         child: SafeArea(
           child: CustomScrollView(
             slivers: [
-              // Add padding for navigation bar
+              // Add padding for app bar
               const SliverToBoxAdapter(
                 child: SizedBox(height: 20),
               ),
-              
+
               SliverPadding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 sliver: SliverList(
                   delegate: SliverChildListDelegate([
-                    // Item description (if exists)
-                    if (widget.practiceItem.description.isNotEmpty) ...[
-                      ClayContainer(
-                        color: CupertinoTheme.of(context).scaffoldBackgroundColor,
-                        borderRadius: 16,
-                        depth: 8,
-                        spread: 1,
-                        curveType: CurveType.concave,
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(20),
-                          child: Text(
-                            widget.practiceItem.description,
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                              color: CupertinoTheme.of(context).textTheme.textStyle.color,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 32),
-                    ],
-                    
                     // Main practice interface
                     _buildPracticeInterface(),
-                    
-                    const SizedBox(height: 32),
-                    
-                    // Complete session button
-                    ClayContainer(
-                      color: CupertinoTheme.of(context).scaffoldBackgroundColor,
-                      borderRadius: 16,
-                      depth: 8,
-                      spread: 1,
-                      curveType: CurveType.concave,
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(4),
-                        child: CupertinoButton.filled(
-                          onPressed: _hasAnyReps() || _elapsedSeconds > 0
-                              ? _completePracticeSession
-                              : null,
-                          borderRadius: BorderRadius.circular(12),
-                          child: const Text(
-                            'Complete Session',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                            ),
+
+                    const SizedBox(height: 10),
+
+                    // Modern complete session button
+                    Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.symmetric(horizontal: 4),
+                      decoration: BoxDecoration(
+                        color: _hasAnyReps() || _elapsedSeconds > 0
+                            ? CupertinoColors.activeGreen
+                            : CupertinoColors.systemGrey4,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: _hasAnyReps() || _elapsedSeconds > 0
+                            ? [
+                                BoxShadow(
+                                  color: CupertinoColors.activeGreen
+                                      .withOpacity(0.4),
+                                  blurRadius: 15,
+                                  offset: const Offset(0, 6),
+                                ),
+                              ]
+                            : null,
+                      ),
+                      child: CupertinoButton(
+                        onPressed: _hasAnyReps() || _elapsedSeconds > 0
+                            ? _completePracticeSession
+                            : null,
+                        borderRadius: BorderRadius.circular(20),
+                        padding: const EdgeInsets.symmetric(vertical: 18),
+                        child: Text(
+                          'Complete Session',
+                          style: TextStyle(
+                            fontSize: 19,
+                            fontWeight: FontWeight.w800,
+                            color: _hasAnyReps() || _elapsedSeconds > 0
+                                ? CupertinoColors.white
+                                : CupertinoColors.systemGrey,
+                            letterSpacing: 0.8,
                           ),
                         ),
                       ),
                     ),
-                    
+
                     const SizedBox(height: 40),
                   ]),
                 ),
@@ -322,338 +327,423 @@ class _PracticeSessionScreenState extends State<PracticeSessionScreen> {
   bool _hasAnyReps() {
     return _keysPracticed.values.any((reps) => reps > 0);
   }
-  
+
   Widget _buildPracticeInterface() {
-    return Column(
-      children: [
-        // Title and timer section
-        ClayContainer(
-          color: CupertinoTheme.of(context).scaffoldBackgroundColor,
-          borderRadius: 20,
-          depth: 15,
-          spread: 2,
-          curveType: CurveType.concave,
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              children: [
-                Text(
-                  'Practice in All 12 Keys',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w700,
-                    color: CupertinoTheme.of(context).textTheme.textStyle.color,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 16),
-                
-                // Timer display
-                ClayContainer(
-                  color: CupertinoTheme.of(context).scaffoldBackgroundColor,
-                  borderRadius: 16,
-                  depth: 8,
-                  spread: 1,
-                  curveType: CurveType.none,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                    child: Text(
-                      _formatTime(_elapsedSeconds),
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w800,
-                        color: CupertinoTheme.of(context).primaryColor,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ),
-                
-                const SizedBox(height: 20),
-                
-                // Timer controls
-                Row(
-                  children: [
-                    Expanded(
-                      child: ClayContainer(
-                        color: CupertinoTheme.of(context).scaffoldBackgroundColor,
-                        borderRadius: 12,
-                        depth: 6,
-                        spread: 1,
-                        curveType: CurveType.concave,
-                        child: Container(
-                          padding: const EdgeInsets.all(2),
-                          child: CupertinoButton.filled(
-                            onPressed: !_isTimerRunning ? _startTimer : _stopTimer,
-                            borderRadius: BorderRadius.circular(10),
-                            child: Text(
-                              _isTimerRunning ? 'Stop' : 'Start',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: ClayContainer(
-                        color: CupertinoTheme.of(context).scaffoldBackgroundColor,
-                        borderRadius: 12,
-                        depth: 6,
-                        spread: 1,
-                        curveType: CurveType.concave,
-                        child: Container(
-                          padding: const EdgeInsets.all(2),
-                          child: CupertinoButton.filled(
-                            onPressed: _resetTimer,
-                            borderRadius: BorderRadius.circular(10),
-                            child: const Text(
-                              'Reset',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
+    return ClayContainer(
+      color: CupertinoTheme.of(context).scaffoldBackgroundColor,
+      borderRadius: 28,
+      depth: 20,
+      spread: 4,
+      curveType: CurveType.concave,
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            // Modern timer section
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.symmetric(horizontal: 4),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    CupertinoColors.systemGrey6.withOpacity(0.3),
+                    CupertinoColors.systemGrey6.withOpacity(0.1),
                   ],
                 ),
-              ],
-            ),
-          ),
-        ),
-        
-        const SizedBox(height: 32),
-        
-        // Practice tracking section
-        ClayContainer(
-          color: CupertinoTheme.of(context).scaffoldBackgroundColor,
-          borderRadius: 20,
-          depth: 15,
-          spread: 2,
-          curveType: CurveType.concave,
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              children: [
-                // Concentric dial and bar graph
-                SizedBox(
-                  height: 400,
-                  child: Row(
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: CupertinoColors.systemGrey4.withOpacity(0.3),
+                  width: 0.5,
+                ),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: Container(
+                  padding: const EdgeInsets.all(28),
+                  child: Column(
                     children: [
-                      // Left side - Concentric Dial
-                      Expanded(
-                        child: Center(
-                          child: ConcentricDialMenu(
-                            size: 280,
-                            ringSpacing: 0.25,
-                            enableInnerHighlight: false, // Hide inner button highlights
-                            enableOuterHighlight: true,
-                            innerButtonScale: 0.0, // Hide inner buttons completely
-                            centerText: 'Keys\nPracticed',
-                            outerItems: _majorKeys.map((key) => DialItem(
-                              label: key,
-                              outerText: '${_keysPracticed[key] ?? 0}',
-                            )).toList(),
-                            innerItems: _majorKeys.map((key) => DialItem(
-                              label: '', // Empty to hide completely
-                            )).toList(),
-                            onSelectionChanged: (innerIndex, outerIndex) {
-                              if (outerIndex != null) {
-                                _incrementKeyReps(_majorKeys[outerIndex]);
-                              }
-                              // Ignore inner button taps since they're hidden
-                            },
+                      Text(
+                        widget.practiceItem.name,
+                        style: TextStyle(
+                          fontSize: 34,
+                          fontWeight: FontWeight.w800,
+                          color: CupertinoTheme.of(context)
+                              .textTheme
+                              .textStyle
+                              .color,
+                          letterSpacing: 0.5,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      // Add description as subtitle if it exists
+                      if (widget.practiceItem.description.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          widget.practiceItem.description,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: CupertinoTheme.of(context)
+                                .textTheme
+                                .textStyle
+                                .color
+                                ?.withOpacity(0.7),
+                            letterSpacing: 0.3,
                           ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                      const SizedBox(height: 20),
+
+                      // Modern timer display
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 32, vertical: 16),
+                        decoration: BoxDecoration(
+                          color: CupertinoTheme.of(context).primaryColor,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: CupertinoTheme.of(context)
+                                  .primaryColor
+                                  .withOpacity(0.3),
+                              blurRadius: 15,
+                              offset: const Offset(0, 5),
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          _formatTime(_elapsedSeconds),
+                          style: const TextStyle(
+                            fontSize: 32,
+                            fontWeight: FontWeight.w900,
+                            color: CupertinoColors.white,
+                            letterSpacing: 2,
+                          ),
+                          textAlign: TextAlign.center,
                         ),
                       ),
-                      
-                      const SizedBox(width: 24),
-                      
-                      // Right side - Bar Graph
-                      Expanded(
-                        child: _buildStylizedBarGraph(),
+
+                      const SizedBox(height: 24),
+
+                      // Modern timer controls
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildModernButton(
+                              text: _isTimerRunning ? 'Stop' : 'Start',
+                              onPressed:
+                                  !_isTimerRunning ? _startTimer : _stopTimer,
+                              color: _isTimerRunning
+                                  ? CupertinoColors.systemRed
+                                  : CupertinoColors.activeGreen,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _buildModernButton(
+                              text: 'Reset',
+                              onPressed: _resetTimer,
+                              color: CupertinoColors.systemGrey,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
                 ),
-                
-                const SizedBox(height: 24),
-                
-                // Instructions
-                ClayContainer(
-                  color: CupertinoTheme.of(context).scaffoldBackgroundColor,
-                  borderRadius: 12,
-                  depth: 4,
-                  spread: 0,
-                  curveType: CurveType.concave,
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    child: Text(
-                      'Tap a key to add a rep',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: CupertinoTheme.of(context).textTheme.textStyle.color?.withOpacity(0.7),
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
-        ),
-      ],
-    );
-  }
-  
-  Widget _buildStylizedBarGraph() {
-    // Find the maximum reps for scaling
-    final maxReps = _keysPracticed.values.isNotEmpty 
-        ? _keysPracticed.values.reduce((a, b) => a > b ? a : b)
-        : 1;
-    
-    // Use a minimum height for visualization even when maxReps is 0
-    final effectiveMaxReps = maxReps > 0 ? maxReps : 1;
-    const maxBarHeight = 200.0;
-    
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        // Title
-        Text(
-          'Reps by Key',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-            color: CupertinoTheme.of(context).textTheme.textStyle.color,
-          ),
-          textAlign: TextAlign.center,
-        ),
-        
-        const SizedBox(height: 20),
-        
-        // Bar graph container
-        ClayContainer(
-          color: CupertinoTheme.of(context).scaffoldBackgroundColor,
-          borderRadius: 16,
-          depth: 8,
-          spread: 1,
-          curveType: CurveType.none,
-          child: Container(
-            height: 280,
-            padding: const EdgeInsets.all(16),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                // Calculate responsive sizing
-                final availableWidth = constraints.maxWidth;
-                final barSpacing = availableWidth / _majorKeys.length;
-                final maxBarWidth = (barSpacing * 0.6).clamp(8.0, 20.0);
-                final fontSize = (barSpacing * 0.2).clamp(8.0, 12.0);
-                
-                return Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: _majorKeys.map((key) {
-                    final reps = _keysPracticed[key] ?? 0;
-                    final heightRatio = reps / effectiveMaxReps;
-                    
-                    return Expanded(
-                      child: Container(
-                        margin: EdgeInsets.symmetric(horizontal: (barSpacing * 0.05).clamp(1.0, 4.0)),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.end,
+
+            const SizedBox(height: 40),
+
+            // Modern practice tracking section
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.symmetric(horizontal: 4),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    CupertinoColors.systemGrey6.withOpacity(0.4),
+                    CupertinoColors.systemGrey6.withOpacity(0.1),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(32),
+                border: Border.all(
+                  color: CupertinoColors.systemGrey4.withOpacity(0.2),
+                  width: 0.5,
+                ),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(32),
+                child: Container(
+                  padding: const EdgeInsets.all(32),
+                  child: Column(
+                    children: [
+                      // Modern title
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: CupertinoTheme.of(context).primaryColor,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Text(
+                          'Keys Practiced',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: CupertinoColors.white,
+                            letterSpacing: 0.8,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+
+                      const SizedBox(height: 28),
+
+                      // Combined Circle of Fifths with Internal Bar Graph
+                      SizedBox(
+                        height: 420,
+                        child: Center(
+                          child: _buildCircularKeysWithBarGraph(),
+                        ),
+                      ),
+
+                      const SizedBox(height: 28),
+
+                      // Modern instructions
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: CupertinoColors.systemGrey6.withOpacity(0.5),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: CupertinoColors.systemGrey4.withOpacity(0.3),
+                            width: 0.5,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            // Reps count (above bar)
-                            if (reps > 0)
-                              Container(
-                                margin: const EdgeInsets.only(bottom: 4),
-                                child: Text(
-                                  reps.toString(),
-                                  style: TextStyle(
-                                    fontSize: fontSize,
-                                    fontWeight: FontWeight.w600,
-                                    color: CupertinoTheme.of(context).primaryColor,
-                                  ),
-                                ),
-                              ),
-                            
-                            // Bar
-                            ClayContainer(
-                              color: reps > 0 
-                                  ? CupertinoTheme.of(context).primaryColor.withOpacity(0.2)
-                                  : CupertinoTheme.of(context).scaffoldBackgroundColor,
-                              borderRadius: 8,
-                              depth: reps > 0 ? 4 : 2,
-                              spread: 1,
-                              curveType: reps > 0 ? CurveType.convex : CurveType.none,
-                              child: Container(
-                                width: maxBarWidth,
-                                height: reps > 0 ? (heightRatio * maxBarHeight) : 4,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(8),
-                                  gradient: reps > 0 ? LinearGradient(
-                                    begin: Alignment.bottomCenter,
-                                    end: Alignment.topCenter,
-                                    colors: [
-                                      CupertinoTheme.of(context).primaryColor,
-                                      CupertinoTheme.of(context).primaryColor.withOpacity(0.7),
-                                    ],
-                                  ) : null,
-                                ),
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: CupertinoTheme.of(context).primaryColor,
+                                shape: BoxShape.circle,
                               ),
                             ),
-                            
-                            const SizedBox(height: 8),
-                            
-                            // Key label
+                            const SizedBox(width: 8),
                             Text(
-                              key,
+                              'Tap a key to add a rep',
                               style: TextStyle(
-                                fontSize: fontSize,
+                                fontSize: 15,
                                 fontWeight: FontWeight.w600,
-                                color: reps > 0 
-                                    ? CupertinoTheme.of(context).primaryColor
-                                    : CupertinoTheme.of(context).textTheme.textStyle.color?.withOpacity(0.6),
+                                color: CupertinoTheme.of(context)
+                                    .textTheme
+                                    .textStyle
+                                    .color
+                                    ?.withOpacity(0.8),
                               ),
                             ),
                           ],
                         ),
                       ),
-                    );
-                  }).toList(),
-                );
-              },
+                    ],
+                  ),
+                ),
+              ),
             ),
-          ),
+          ],
         ),
-      ],
+      ),
     );
   }
 
-  void _incrementKeyReps(String key) {
+  Widget _buildModernButton({
+    required String text,
+    required VoidCallback onPressed,
+    required Color color,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: CupertinoButton(
+        onPressed: onPressed,
+        borderRadius: BorderRadius.circular(16),
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        child: Text(
+          text,
+          style: const TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.w700,
+            color: CupertinoColors.white,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCircularKeysWithBarGraph() {
+    return ClayContainer(
+      color: CupertinoTheme.of(context).scaffoldBackgroundColor,
+      borderRadius: 32,
+      depth: 18,
+      spread: 3,
+      curveType: CurveType.concave,
+      child: Container(
+        width: 430,
+        height: 430,
+        padding: const EdgeInsets.all(40),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(32),
+          gradient: RadialGradient(
+            center: Alignment.center,
+            radius: 1.0,
+            colors: [
+              CupertinoTheme.of(context).scaffoldBackgroundColor,
+              CupertinoTheme.of(context)
+                  .scaffoldBackgroundColor
+                  .withOpacity(0.85),
+              CupertinoTheme.of(context)
+                  .scaffoldBackgroundColor
+                  .withOpacity(0.7),
+            ],
+            stops: const [0.0, 0.7, 1.0],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: CupertinoColors.systemGrey.withOpacity(0.1),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: GestureDetector(
+          onTapDown: (details) {
+            final result = _getKeyFromPosition(details.localPosition);
+            if (result != null) {
+              _incrementKeyReps(result);
+            }
+          },
+          child: CustomPaint(
+            size: const Size(350, 350), // Account for padding (430-80)
+            painter: _CircularKeyBarGraphPainter(
+              majorKeys: _majorKeys,
+              keysPracticed: _keysPracticed,
+              todaysReps: _todaysReps,
+              textColor: CupertinoTheme.of(context).textTheme.textStyle.color ??
+                  CupertinoColors.label,
+              primaryColor: CupertinoTheme.of(context).primaryColor,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String? _getKeyFromPosition(Offset position) {
+    const customPaintSize = 350.0;
+    const customPaintCenter = Offset(customPaintSize / 2, customPaintSize / 2);
+
+    // The position is already in CustomPaint coordinates (0-350)
+    final dx = position.dx - customPaintCenter.dx;
+    final dy = position.dy - customPaintCenter.dy;
+
+    // Use the same radius calculations as in the painter
+    const outerRadius = customPaintSize / 2 * 0.8; // 350/2 * 0.8 = 140
+    const buttonRadius = customPaintSize / 2 * 0.14; // Match painter buttonRadius
+
+    double minDistance = double.infinity;
+    String? closestKey;
+
+    for (int i = 0; i < _majorKeys.length; i++) {
+      final anglePerItem = 2 * pi / _majorKeys.length;
+      final buttonAngle = i * anglePerItem - pi / 2; // Start from top
+      final buttonCenter = Offset(
+        customPaintCenter.dx + outerRadius * cos(buttonAngle),
+        customPaintCenter.dy + outerRadius * sin(buttonAngle),
+      );
+      final distanceToButton = sqrt(pow(position.dx - buttonCenter.dx, 2) +
+          pow(position.dy - buttonCenter.dy, 2));
+
+      // Use generous threshold for touch interface
+      const threshold = 30.0;
+      if (distanceToButton < minDistance && distanceToButton <= threshold) {
+        minDistance = distanceToButton;
+        closestKey = _majorKeys[i];
+      }
+    }
+
+    return closestKey;
+  }
+
+  void _incrementKeyReps(String key) async {
     setState(() {
       _keysPracticed[key] = (_keysPracticed[key] ?? 0) + 1;
+      _todaysReps[key] = (_todaysReps[key] ?? 0) + 1; // Track today's additions
     });
+
     // Update the practice item immediately
     widget.practiceItem.keysPracticed[key] = _keysPracticed[key]!;
+
+    // Save the updated practice item to persistent storage
+    await _savePracticeItemProgress();
   }
+
+  Future<void> _savePracticeItemProgress() async {
+    try {
+      // Load all practice items from storage
+      final itemsByArea = await LocalStorageService.loadPracticeItems();
+
+      // Find and update this practice item across all areas
+      bool itemUpdated = false;
+      for (final areaId in itemsByArea.keys) {
+        final items = itemsByArea[areaId]!;
+        for (int i = 0; i < items.length; i++) {
+          if (items[i].id == widget.practiceItem.id) {
+            // Update the item in the list with our current progress
+            items[i] = widget.practiceItem;
+            itemUpdated = true;
+            break;
+          }
+        }
+        if (itemUpdated) break;
+      }
+
+      // Save the updated data back to storage
+      if (itemUpdated) {
+        await LocalStorageService.savePracticeItems(itemsByArea);
+      }
+    } catch (e) {
+      // Silently handle errors - practice can continue even if save fails
+    }
+  }
+
   void _showEndSessionDialog() {
     showCupertinoDialog(
       context: context,
       builder: (BuildContext context) {
         return CupertinoAlertDialog(
           title: const Text('End Practice Session'),
-          content: const Text('Are you sure you want to end this practice session? Your progress will be saved.'),
+          content: const Text(
+              'Are you sure you want to end this practice session? Your progress will be saved.'),
           actions: [
             CupertinoDialogAction(
               child: const Text('Cancel'),
@@ -674,5 +764,250 @@ class _PracticeSessionScreenState extends State<PracticeSessionScreen> {
         );
       },
     );
+  }
+}
+
+class _CircularKeyBarGraphPainter extends CustomPainter {
+  final List<String> majorKeys;
+  final Map<String, int> keysPracticed;
+  final Map<String, int> todaysReps;
+  final Color textColor;
+  final Color primaryColor;
+
+  _CircularKeyBarGraphPainter({
+    required this.majorKeys,
+    required this.keysPracticed,
+    required this.todaysReps,
+    required this.textColor,
+    required this.primaryColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final outerRadius = size.width / 2 * 0.8;
+    final buttonRadius = size.width / 2 * 0.14;
+    final centerCircleRadius =
+        size.width / 2 * 0.08; // Professional center circle
+
+    // Calculate max reps for scaling bars
+    final maxReps = keysPracticed.values.isNotEmpty
+        ? keysPracticed.values.reduce((a, b) => a > b ? a : b)
+        : 1;
+    final effectiveMaxReps = maxReps > 0 ? maxReps : 1;
+    final maxBarLength =
+        size.width / 2 * 0.45; // Slightly shorter bars for cleaner look
+
+    // Draw radial bars from center circle edge (bar graph inside circle)
+    for (int i = 0; i < majorKeys.length; i++) {
+      final key = majorKeys[i];
+      final totalReps = keysPracticed[key] ?? 0;
+      final todayReps = todaysReps[key] ?? 0;
+      final historicalReps = totalReps - todayReps;
+      final anglePerItem = 2 * pi / majorKeys.length;
+      final angle = i * anglePerItem - pi / 2; // Start from top
+
+      if (totalReps > 0) {
+        final totalBarLength = (totalReps / effectiveMaxReps) * maxBarLength;
+        final historicalBarLength = historicalReps > 0
+            ? (historicalReps / effectiveMaxReps) * maxBarLength
+            : 0;
+        final barStartRadius = centerCircleRadius + 3;
+
+        final startPoint = Offset(
+          center.dx + barStartRadius * cos(angle),
+          center.dy + barStartRadius * sin(angle),
+        );
+
+        // Draw historical reps (darker, established color)
+        if (historicalReps > 0) {
+          final historicalEndPoint = Offset(
+            center.dx + (barStartRadius + historicalBarLength) * cos(angle),
+            center.dy + (barStartRadius + historicalBarLength) * sin(angle),
+          );
+
+          final historicalPaint = Paint()
+            ..color = CupertinoColors.systemBlue.withOpacity(0.53)
+            ..strokeWidth = 12
+            ..strokeCap = StrokeCap.round;
+
+          canvas.drawLine(startPoint, historicalEndPoint, historicalPaint);
+        }
+
+        // Draw today's reps (brighter, fresh color)
+        if (todayReps > 0) {
+          final todayStartPoint = Offset(
+            center.dx + (barStartRadius + historicalBarLength) * cos(angle),
+            center.dy + (barStartRadius + historicalBarLength) * sin(angle),
+          );
+          final todayEndPoint = Offset(
+            center.dx + (barStartRadius + totalBarLength) * cos(angle),
+            center.dy + (barStartRadius + totalBarLength) * sin(angle),
+          );
+
+          // Use consistent color for today's progress
+          final todayColor = CupertinoColors.activeOrange;
+
+          final todayPaint = Paint()
+            ..color = todayColor.withOpacity(0.95)
+            ..strokeWidth = 12
+            ..strokeCap = StrokeCap.round;
+
+          canvas.drawLine(todayStartPoint, todayEndPoint, todayPaint);
+
+          // Add glow effect for today's bars
+          final glowPaint = Paint()
+            ..color = todayColor
+            ..strokeWidth = 13.3
+            ..strokeCap = StrokeCap.round;
+
+          canvas.drawLine(todayStartPoint, todayEndPoint, glowPaint);
+        }
+
+        // Add subtle shadow effect for the entire bar
+        final shadowPaint = Paint()
+          ..color = CupertinoColors.black.withOpacity(0.1)
+          ..strokeWidth = 14
+          ..strokeCap = StrokeCap.round;
+
+        final totalEndPoint = Offset(
+          center.dx + (barStartRadius + totalBarLength) * cos(angle),
+          center.dy + (barStartRadius + totalBarLength) * sin(angle),
+        );
+
+        canvas.drawLine(
+          Offset(startPoint.dx + 1.5, startPoint.dy + 1.5),
+          Offset(totalEndPoint.dx + 1.5, totalEndPoint.dy + 1.5),
+          shadowPaint,
+        );
+      }
+    }
+
+    // Draw outer ring of key buttons with enhanced professional styling
+    for (int i = 0; i < majorKeys.length; i++) {
+      final key = majorKeys[i];
+      final reps = keysPracticed[key] ?? 0;
+      final anglePerItem = 2 * pi / majorKeys.length;
+      final angle = i * anglePerItem - pi / 2; // Start from top
+
+      final buttonCenter = Offset(
+        center.dx + outerRadius * cos(angle),
+        center.dy + outerRadius * sin(angle),
+      );
+
+      // Draw button shadow first
+      final shadowPaint = Paint()
+        ..color = CupertinoColors.black.withOpacity(0.1)
+        ..style = PaintingStyle.fill;
+      canvas.drawCircle(Offset(buttonCenter.dx + 1, buttonCenter.dy + 1),
+          buttonRadius, shadowPaint);
+
+      // Draw button background with gradient
+      final buttonPaint = Paint()..style = PaintingStyle.fill;
+
+      final todayReps = todaysReps[key] ?? 0;
+
+      if (todayReps > 0) {
+        // Key worked on today - blue
+        buttonPaint.color = CupertinoColors.activeOrange;
+      } else if (reps > 0) {
+        // Key with historical practice but not today - darker grey
+        buttonPaint.color = primaryColor.withOpacity(0.8);
+      } else {
+        // No practice at all - light grey
+        buttonPaint.color = CupertinoColors.systemGrey5;
+      }
+
+      canvas.drawCircle(buttonCenter, buttonRadius, buttonPaint);
+
+      // Draw button border with enhanced styling
+      final borderPaint = Paint()
+        ..color = todayReps > 0
+            ? CupertinoColors.activeOrange
+            : (reps > 0 ? Colors.transparent : Colors.transparent);
+
+      canvas.drawCircle(buttonCenter, buttonRadius, borderPaint);
+
+      // Draw key label with enhanced typography
+      final labelPainter = TextPainter(
+        textDirection: TextDirection.ltr,
+        text: TextSpan(
+          text: key,
+          style: TextStyle(
+            color: todayReps > 0
+                ? CupertinoColors.white
+                : (reps > 0
+                    ? CupertinoColors.white
+                    : textColor.withOpacity(0.7)),
+            fontSize: buttonRadius * 0.55,
+            fontWeight: todayReps > 0 ? FontWeight.w700 : FontWeight.w600,
+            letterSpacing: 0.5,
+          ),
+        ),
+      );
+      labelPainter.layout();
+      labelPainter.paint(
+        canvas,
+        Offset(
+          buttonCenter.dx - labelPainter.width / 2,
+          buttonCenter.dy - labelPainter.height / 2,
+        ),
+      );
+
+      // Draw rep count outside the button with enhanced styling
+      if (reps > 0) {
+        final outerTextRadius = outerRadius + buttonRadius + 18;
+        final outerTextCenter = Offset(
+          center.dx + outerTextRadius * cos(angle),
+          center.dy + outerTextRadius * sin(angle),
+        );
+
+        // Draw background circle for rep count
+        final repBgPaint = Paint()
+          ..color = todayReps > 0
+              ? CupertinoColors.activeOrange.withOpacity(0.9)
+              : primaryColor.withOpacity(0.7)
+          ..style = PaintingStyle.fill;
+        canvas.drawCircle(outerTextCenter, 12, repBgPaint);
+
+        final outerTextPainter = TextPainter(
+          textDirection: TextDirection.ltr,
+          text: TextSpan(
+            text: reps.toString(),
+            style: const TextStyle(
+              color: CupertinoColors.white,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        );
+        outerTextPainter.layout();
+        outerTextPainter.paint(
+          canvas,
+          Offset(
+            outerTextCenter.dx - outerTextPainter.width / 2,
+            outerTextCenter.dy - outerTextPainter.height / 2,
+          ),
+        );
+      }
+    }
+
+    // Draw center circle on top (above bars)
+    final centerCirclePaint = Paint()
+      ..color = CupertinoColors.black
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(center, centerCircleRadius, centerCirclePaint);
+
+    // Draw center circle border
+    final centerBorderPaint = Paint()
+      ..color = CupertinoColors.black
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3;
+    canvas.drawCircle(center, centerCircleRadius, centerBorderPaint);
+  }
+
+  @override
+  bool shouldRepaint(CustomPainter oldDelegate) {
+    return true;
   }
 }

@@ -108,6 +108,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 color: theme.colorScheme.primary,
                 borderRadius: BorderRadius.circular(20),
+                onPressed: widget.onStatsPressed,
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -127,7 +128,6 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                     ),
                   ],
                 ),
-                onPressed: widget.onStatsPressed,
               ),
             ],
           ),
@@ -216,7 +216,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                         children: [
                           const Icon(
                             CupertinoIcons.star_fill,
-                            size: 32,
+                            size: 36,
                             color: Colors.white,
                           ),
                           Text(
@@ -253,7 +253,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                         children: [
                           const Icon(
                             CupertinoIcons.star_fill,
-                            size: 32,
+                            size: 36,
                             color: Colors.white,
                           ),
                           Text(

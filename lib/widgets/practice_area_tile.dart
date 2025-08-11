@@ -3,7 +3,6 @@ import 'package:practice_pad/models/practice_area.dart';
 import 'package:practice_pad/models/practice_item.dart';
 import 'package:practice_pad/features/practice/presentation/viewmodels/today_viewmodel.dart';
 import 'package:practice_pad/features/practice/presentation/pages/practice_session_screen.dart';
-import 'package:practice_pad/features/practice/presentation/pages/practice_item_selection_screen.dart';
 import 'package:practice_pad/features/song_viewer/presentation/screens/song_viewer_screen.dart';
 import 'package:practice_pad/services/practice_session_manager.dart';
 import 'package:provider/provider.dart';
@@ -51,22 +50,22 @@ class _PracticeAreaTileState extends State<PracticeAreaTile> {
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Practice Items button - navigate to dedicated screen
-                CupertinoButton(
-                  padding: EdgeInsets.zero,
-                  child: const Icon(CupertinoIcons.list_bullet, color: CupertinoColors.systemGreen),
-                  onPressed: () {
-                    // Navigate to practice item selection screen
-                    Navigator.of(context).push(
-                      CupertinoPageRoute(
-                        builder: (context) => PracticeItemSelectionScreen(
-                          area: widget.area,
-                          viewModel: widget.viewModel,
-                        ),
-                      ),
-                    );
-                  },
-                ),
+                // // Practice Items button - navigate to dedicated screen
+                // CupertinoButton(
+                //   padding: EdgeInsets.zero,
+                //   child: const Icon(CupertinoIcons.list_bullet, color: CupertinoColors.systemGreen),
+                //   onPressed: () {
+                //     // Navigate to practice item selection screen
+                //     Navigator.of(context).push(
+                //       CupertinoPageRoute(
+                //         builder: (context) => PracticeItemSelectionScreen(
+                //           area: widget.area,
+                //           viewModel: widget.viewModel,
+                //         ),
+                //       ),
+                //     );
+                //   },
+                // ),
                 // Song viewer button (if it's a song area)
                 if (widget.area.type == PracticeAreaType.song && widget.area.song != null)
                   CupertinoButton(
