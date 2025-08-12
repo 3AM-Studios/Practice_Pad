@@ -243,8 +243,8 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                       color: Colors.amber,
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: theme.colorScheme.primary,
-                        width: 3,
+                        color: CupertinoColors.systemGrey,
+                        width: 2,
                       ),
                     ),
                     child: Center(

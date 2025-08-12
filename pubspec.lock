@@ -118,6 +118,13 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  flutter_drawing_board:
+    dependency: "direct main"
+    description:
+      path: "packages/flutter_drawing_board"
+      relative: true
+    source: path
+    version: "0.9.8"
   flutter_lints:
     dependency: "direct dev"
     description:

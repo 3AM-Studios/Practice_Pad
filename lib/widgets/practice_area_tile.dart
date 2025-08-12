@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:practice_pad/models/practice_area.dart';
 import 'package:practice_pad/models/practice_item.dart';
+import 'package:practice_pad/models/statistics.dart';
 import 'package:practice_pad/features/practice/presentation/viewmodels/today_viewmodel.dart';
 import 'package:practice_pad/features/practice/presentation/pages/practice_session_screen.dart';
 import 'package:practice_pad/features/song_viewer/presentation/screens/song_viewer_screen.dart';
@@ -126,7 +127,7 @@ class _PracticeAreaTileState extends State<PracticeAreaTile> {
 }
 
 /// Sub-tile widget for individual practice items
-class _PracticeItemSubTile extends StatelessWidget {
+class _PracticeItemSubTile extends StatefulWidget {
   final PracticeItem item;
   final TodayViewModel viewModel;
   final PracticeArea area;
@@ -138,17 +139,28 @@ class _PracticeItemSubTile extends StatelessWidget {
   });
 
   @override
+  State<_PracticeItemSubTile> createState() => _PracticeItemSubTileState();
+}
+
+class _PracticeItemSubTileState extends State<_PracticeItemSubTile> {
+
+  Future<bool> _wasCompletedToday() async {
+    final todayStats = await Statistics.getToday();
+    return todayStats.any((stat) => stat.practiceItemId == widget.item.id);
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(bottom: 4),
       child: CupertinoListTile.notched(
         title: Text(
-          item.name,
+          widget.item.name,
           style: const TextStyle(fontSize: 16),
         ),
-        subtitle: item.description.isNotEmpty 
+        subtitle: widget.item.description.isNotEmpty 
             ? Text(
-                item.description,
+                widget.item.description,
                 style: const TextStyle(fontSize: 14),
               )
             : null,
@@ -161,7 +173,7 @@ class _PracticeItemSubTile extends StatelessWidget {
           builder: (context, sessionManager, child) {
             // Show different states based on active session
             if (sessionManager.hasActiveSession && 
-                sessionManager.activePracticeItem?.id == item.id) {
+                sessionManager.activePracticeItem?.id == widget.item.id) {
               return Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
@@ -179,9 +191,29 @@ class _PracticeItemSubTile extends StatelessWidget {
               );
             }
             
-            return const Icon(
-              CupertinoIcons.play_circle,
-              color: CupertinoColors.systemGrey,
+            return FutureBuilder<bool>(
+              future: _wasCompletedToday(),
+              builder: (context, snapshot) {
+                final wasCompleted = snapshot.data ?? false;
+                
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (wasCompleted)
+                      const Icon(
+                        CupertinoIcons.checkmark_circle_fill,
+                        color: CupertinoColors.systemGreen,
+                        size: 20,
+                      ),
+                    if (wasCompleted)
+                      const SizedBox(width: 8),
+                    const Icon(
+                      CupertinoIcons.play_circle,
+                      color: CupertinoColors.systemGrey,
+                    ),
+                  ],
+                );
+              },
             );
           },
         ),
@@ -190,14 +222,16 @@ class _PracticeItemSubTile extends StatelessWidget {
           final bool? sessionCompleted = await Navigator.of(context).push(
             CupertinoPageRoute(
               builder: (_) => PracticeSessionScreen(
-                practiceItem: item,
+                practiceItem: widget.item,
               ),
             ),
           );
           
-          // Optional: Handle session completion if needed
-          if (sessionCompleted == true) {
-            // Session was completed successfully
+          // Refresh the completion status after session ends
+          if (sessionCompleted == true && mounted) {
+            setState(() {
+              // This will trigger a rebuild and refresh the FutureBuilder
+            });
           }
         },
       ),

@@ -55,8 +55,8 @@ class BeamCalculator {
 
     // Use much thicker beams for better visibility (multiply stem thickness by 4)
     final thickness = metadata.stemThickness * 4.0;
-    // Use larger spacing between beams (typical music notation spacing)
-    final spacing = metadata.stemThickness * 1.5;
+    // Use larger spacing between beams to clearly distinguish 16th notes from 8th notes
+    final spacing = metadata.stemThickness * 5.0;
     
     // Calculate beam endpoints
     final startX = noteXPositions.first;

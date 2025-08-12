@@ -1007,13 +1007,12 @@ class ChordSymbol {
     final isCurrentChord = index != null && currentChordIndex != null && index == currentChordIndex;
 
     // Use the full Clay container styling for all contexts
-    return MouseRegion(
-      onEnter: onHover,
-      child: GestureDetector(
-        onTap: onTap,
-        onLongPress: onLongPress,
-        onLongPressEnd: onLongPressEnd,
-        child: AnimatedScale(
+    // MouseRegion removed to prevent layout issues - hover handled elsewhere
+    return GestureDetector(
+      onTap: onTap,
+      onLongPress: onLongPress,
+      onLongPressEnd: onLongPressEnd,
+      child: AnimatedScale(
           scale: isAnimating ? 1.2 : 1.0,
           duration: const Duration(milliseconds: 150),
           child: _buildClayContainer(
@@ -1030,7 +1029,6 @@ class ChordSymbol {
             canvasScale: canvasScale,
           ),
         ),
-      ),
     );
   }
 

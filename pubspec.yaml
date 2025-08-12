@@ -58,6 +58,8 @@ dependencies:
   flex_color_scheme: ^8.0.2
   equatable: ^2.0.7
 
+  flutter_drawing_board: 
+    path: packages/flutter_drawing_board
 
 dev_dependencies:
   flutter_test:

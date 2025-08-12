@@ -1,13 +1,20 @@
 import 'dart:convert';
 import 'dart:core';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:music_sheet/index.dart';
+import 'package:music_sheet/simple_sheet_music.dart';
 import 'package:music_sheet/src/midi/midi_playback_mixin.dart';
+import 'package:music_sheet/src/music_objects/interface/musical_symbol.dart';
+import 'package:music_sheet/src/sheet_music_metrics.dart';
+import 'package:music_sheet/src/sheet_music_renderer.dart';
 import 'package:music_sheet/src/utils/interaction_overlay_painter.dart';
 import 'package:xml/xml.dart';
 
+import 'music_objects/key_signature/keysignature_type.dart';
+import 'sheet_music_layout.dart';
 import 'widgets/note_editor_popup.dart';
 
 typedef OnTapMusicObjectCallback = void Function(
@@ -219,8 +226,8 @@ class SimpleSheetMusicState extends State<SimpleSheetMusic>
       tempo: widget.tempo,
     );
 
-    // Get actual screen width instead of widget.width which may be incorrect
-    final actualWidth = MediaQuery.of(context).size.width;
+    // Use the widget's provided width for proper layout calculation
+    final actualWidth = widget.width;
 
     _layout = SheetMusicLayout(
       metricsBuilder,
@@ -535,7 +542,7 @@ void _resetInteractionState() {
         physics: const BouncingScrollPhysics(
           parent: AlwaysScrollableScrollPhysics(),
         ),
-        padding: const EdgeInsets.only(bottom: 50.0),
+        padding: const EdgeInsets.only(bottom: 200.0),
         child: GestureDetector(
           onTapDown: _handleTapDown,
           onTapUp: _handleTapUp,
@@ -543,7 +550,7 @@ void _resetInteractionState() {
           onPanEnd: _handlePanEnd,
           behavior: HitTestBehavior.deferToChild,
           child: SizedBox(
-            width: MediaQuery.of(context).size.width,
+            width: widget.width,
             height: currentLayout.totalContentHeight,
             // The Stack is how we layer our static and dynamic painters.
             child: Stack(
@@ -554,7 +561,7 @@ void _resetInteractionState() {
                 RepaintBoundary(
                   key: const ValueKey('sheet_music_canvas'),
                   child: CustomPaint(
-                    size: Size(MediaQuery.of(context).size.width, currentLayout.totalContentHeight),
+                    size: Size(widget.width, currentLayout.totalContentHeight),
                     painter: staticSheetMusicRenderer,
                   ),
                 ),
@@ -589,7 +596,7 @@ void _resetInteractionState() {
 
                     // If there IS an interaction, we draw our fast overlay.
                     return CustomPaint(
-                      size: Size(MediaQuery.of(context).size.width, currentLayout.totalContentHeight),
+                      size: Size(widget.width, currentLayout.totalContentHeight),
                       painter: InteractionOverlayPainter(
                         interactionState: interactionState,
                         canvasScale: currentLayout.canvasScale,

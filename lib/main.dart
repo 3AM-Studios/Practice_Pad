@@ -13,9 +13,10 @@ import 'package:practice_pad/widgets/wooden_border_wrapper.dart';
 import 'package:practice_pad/services/cloud_kit_service.dart';
 import 'package:practice_pad/features/edit_items/presentation/pages/edit_items_screen.dart';
 import 'package:practice_pad/features/routines/presentation/pages/edit_routines_screen.dart';
-import 'package:practice_pad/features/practice/presentation/pages/practice_history_screen.dart';
 import 'package:practice_pad/services/practice_session_manager.dart';
 import 'package:practice_pad/models/statistics.dart';
+import 'package:practice_pad/models/practice_area.dart';
+import 'dart:math' as math;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -218,7 +219,6 @@ class ClayNavigationBar extends StatelessWidget {
     final primaryColor = theme.colorScheme.primary;
     final surfaceColor = theme.colorScheme.surface;
     final onSurfaceColor = theme.colorScheme.onSurface;
-    final secondaryColor = theme.colorScheme.secondary;
     
     return Container(
       margin: const EdgeInsets.only(left: 10, right: 10, bottom: 16),
@@ -290,6 +290,417 @@ class StatsScreen extends StatefulWidget {
 }
 
 class _StatsScreenState extends State<StatsScreen> {
+  List<PracticeArea> _practiceAreas = [];
+  String? _selectedAreaId;
+  bool _isLoading = true;
+  Map<String, int> _sessionCounts = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() => _isLoading = true);
+    
+    try {
+      final editItemsViewModel = Provider.of<EditItemsViewModel>(context, listen: false);
+      final practiceAreas = editItemsViewModel.areas;
+      final allStats = await Statistics.getAll();
+      
+      final Map<String, int> sessionCounts = {};
+      
+      for (final stat in allStats) {
+        sessionCounts[stat.practiceItemId] = (sessionCounts[stat.practiceItemId] ?? 0) + 1;
+      }
+      
+      setState(() {
+        _practiceAreas = practiceAreas;
+        _sessionCounts = sessionCounts;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Color _getPracticeIntensityColor(String itemId) {
+    final sessionCount = _sessionCounts[itemId] ?? 0;
+    if (sessionCount == 0) return const Color(0xFFE0E0E0);
+    if (sessionCount <= 2) return const Color(0xFF64B5F6);
+    if (sessionCount <= 5) return const Color(0xFFFFB74D);
+    return const Color(0xFFEF5350);
+  }
+
+  double _getBubbleThickness(String itemId) {
+    final sessionCount = _sessionCounts[itemId] ?? 0;
+    return (sessionCount * 2.0).clamp(2.0, 10.0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return CupertinoPageScaffold(
+      navigationBar: CupertinoNavigationBar(
+        middle: const Text('Practice Stats'),
+        trailing: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Icon(CupertinoIcons.time, size: 24),
+          onPressed: () {
+            Navigator.of(context).push(
+              CupertinoPageRoute(builder: (_) => const PracticeTimeHistoryScreen()),
+            );
+          },
+        ),
+      ),
+      child: SafeArea(
+        child: _isLoading
+            ? const Center(child: CupertinoActivityIndicator())
+            : _practiceAreas.isEmpty
+                ? const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(CupertinoIcons.chart_bar, size: 64, color: CupertinoColors.systemGrey),
+                        SizedBox(height: 16),
+                        Text('No practice areas yet', style: TextStyle(fontSize: 18, color: CupertinoColors.systemGrey)),
+                        SizedBox(height: 8),
+                        Text('Create practice areas to see your stats!', style: TextStyle(fontSize: 14, color: CupertinoColors.systemGrey2)),
+                      ],
+                    ),
+                  )
+                : Column(
+                    children: [
+                      // Practice Area Selection
+                      Container(
+                        height: 60,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        child: Row(
+                          children: [
+                            const Text('Area: ', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                            Expanded(
+                              child: CupertinoButton(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                color: CupertinoColors.systemGrey6,
+                                child: Text(
+                                  _selectedAreaId == null 
+                                      ? 'Select Practice Area' 
+                                      : _practiceAreas.firstWhere((a) => a.recordName == _selectedAreaId).name,
+                                  style: const TextStyle(color: CupertinoColors.label),
+                                ),
+                                onPressed: () => _showAreaSelector(),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Color Legend
+                      if (_selectedAreaId != null)
+                        Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: CupertinoColors.systemGrey6.resolveFrom(context),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              _ColorLegendItem(color: Color(0xFFE0E0E0), label: 'No practice'),
+                              _ColorLegendItem(color: Color(0xFF64B5F6), label: '1-2 sessions'),
+                              _ColorLegendItem(color: Color(0xFFFFB74D), label: '3-5 sessions'),
+                              _ColorLegendItem(color: Color(0xFFEF5350), label: '6+ sessions'),
+                            ],
+                          ),
+                        ),
+                      // Bubble Visualization
+                      Expanded(
+                        child: _selectedAreaId == null
+                            ? const Center(
+                                child: Text(
+                                  'Select a practice area to view bubble visualization',
+                                  style: TextStyle(fontSize: 16, color: CupertinoColors.systemGrey),
+                                ),
+                              )
+                            : BubbleVisualizationWidget(
+                                practiceArea: _practiceAreas.firstWhere((a) => a.recordName == _selectedAreaId),
+                                sessionCounts: _sessionCounts,
+                                getIntensityColor: _getPracticeIntensityColor,
+                                getBubbleThickness: _getBubbleThickness,
+                              ),
+                      ),
+                    ],
+                  ),
+      ),
+    );
+  }
+
+  void _showAreaSelector() {
+    showCupertinoModalPopup(
+      context: context,
+      builder: (context) => CupertinoActionSheet(
+        title: const Text('Select Practice Area'),
+        actions: _practiceAreas.map((area) => 
+          CupertinoActionSheetAction(
+            child: Text(area.name),
+            onPressed: () {
+              setState(() => _selectedAreaId = area.recordName);
+              Navigator.pop(context);
+            },
+          ),
+        ).toList(),
+        cancelButton: CupertinoActionSheetAction(
+          child: const Text('Cancel'),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+    );
+  }
+}
+
+class _ColorLegendItem extends StatelessWidget {
+  final Color color;
+  final String label;
+
+  const _ColorLegendItem({required this.color, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 16,
+          height: 16,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.grey.shade300, width: 1),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 10, color: CupertinoColors.secondaryLabel),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+}
+
+class BubbleVisualizationWidget extends StatelessWidget {
+  final PracticeArea practiceArea;
+  final Map<String, int> sessionCounts;
+  final Color Function(String) getIntensityColor;
+  final double Function(String) getBubbleThickness;
+
+  const BubbleVisualizationWidget({
+    super.key,
+    required this.practiceArea,
+    required this.sessionCounts,
+    required this.getIntensityColor,
+    required this.getBubbleThickness,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.grey.shade50,
+            Colors.grey.shade100,
+          ],
+        ),
+      ),
+      child: CustomPaint(
+        painter: BubblePainter(
+          practiceArea: practiceArea,
+          sessionCounts: sessionCounts,
+          getIntensityColor: getIntensityColor,
+          getBubbleThickness: getBubbleThickness,
+        ),
+        child: Container(),
+      ),
+    );
+  }
+}
+
+class BubblePainter extends CustomPainter {
+  final PracticeArea practiceArea;
+  final Map<String, int> sessionCounts;
+  final Color Function(String) getIntensityColor;
+  final double Function(String) getBubbleThickness;
+
+  BubblePainter({
+    required this.practiceArea,
+    required this.sessionCounts,
+    required this.getIntensityColor,
+    required this.getBubbleThickness,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    
+    // Draw center bubble (practice area) with gradient
+    const centerRadius = 80.0;
+    final centerGradient = RadialGradient(
+      colors: [
+        Colors.white,
+        Colors.grey.shade100,
+        Colors.grey.shade200,
+      ],
+      stops: const [0.0, 0.7, 1.0],
+    );
+    
+    final centerPaint = Paint()
+      ..shader = centerGradient.createShader(Rect.fromCircle(center: center, radius: centerRadius))
+      ..style = PaintingStyle.fill;
+    
+    canvas.drawCircle(center, centerRadius, centerPaint);
+    
+    // Draw center shadow
+    final shadowPaint = Paint()
+      ..color = Colors.black12
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+    canvas.drawCircle(center + const Offset(2, 2), centerRadius, shadowPaint);
+    
+    // Draw center border with subtle gradient
+    final centerBorderPaint = Paint()
+      ..color = Colors.grey.shade300
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0;
+    
+    canvas.drawCircle(center, centerRadius, centerBorderPaint);
+    
+    // Draw practice area name
+    final centerTextPainter = TextPainter(
+      text: TextSpan(
+        text: practiceArea.name,
+        style: const TextStyle(
+          color: Colors.black87,
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    centerTextPainter.layout(maxWidth: centerRadius * 1.5);
+    centerTextPainter.paint(
+      canvas,
+      center - Offset(centerTextPainter.width / 2, centerTextPainter.height / 2),
+    );
+    
+    // Draw practice item bubbles around the center
+    final items = practiceArea.practiceItems;
+    if (items.isEmpty) return;
+    
+    const itemRadius = 50.0;
+    const orbitRadius = 180.0;
+    final angleStep = (2 * math.pi) / items.length;
+    
+    for (int i = 0; i < items.length; i++) {
+      final item = items[i];
+      final angle = angleStep * i - math.pi / 2; // Start from top
+      final itemCenter = Offset(
+        center.dx + orbitRadius * math.cos(angle),
+        center.dy + orbitRadius * math.sin(angle),
+      );
+      
+      // Ensure bubble stays within bounds
+      final clampedCenter = Offset(
+        itemCenter.dx.clamp(itemRadius, size.width - itemRadius),
+        itemCenter.dy.clamp(itemRadius, size.height - itemRadius),
+      );
+      
+      // Draw shadow for practice item bubble
+      final itemShadowPaint = Paint()
+        ..color = Colors.black12
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
+      canvas.drawCircle(clampedCenter + const Offset(1, 1), itemRadius, itemShadowPaint);
+      
+      // Draw practice item bubble with gradient
+      final itemColor = getIntensityColor(item.id);
+      final itemGradient = RadialGradient(
+        colors: [
+          itemColor.withOpacity(0.8),
+          itemColor,
+          itemColor.withOpacity(0.9),
+        ],
+        stops: const [0.0, 0.6, 1.0],
+      );
+      
+      final itemPaint = Paint()
+        ..shader = itemGradient.createShader(Rect.fromCircle(center: clampedCenter, radius: itemRadius))
+        ..style = PaintingStyle.fill;
+      
+      canvas.drawCircle(clampedCenter, itemRadius, itemPaint);
+      
+      // Draw bubble border with thickness based on practice frequency
+      final borderThickness = getBubbleThickness(item.id);
+      final borderPaint = Paint()
+        ..color = itemColor.withOpacity(0.9)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = borderThickness;
+      
+      canvas.drawCircle(clampedCenter, itemRadius, borderPaint);
+      
+      // Draw practice item name
+      final itemTextPainter = TextPainter(
+        text: TextSpan(
+          text: item.name,
+          style: const TextStyle(
+            color: Colors.black87,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+        textAlign: TextAlign.center,
+      );
+      itemTextPainter.layout(maxWidth: itemRadius * 1.8);
+      itemTextPainter.paint(
+        canvas,
+        clampedCenter - Offset(itemTextPainter.width / 2, itemTextPainter.height / 2 + 5),
+      );
+      
+      // Draw session count
+      final sessionCount = sessionCounts[item.id] ?? 0;
+      final countTextPainter = TextPainter(
+        text: TextSpan(
+          text: '$sessionCount',
+          style: const TextStyle(
+            color: Colors.black54,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      );
+      countTextPainter.layout();
+      countTextPainter.paint(
+        canvas,
+        clampedCenter - Offset(countTextPainter.width / 2, -10),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+class PracticeTimeHistoryScreen extends StatefulWidget {
+  const PracticeTimeHistoryScreen({super.key});
+
+  @override
+  State<PracticeTimeHistoryScreen> createState() => _PracticeTimeHistoryScreenState();
+}
+
+class _PracticeTimeHistoryScreenState extends State<PracticeTimeHistoryScreen> {
   Map<String, int> _totalPracticeTime = {};
   bool _isLoading = true;
 
@@ -300,12 +711,9 @@ class _StatsScreenState extends State<StatsScreen> {
   }
 
   Future<void> _loadStats() async {
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     try {
-      // Get all stats and calculate practice time per date
       final allStats = await Statistics.getAll();
       final Map<String, int> timeByDate = {};
       
@@ -341,12 +749,28 @@ class _StatsScreenState extends State<StatsScreen> {
     }
   }
 
+  String _formatDisplayDate(String dateString) {
+    final date = DateTime.parse(dateString);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final selectedDateTime = DateTime(date.year, date.month, date.day);
+    
+    if (selectedDateTime == today) {
+      return 'Today';
+    } else if (selectedDateTime == today.subtract(const Duration(days: 1))) {
+      return 'Yesterday';
+    } else {
+      final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return '${months[date.month - 1]} ${date.day}, ${date.year}';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
       navigationBar: const CupertinoNavigationBar(
-        middle: Text('Practice Stats'),
-        transitionBetweenRoutes: false,
+        middle: Text('Practice Time History'),
       ),
       child: SafeArea(
         child: _isLoading
@@ -356,27 +780,11 @@ class _StatsScreenState extends State<StatsScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
-                          CupertinoIcons.chart_bar,
-                          size: 64,
-                          color: CupertinoColors.systemGrey,
-                        ),
+                        Icon(CupertinoIcons.time, size: 64, color: CupertinoColors.systemGrey),
                         SizedBox(height: 16),
-                        Text(
-                          'No practice data yet',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: CupertinoColors.systemGrey,
-                          ),
-                        ),
+                        Text('No practice data yet', style: TextStyle(fontSize: 18, color: CupertinoColors.systemGrey)),
                         SizedBox(height: 8),
-                        Text(
-                          'Start practicing to see your stats!',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: CupertinoColors.systemGrey2,
-                          ),
-                        ),
+                        Text('Start practicing to see your history!', style: TextStyle(fontSize: 14, color: CupertinoColors.systemGrey2)),
                       ],
                     ),
                   )
@@ -385,38 +793,11 @@ class _StatsScreenState extends State<StatsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Practice History button at the top
-                        SizedBox(
-                          width: double.infinity,
-                          child: CupertinoButton.filled(
-                            child: const Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(CupertinoIcons.clock, color: CupertinoColors.white),
-                                SizedBox(width: 8),
-                                Text('View Practice History'),
-                              ],
-                            ),
-                            onPressed: () {
-                              Navigator.of(context).push(
-                                CupertinoPageRoute(
-                                  builder: (_) => const PracticeHistoryScreen(),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        
                         const Text(
                           'Total Practice Time by Date',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 16),
-                        
                         Expanded(
                           child: ListView.builder(
                             itemCount: _totalPracticeTime.keys.length,
@@ -441,10 +822,7 @@ class _StatsScreenState extends State<StatsScreen> {
                                     children: [
                                       Text(
                                         _formatDisplayDate(date),
-                                        style: const TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w500,
-                                        ),
+                                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
                                       ),
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -473,23 +851,6 @@ class _StatsScreenState extends State<StatsScreen> {
                   ),
       ),
     );
-  }
-
-  String _formatDisplayDate(String dateString) {
-    final date = DateTime.parse(dateString);
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final selectedDateTime = DateTime(date.year, date.month, date.day);
-    
-    if (selectedDateTime == today) {
-      return 'Today';
-    } else if (selectedDateTime == today.subtract(const Duration(days: 1))) {
-      return 'Yesterday';
-    } else {
-      final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      return '${months[date.month - 1]} ${date.day}, ${date.year}';
-    }
   }
 }
 

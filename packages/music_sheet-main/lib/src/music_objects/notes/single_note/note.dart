@@ -401,8 +401,8 @@ class NoteRenderer with DebugRenderMixin implements MusicalSymbolRenderer {
         text: extension,
         style: TextStyle(
           color: Colors.white,
-          fontSize: 12 / layout.canvasScale,
-          fontWeight: FontWeight.w600,
+          fontSize: 13 / layout.canvasScale,
+          fontWeight: FontWeight.bold,
         ),
       ),
       textDirection: TextDirection.ltr,
@@ -416,8 +416,8 @@ class NoteRenderer with DebugRenderMixin implements MusicalSymbolRenderer {
     final noteHeadCenter = noteHeadBounds.center;
 
     // Calculate container size with padding
-    const padding = 4.0;
-    final containerWidth = textPainter.width + (padding * 2);
+    const padding = 4.5;
+    final containerWidth = textPainter.width + (padding * 2.34);
     final containerHeight = textPainter.height + (padding * 2);
 
     // Position the container based on stem direction
