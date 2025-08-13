@@ -1936,6 +1936,248 @@ class _SongViewerScreenState extends State<SongViewerScreen>
     return result;
   }
 
+  /// Builds the key controls section (key button and indicator)
+  Widget _buildKeyControls() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Transform.scale(
+          scale: 0.8,
+          child: _buildOriginalKeyButton(),
+        ),
+        const SizedBox(height: 4),
+        Transform.scale(
+          scale: 0.8,
+          child: _buildCurrentKeyIndicator(),
+        ),
+      ],
+    );
+  }
+
+  /// Builds the zoom and draw controls section
+  Widget _buildZoomAndDrawControls(Color surfaceColor) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Zoom controls
+        ClayContainer(
+          color: surfaceColor,
+          borderRadius: 8,
+          depth: 4,
+          spread: 1,
+          child: IconButton(
+            icon: const Icon(Icons.zoom_in, size: 20),
+            onPressed: _zoomIn,
+            tooltip: 'Zoom In',
+            constraints: const BoxConstraints(
+              minWidth: 36,
+              minHeight: 36,
+            ),
+            padding: const EdgeInsets.all(4),
+          ),
+        ),
+        const SizedBox(width: 4),
+        ClayContainer(
+          color: surfaceColor,
+          borderRadius: 8,
+          depth: 4,
+          spread: 1,
+          child: IconButton(
+            icon: const Icon(Icons.zoom_out, size: 20),
+            onPressed: _zoomOut,
+            tooltip: 'Zoom Out',
+            constraints: const BoxConstraints(
+              minWidth: 36,
+              minHeight: 36,
+            ),
+            padding: const EdgeInsets.all(4),
+          ),
+        ),
+        const SizedBox(width: 8),
+        // Drawing mode toggle button
+        ClayContainer(
+          color: _isDrawingMode 
+            ? CupertinoColors.systemBlue.withOpacity(0.8)
+            : surfaceColor,
+          borderRadius: 8,
+          depth: _isDrawingMode ? 2 : 4,
+          spread: 1,
+          child: IconButton(
+            icon: Icon(
+              _isDrawingMode ? Icons.edit_off : Icons.draw,
+              size: 20,
+              color: _isDrawingMode ? Colors.white : null,
+            ),
+            onPressed: () {
+              setState(() {
+                _isDrawingMode = !_isDrawingMode;
+                // Drawings are preserved automatically since we're not clearing the controller
+              });
+              // Save drawing state when exiting drawing mode
+              if (!_isDrawingMode) {
+                _saveDrawingData();
+              }
+            },
+            tooltip: _isDrawingMode ? 'Exit Drawing Mode' : 'Enter Drawing Mode',
+            constraints: const BoxConstraints(
+              minWidth: 36,
+              minHeight: 36,
+            ),
+            padding: const EdgeInsets.all(4),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Builds the extension numbering controls section
+  Widget _buildExtensionControls(Color surfaceColor) {
+    return ClayContainer(
+      color: surfaceColor,
+      borderRadius: 12,
+      depth: 3,
+      spread: 1,
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header text with improved styling
+            Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: surfaceColor,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                'Extension # Relative To:',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.primary,
+                  fontSize: 12.75,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(height: 4),
+            // Toggle buttons with improved styling
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ClayContainer(
+                  color: _extensionNumbersRelativeToChords
+                      ? CupertinoColors.systemBlue.withOpacity(0.3)
+                      : surfaceColor,
+                  borderRadius: 6,
+                  depth: _extensionNumbersRelativeToChords ? 1 : 2,
+                  spread: 0,
+                  child: GestureDetector(
+                    onTap: () => _toggleExtensionNumbering(true),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      child: Text(
+                        'chord',
+                        style: TextStyle(
+                          color: _extensionNumbersRelativeToChords
+                              ? Colors.white
+                              : Colors.black87,
+                          fontSize: 12.75,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 2),
+                ClayContainer(
+                  color: !_extensionNumbersRelativeToChords
+                      ? CupertinoColors.systemBlue.withOpacity(0.3)
+                      : surfaceColor,
+                  borderRadius: 6,
+                  depth: !_extensionNumbersRelativeToChords ? 1 : 2,
+                  spread: 0,
+                  child: GestureDetector(
+                    onTap: () => _toggleExtensionNumbering(false),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      child: Text(
+                        'key',
+                        style: TextStyle(
+                          color: !_extensionNumbersRelativeToChords
+                              ? Colors.white
+                              : Colors.black87,
+                          fontSize: 12.75,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Shows help dialog for sheet music interactions
+  void _showSheetMusicHelp() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.help_outline, color: Colors.blue),
+              SizedBox(width: 8),
+              Text('Sheet Music Help'),
+            ],
+          ),
+          content: const Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('• ', style: TextStyle(fontWeight: FontWeight.bold)),
+                  Expanded(
+                    child: Text(
+                      'Hold and drag chord symbols to add progression to practice items',
+                      style: TextStyle(fontSize: 14),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 12),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('• ', style: TextStyle(fontWeight: FontWeight.bold)),
+                  Expanded(
+                    child: Text(
+                      'Orange chord symbols represent a sequence of non-diatonic chords. Press an orange chord symbol to change the relative key for that chord sequence',
+                      style: TextStyle(fontSize: 14),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Got it'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   /// Builds the current key indicator text below the buttons
   Widget _buildCurrentKeyIndicator() {
     final theme = Theme.of(context);
@@ -3428,8 +3670,9 @@ class _SongViewerScreenState extends State<SongViewerScreen>
             child: SafeArea(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Column(
-                  children: [
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
                     const SizedBox(height: 16),
                     // Key signature controls
                     Container(
@@ -3443,192 +3686,42 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                           padding: const EdgeInsets.all(16),
                           child: Column(
                             children:[
-                              // Main controls row with key controls, zoom/draw controls, and extension numbering
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  // Key signature controls (smaller)
-                                  Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Transform.scale(
-                                        scale: 0.8,
-                                        child: _buildOriginalKeyButton(),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Transform.scale(
-                                        scale: 0.8,
-                                        child: _buildCurrentKeyIndicator(),
-                                      ),
-                                    ],
-                                  ),
+                              // Main controls with responsive layout
+                              LayoutBuilder(
+                                builder: (context, constraints) {
+                                  // Check if we have enough width for single row layout
+                                  final isWideScreen = constraints.maxWidth > 600;
                                   
-                                  // Center controls (zoom and drawing)
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      // Zoom controls
-                                      ClayContainer(
-                                        color: surfaceColor,
-                                        borderRadius: 8,
-                                        depth: 4,
-                                        spread: 1,
-                                        child: IconButton(
-                                          icon: const Icon(Icons.zoom_in, size: 20),
-                                          onPressed: _zoomIn,
-                                          tooltip: 'Zoom In',
-                                          constraints: const BoxConstraints(
-                                            minWidth: 36,
-                                            minHeight: 36,
-                                          ),
-                                          padding: const EdgeInsets.all(4),
+                                  if (isWideScreen) {
+                                    // Wide screen: single row layout
+                                    return Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      crossAxisAlignment: CrossAxisAlignment.center,
+                                      children: [
+                                        _buildKeyControls(),
+                                        _buildZoomAndDrawControls(surfaceColor),
+                                        _buildExtensionControls(surfaceColor),
+                                      ],
+                                    );
+                                  } else {
+                                    // Narrow screen: wrapped layout
+                                    return Column(
+                                      children: [
+                                        // Top row: Key controls and extension controls
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            _buildKeyControls(),
+                                            _buildExtensionControls(surfaceColor),
+                                          ],
                                         ),
-                                      ),
-                                      const SizedBox(width: 4),
-                                      ClayContainer(
-                                        color: surfaceColor,
-                                        borderRadius: 8,
-                                        depth: 4,
-                                        spread: 1,
-                                        child: IconButton(
-                                          icon: const Icon(Icons.zoom_out, size: 20),
-                                          onPressed: _zoomOut,
-                                          tooltip: 'Zoom Out',
-                                          constraints: const BoxConstraints(
-                                            minWidth: 36,
-                                            minHeight: 36,
-                                          ),
-                                          padding: const EdgeInsets.all(4),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      // Drawing mode toggle button
-                                      ClayContainer(
-                                        color: _isDrawingMode 
-                                          ? CupertinoColors.systemBlue.withOpacity(0.8)
-                                          : surfaceColor,
-                                        borderRadius: 8,
-                                        depth: _isDrawingMode ? 2 : 4,
-                                        spread: 1,
-                                        child: IconButton(
-                                          icon: Icon(
-                                            _isDrawingMode ? Icons.edit_off : Icons.draw,
-                                            size: 20,
-                                            color: _isDrawingMode ? Colors.white : null,
-                                          ),
-                                          onPressed: () {
-                                            setState(() {
-                                              _isDrawingMode = !_isDrawingMode;
-                                              // Drawings are preserved automatically since we're not clearing the controller
-                                            });
-                                            // Save drawing state when exiting drawing mode
-                                            if (!_isDrawingMode) {
-                                              _saveDrawingData();
-                                            }
-                                          },
-                                          tooltip: _isDrawingMode ? 'Exit Drawing Mode' : 'Enter Drawing Mode',
-                                          constraints: const BoxConstraints(
-                                            minWidth: 36,
-                                            minHeight: 36,
-                                          ),
-                                          padding: const EdgeInsets.all(4),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  
-                                  // Extension numbering controls (improved styling)
-                                  ClayContainer(
-                                    color: surfaceColor,
-                                    borderRadius: 12,
-                                    depth: 3,
-                                    spread: 1,
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(8),
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          // Header text with improved styling
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: 6, vertical: 2),
-                                            decoration: BoxDecoration(
-                                              color: surfaceColor,
-                                              borderRadius: BorderRadius.circular(4),
-                                            ),
-                                            child: Text(
-                                              'Extension # Relative To:',
-                                              style: TextStyle(
-                                                color: Theme.of(context).colorScheme.primary,
-                                                fontSize: 10,
-                                                fontWeight: FontWeight.w700,
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          // Toggle buttons with improved styling
-                                          Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              ClayContainer(
-                                                color: _extensionNumbersRelativeToChords
-                                                    ? CupertinoColors.systemBlue.withOpacity(0.3)
-                                                    : surfaceColor,
-                                                borderRadius: 6,
-                                                depth: _extensionNumbersRelativeToChords ? 1 : 2,
-                                                spread: 0,
-                                                child: GestureDetector(
-                                                  onTap: () => _toggleExtensionNumbering(true),
-                                                  child: Container(
-                                                    padding: const EdgeInsets.symmetric(
-                                                        horizontal: 8, vertical: 4),
-                                                    child: Text(
-                                                      'chord',
-                                                      style: TextStyle(
-                                                        color: _extensionNumbersRelativeToChords
-                                                            ? Colors.white
-                                                            : Colors.black87,
-                                                        fontSize: 10,
-                                                        fontWeight: FontWeight.w600,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                              const SizedBox(width: 2),
-                                              ClayContainer(
-                                                color: !_extensionNumbersRelativeToChords
-                                                    ? CupertinoColors.systemBlue.withOpacity(0.3)
-                                                    : surfaceColor,
-                                                borderRadius: 6,
-                                                depth: !_extensionNumbersRelativeToChords ? 1 : 2,
-                                                spread: 0,
-                                                child: GestureDetector(
-                                                  onTap: () => _toggleExtensionNumbering(false),
-                                                  child: Container(
-                                                    padding: const EdgeInsets.symmetric(
-                                                        horizontal: 8, vertical: 4),
-                                                    child: Text(
-                                                      'key',
-                                                      style: TextStyle(
-                                                        color: !_extensionNumbersRelativeToChords
-                                                            ? Colors.white
-                                                            : Colors.black87,
-                                                        fontSize: 10,
-                                                        fontWeight: FontWeight.w600,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                                        const SizedBox(height: 8),
+                                        // Bottom row: Zoom/draw controls centered
+                                        Center(child: _buildZoomAndDrawControls(surfaceColor)),
+                                      ],
+                                    );
+                                  }
+                                },
                               ),
                             ]
                           ),
@@ -3647,67 +3740,56 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                     
                     // Sheet Music Display with Canvas-based Chord Symbols
                     if (_chordMeasures.isNotEmpty)
-                      Expanded(
-                        child: Container(
+                      Container(
+                        height: 600,
                         margin: const EdgeInsets.symmetric(vertical: 8),
                         child: ClayContainer(
                           color: surfaceColor,
                           borderRadius: 20,
                           depth: 10,
                           spread: 3,
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: _buildSheetMusicWithDrawings(),
-                            ),
+                          child: Stack(
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: SingleChildScrollView(
+                                  scrollDirection: Axis.horizontal,
+                                  child: _buildSheetMusicWithDrawings(),
+                                ),
+                              ),
+                              // Help button in top left
+                              Positioned(
+                                top: 8,
+                                left: 8,
+                                child: ClayContainer(
+                                  color: surfaceColor,
+                                  borderRadius: 15,
+                                  depth: 4,
+                                  spread: 1,
+                                  child: IconButton(
+                                    icon: const Icon(
+                                      Icons.help_outline,
+                                      size: 20,
+                                      color: Colors.grey,
+                                    ),
+                                    onPressed: _showSheetMusicHelp,
+                                    tooltip: 'Sheet Music Help',
+                                    constraints: const BoxConstraints(
+                                      minWidth: 30,
+                                      minHeight: 30,
+                                    ),
+                                    padding: const EdgeInsets.all(4),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
                         ),
                       ),
                     const SizedBox(height: 20),
                     // Chord progression creation button (appears when chords are selected)
                     _buildChordProgressionButton(),
-                    // Help text for long press selection
-                    if (_selectedChordIndices.isEmpty && !_isLongPressing)
-                      Container(
-                        margin: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 8),
-                        child: const ClayContainer(
-                          color: CupertinoColors.extraLightBackgroundGray,
-                          borderRadius: 12,
-                          depth: 8,
-                          spread: 2,
-                          child: Padding(
-                            padding: EdgeInsets.all(12),
-                            child: Column(
-                              children: [
-                                Row(
-                                  children: [
-                                    Icon(
-                                      Icons.info_outline,
-                                      color: Colors.black,
-                                      size: 20,
-                                    ),
-                                    SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        'Hold and drag on chord symbols to select and add progression to practice items.',
-                                        style: TextStyle(
-                                          color: Colors.black,
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    // Beat timeline - positioned right after sheet music
+
                     // Center(
                     //   child: SizedBox(
                     //     width: MediaQuery.of(context).size.width * 0.8,
@@ -3720,7 +3802,6 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                     //     ),
                     //   ),
                     // ),
-                    const SizedBox(height: 16),
                     const ActiveSessionBanner(),
                     // Practice items widget
                     _buildPracticeItemsWidget(),
@@ -3730,6 +3811,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                     const SizedBox(height: 20), // Bottom padding for scroll
                   ],
                 ),
+              ),
               ),
             ),
           ), // MouseRegio
