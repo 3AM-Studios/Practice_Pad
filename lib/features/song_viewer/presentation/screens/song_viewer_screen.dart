@@ -25,7 +25,6 @@ import 'package:practice_pad/features/practice/presentation/pages/practice_sessi
 import 'package:practice_pad/features/edit_items/presentation/viewmodels/edit_items_viewmodel.dart';
 import 'package:provider/provider.dart';
 import 'package:music_sheet/index.dart';
-import 'package:music_sheet/src/music_objects/interface/musical_symbol.dart';
 import 'package:practice_pad/services/local_storage_service.dart';
 
 class SongViewerScreen extends StatefulWidget {
@@ -1313,6 +1312,9 @@ class _SongViewerScreenState extends State<SongViewerScreen>
       */
       print('Metronome disabled - add proper audio assets to enable');
 
+      // Load any saved sheet music modifications before finishing
+      await _loadSheetMusic();
+      
       setState(() {
         _isLoading = false;
       });
@@ -2756,6 +2758,9 @@ class _SongViewerScreenState extends State<SongViewerScreen>
       print(
           '🎵 Inserted symbol ${symbol.runtimeType} at measure $measureIndex, position $positionIndex. Invalidating cache.');
     });
+    
+    // 4. Save sheet music to persistence
+    _saveSheetMusic();
   }
 
   /// Updates a musical symbol in a measure at a specific position.
@@ -2788,6 +2793,9 @@ class _SongViewerScreenState extends State<SongViewerScreen>
       print(
           '🎵 Updated symbol at measure $measureIndex, position $positionIndex. Invalidating cache.');
     });
+    
+    // 4. Save sheet music to persistence
+    _saveSheetMusic();
   }
 
   /// Deletes a musical symbol from a measure at a specific position.
@@ -2819,8 +2827,73 @@ class _SongViewerScreenState extends State<SongViewerScreen>
       print(
           '🎵 Deleted symbol at measure $measureIndex, position $positionIndex. Invalidating cache.');
     });
+    
+    // 4. Save sheet music to persistence
+    _saveSheetMusic();
   }
 
+  /// Save current sheet music state to local storage
+  Future<void> _saveSheetMusic() async {
+    try {
+      // Convert ChordMeasures to regular Measures for persistence
+      final measures = _chordMeasures.map((chordMeasure) => music_sheet.Measure(
+        chordMeasure.musicalSymbols,
+        isNewLine: chordMeasure.isNewLine,
+        // Note: chordSymbols will be saved separately later
+      )).toList();
+      
+      await LocalStorageService.saveSheetMusicForSong(widget.songAssetPath, measures);
+      developer.log('💾 Saved sheet music for ${widget.songAssetPath}');
+    } catch (e) {
+      developer.log('❌ Error saving sheet music: $e', error: e);
+    }
+  }
+
+  /// Load saved sheet music modifications from local storage
+  Future<void> _loadSheetMusic() async {
+    try {
+      final savedMeasures = await LocalStorageService.loadSheetMusicForSong(widget.songAssetPath);
+      if (savedMeasures.isNotEmpty) {
+        setState(() {
+          // Convert saved measures to ChordMeasures, merging with original symbols
+          final updatedMeasures = <ChordMeasure>[];
+          for (int i = 0; i < savedMeasures.length && i < _chordMeasures.length; i++) {
+            final savedMeasure = savedMeasures[i];
+            final originalChordMeasure = _chordMeasures[i];
+            
+            // Separate original symbols into clefs/time signatures vs modifiable symbols
+            final originalNonModifiableSymbols = originalChordMeasure.musicalSymbols.where((symbol) {
+              return symbol is Clef || symbol is KeySignature || symbol is TimeSignature;
+            }).toList();
+            
+            // Combine: original non-modifiable symbols + saved modifiable symbols
+            final combinedSymbols = <MusicalSymbol>[
+              ...originalNonModifiableSymbols,
+              ...savedMeasure.musicalSymbols,
+            ];
+            
+            updatedMeasures.add(ChordMeasure(
+              combinedSymbols,
+              chordSymbols: originalChordMeasure.chordSymbols, // Preserve original chord symbols
+              isNewLine: savedMeasure.isNewLine,
+            ));
+          }
+          
+          // If there are more original measures, keep them unchanged
+          if (_chordMeasures.length > savedMeasures.length) {
+            updatedMeasures.addAll(_chordMeasures.sublist(savedMeasures.length));
+          }
+          
+          _chordMeasures = updatedMeasures;
+          _cachedSheetMusicWidget = null; // Invalidate cache
+          _lastRenderedMeasures = null;
+        });
+        developer.log('📖 Loaded ${savedMeasures.length} modified measures for ${widget.songAssetPath}');
+      }
+    } catch (e) {
+      developer.log('❌ Error loading sheet music: $e', error: e);
+    }
+  }
 
   /// Builds the drawing overlay with sheet music as background
   Widget _buildDrawingOverlay() {

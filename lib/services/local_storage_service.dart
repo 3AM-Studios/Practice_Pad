@@ -1,10 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:practice_pad/models/practice_area.dart';
 import 'package:practice_pad/models/practice_item.dart';
 import 'package:practice_pad/models/chord_progression.dart';
 import 'package:practice_pad/features/song_viewer/data/models/song.dart';
+import 'package:music_sheet/index.dart';
 import 'dart:developer' as developer;
 
 /// Local storage service for persisting app data
@@ -14,6 +16,7 @@ class LocalStorageService {
   static const String _weeklyScheduleFileName = 'weekly_schedule.json';
   static const String _songChangesFileName = 'song_changes.json';
   static const String _chordKeysFileName = 'chord_keys.json';
+  static const String _sheetMusicFileName = 'sheet_music.json';
 
   /// Save practice areas to local storage
   static Future<void> savePracticeAreas(List<PracticeArea> areas) async {
@@ -309,6 +312,195 @@ class LocalStorageService {
     );
   }
 
+  /// Save sheet music data for a specific song
+  static Future<void> saveSheetMusicForSong(String songId, List<Measure> measures) async {
+    try {
+      final allSheetMusic = await loadAllSheetMusic();
+      allSheetMusic[songId] = measures.map((measure) => _measureToJson(measure)).toList();
+      
+      final file = await _getFile(_sheetMusicFileName);
+      await file.writeAsString(json.encode(allSheetMusic));
+      developer.log('Saved sheet music for song: $songId (${measures.length} measures)');
+    } catch (e) {
+      developer.log('Error saving sheet music: $e', error: e);
+      throw Exception('Failed to save sheet music: $e');
+    }
+  }
+
+  /// Load sheet music data for a specific song
+  static Future<List<Measure>> loadSheetMusicForSong(String songId) async {
+    try {
+      final allSheetMusic = await loadAllSheetMusic();
+      final measureData = allSheetMusic[songId] ?? [];
+      final measures = measureData.map((json) => _measureFromJson(json)).toList();
+      developer.log('Loaded sheet music for song: $songId (${measures.length} measures)');
+      return measures;
+    } catch (e) {
+      developer.log('Error loading sheet music for $songId: $e', error: e);
+      return [];
+    }
+  }
+
+  /// Load all sheet music data
+  static Future<Map<String, List<dynamic>>> loadAllSheetMusic() async {
+    try {
+      final file = await _getFile(_sheetMusicFileName);
+      if (!await file.exists()) {
+        developer.log('Sheet music file does not exist, returning empty map');
+        return {};
+      }
+
+      final content = await file.readAsString();
+      if (content.trim().isEmpty) {
+        developer.log('Sheet music file is empty, returning empty map');
+        return {};
+      }
+
+      final Map<String, dynamic> jsonData = json.decode(content);
+      final sheetMusic = jsonData.map((songId, measures) => MapEntry(
+        songId,
+        List<dynamic>.from(measures as List),
+      ));
+      developer.log('Loaded sheet music for ${sheetMusic.length} songs');
+      return sheetMusic;
+    } catch (e) {
+      developer.log('Error loading all sheet music: $e', error: e);
+      return {};
+    }
+  }
+
+  /// Convert Measure to JSON (excluding clefs and time signatures)
+  static Map<String, dynamic> _measureToJson(Measure measure) {
+    // Filter out clefs and time signatures - only save modifiable symbols
+    final modifiableSymbols = measure.musicalSymbols.where((symbol) {
+      return symbol is! Clef && symbol is! KeySignature && symbol is! TimeSignature;
+    }).toList();
+
+    return {
+      'musicalSymbols': modifiableSymbols.map((symbol) => _musicalSymbolToJson(symbol)).toList(),
+      'isNewLine': measure.isNewLine,
+      // Note: chordSymbols serialization will be added later
+    };
+  }
+
+  /// Convert JSON to Measure
+  static Measure _measureFromJson(Map<String, dynamic> json) {
+    final symbolsData = json['musicalSymbols'] as List? ?? [];
+    final symbols = symbolsData.map((symbolJson) => _musicalSymbolFromJson(symbolJson)).toList();
+    
+    // If no symbols, add a quarter rest as default
+    if (symbols.isEmpty) {
+      symbols.add(Rest(RestType.quarter));
+    }
+
+    return Measure(
+      symbols,
+      isNewLine: json['isNewLine'] as bool? ?? false,
+      // Note: chordSymbols deserialization will be added later
+    );
+  }
+
+  /// Convert MusicalSymbol to JSON
+  static Map<String, dynamic> _musicalSymbolToJson(MusicalSymbol symbol) {
+    if (symbol is Note) {
+      return {
+        'type': 'Note',
+        'id': symbol.id,
+        'pitch': symbol.pitch.name,
+        'noteDuration': symbol.noteDuration.name,
+        'accidental': symbol.accidental?.name,
+        'color': symbol.color.value,
+        'margin': {
+          'left': symbol.margin.left,
+          'top': symbol.margin.top,
+          'right': symbol.margin.right,
+          'bottom': symbol.margin.bottom,
+        },
+      };
+    } else if (symbol is Rest) {
+      return {
+        'type': 'Rest',
+        'id': symbol.id,
+        'restType': symbol.restType.name,
+        'color': symbol.color.value,
+        'margin': {
+          'left': symbol.margin.left,
+          'top': symbol.margin.top,
+          'right': symbol.margin.right,
+          'bottom': symbol.margin.bottom,
+        },
+      };
+    } else {
+      // For other symbol types, store basic info but they won't be fully reconstructed
+      return {
+        'type': symbol.runtimeType.toString(),
+        'id': symbol.id,
+        'color': symbol.color.value,
+        'margin': {
+          'left': symbol.margin.left,
+          'top': symbol.margin.top,
+          'right': symbol.margin.right,
+          'bottom': symbol.margin.bottom,
+        },
+      };
+    }
+  }
+
+  /// Convert JSON to MusicalSymbol
+  static MusicalSymbol _musicalSymbolFromJson(Map<String, dynamic> json) {
+    final type = json['type'] as String;
+    final id = json['id'] as String?;
+    final colorValue = json['color'] as int? ?? Colors.black.value;
+    final color = Color(colorValue);
+    
+    final marginData = json['margin'] as Map<String, dynamic>? ?? {};
+    final margin = EdgeInsets.fromLTRB(
+      (marginData['left'] as num?)?.toDouble() ?? 2.0,
+      (marginData['top'] as num?)?.toDouble() ?? 0.0,
+      (marginData['right'] as num?)?.toDouble() ?? 2.0,
+      (marginData['bottom'] as num?)?.toDouble() ?? 0.0,
+    );
+
+    switch (type) {
+      case 'Note':
+        final pitchName = json['pitch'] as String;
+        final pitch = Pitch.values.firstWhere((p) => p.name == pitchName);
+        
+        final durationName = json['noteDuration'] as String;
+        final noteDuration = NoteDuration.values.firstWhere((d) => d.name == durationName);
+        
+        Accidental? accidental;
+        final accidentalName = json['accidental'] as String?;
+        if (accidentalName != null) {
+          accidental = Accidental.values.firstWhere((a) => a.name == accidentalName);
+        }
+
+        return Note(
+          pitch,
+          id: id,
+          noteDuration: noteDuration,
+          accidental: accidental,
+          color: color,
+          margin: margin,
+        );
+        
+      case 'Rest':
+        final restTypeName = json['restType'] as String;
+        final restType = RestType.values.firstWhere((r) => r.name == restTypeName);
+        
+        return Rest(
+          restType,
+          color: color,
+          margin: margin,
+        );
+        
+      default:
+        // For unsupported types, return a quarter rest as fallback
+        developer.log('Unsupported musical symbol type: $type, using Rest as fallback');
+        return Rest(RestType.quarter, color: color, margin: margin);
+    }
+  }
+
   /// Clear all local storage
   static Future<void> clearAll() async {
     try {
@@ -318,6 +510,7 @@ class LocalStorageService {
         _weeklyScheduleFileName,
         _songChangesFileName,
         _chordKeysFileName,
+        _sheetMusicFileName,
       ];
 
       for (final fileName in files) {
