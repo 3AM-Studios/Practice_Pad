@@ -2,11 +2,23 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:practice_pad/models/statistics.dart';
+import 'package:clay_containers/clay_containers.dart';
+
+enum CalendarSize {
+  small,   // Compact size
+  medium,  // Default/current size
+  large,   // Expanded size
+}
 
 class PracticeCalendar extends StatefulWidget {
   final VoidCallback? onStatsPressed;
+  final CalendarSize calendarSize;
   
-  const PracticeCalendar({super.key, this.onStatsPressed});
+  const PracticeCalendar({
+    super.key, 
+    this.onStatsPressed,
+    this.calendarSize = CalendarSize.medium, // Default to medium (current size)
+  });
 
   @override
   State<PracticeCalendar> createState() => _PracticeCalendarState();
@@ -16,6 +28,62 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
   DateTime _focusedDay = DateTime.now();
   Set<DateTime> _completedDays = <DateTime>{};
   bool _isLoading = true;
+
+  // Size configuration based on CalendarSize
+  double get _cellSize {
+    switch (widget.calendarSize) {
+      case CalendarSize.small:
+        return 32.0;
+      case CalendarSize.medium:
+        return 40.0; // Current default size
+      case CalendarSize.large:
+        return 48.0;
+    }
+  }
+
+  double get _fontSize {
+    switch (widget.calendarSize) {
+      case CalendarSize.small:
+        return 12.0;
+      case CalendarSize.medium:
+        return 14.0; // Current default
+      case CalendarSize.large:
+        return 16.0;
+    }
+  }
+
+  double get _headerFontSize {
+    switch (widget.calendarSize) {
+      case CalendarSize.small:
+        return 14.0;
+      case CalendarSize.medium:
+        return 16.0; // Current default
+      case CalendarSize.large:
+        return 18.0;
+    }
+  }
+
+  double get _starIconSize {
+    switch (widget.calendarSize) {
+      case CalendarSize.small:
+        return 28.0;
+      case CalendarSize.medium:
+        return 30.0; // Current default
+      case CalendarSize.large:
+        return 42.0;
+    }
+  }
+
+  double get _containerPadding {
+    switch (widget.calendarSize) {
+      case CalendarSize.small:
+        return 12.0;
+      case CalendarSize.medium:
+        return 16.0; // Current default
+      case CalendarSize.large:
+        return 20.0;
+    }
+  }
 
   @override
   void initState() {
@@ -64,7 +132,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+    double dayButtonSpread = 2.12;
     if (_isLoading) {
       return const SizedBox(
         height: 300,
@@ -75,8 +143,8 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
     }
 
     return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(16),
+      margin: EdgeInsets.all(_containerPadding),
+      padding: EdgeInsets.all(_containerPadding),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
@@ -105,28 +173,33 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                 ),
               ),
               CupertinoButton(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                color: theme.colorScheme.primary,
-                borderRadius: BorderRadius.circular(20),
+                padding: EdgeInsets.zero,
                 onPressed: widget.onStatsPressed,
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      CupertinoIcons.chart_bar_square,
-                      size: 16,
-                      color: Colors.white,
+                child: ClayContainer(
+                  color: theme.colorScheme.surface,
+                  borderRadius: 20,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          CupertinoIcons.chart_bar_square,
+                          size: 16,
+                          color: theme.colorScheme.onSurface,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Stats',
+                          style: TextStyle(
+                            color: theme.colorScheme.onSurface,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
-                    SizedBox(width: 4),
-                    Text(
-                      'Stats',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ],
@@ -140,6 +213,8 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
             focusedDay: _focusedDay,
             calendarFormat: CalendarFormat.month,
             startingDayOfWeek: StartingDayOfWeek.sunday,
+            rowHeight: _cellSize,
+            daysOfWeekHeight: _cellSize * 0.8,
             headerStyle: HeaderStyle(
               formatButtonVisible: false,
               titleCentered: true,
@@ -155,35 +230,36 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
               ),
               titleTextStyle: TextStyle(
                 color: theme.colorScheme.onSurface,
-                fontSize: 16,
+                fontSize: _headerFontSize,
                 fontWeight: FontWeight.w600,
               ),
             ),
             daysOfWeekStyle: DaysOfWeekStyle(
               weekdayStyle: TextStyle(
                 color: theme.colorScheme.onSurface.withOpacity(0.7),
-                fontSize: 12,
+                fontSize: _fontSize * 0.85,
                 fontWeight: FontWeight.w500,
               ),
               weekendStyle: TextStyle(
                 color: theme.colorScheme.onSurface.withOpacity(0.7),
-                fontSize: 12,
+                fontSize: _fontSize * 0.85,
                 fontWeight: FontWeight.w500,
               ),
             ),
             calendarStyle: CalendarStyle(
               outsideDaysVisible: false,
+              cellMargin: EdgeInsets.all(_cellSize * 0.1),
               defaultTextStyle: TextStyle(
                 color: theme.colorScheme.onSurface,
-                fontSize: 14,
+                fontSize: _fontSize,
               ),
               weekendTextStyle: TextStyle(
                 color: theme.colorScheme.onSurface,
-                fontSize: 14,
+                fontSize: _fontSize,
               ),
               todayTextStyle: TextStyle(
                 color: theme.colorScheme.onPrimary,
-                fontSize: 14,
+                fontSize: _fontSize,
                 fontWeight: FontWeight.bold,
               ),
               todayDecoration: BoxDecoration(
@@ -206,28 +282,33 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                 if (_isDayCompleted(day)) {
                   return Container(
                     margin: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(
+                    child: ClayContainer(
                       color: Colors.amber,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          const Icon(
-                            CupertinoIcons.star_fill,
-                            size: 36,
-                            color: Colors.white,
+                      borderRadius: _cellSize / 2,
+                      spread: dayButtonSpread,
+                      child: SizedBox(
+                        width: _cellSize - 8,
+                        height: _cellSize - 8,
+                        child: Center(
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              Icon(
+                                CupertinoIcons.star_fill,
+                                size: _starIconSize,
+                                color: Colors.white,
+                              ),
+                              Text(
+                                '${day.day}',
+                                style: TextStyle(
+                                  color: Colors.black,
+                                  fontSize: _fontSize * 0.85,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
                           ),
-                          Text(
-                            '${day.day}',
-                            style: const TextStyle(
-                              color: Colors.black,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
                     ),
                   );
@@ -239,49 +320,62 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                 if (isCompleted) {
                   return Container(
                     margin: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
+                    child: ClayContainer(
                       color: Colors.amber,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: CupertinoColors.systemGrey,
-                        width: 2,
-                      ),
-                    ),
-                    child: Center(
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          const Icon(
-                            CupertinoIcons.star_fill,
-                            size: 36,
-                            color: Colors.white,
+                      borderRadius: _cellSize / 2,
+                      spread: dayButtonSpread,
+                      child: Container(
+                        width: _cellSize - 8,
+                        height: _cellSize - 8,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: CupertinoColors.systemGrey,
+                            width: 2,
                           ),
-                          Text(
-                            '${day.day}',
-                            style: const TextStyle(
-                              color: Colors.black,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
+                        ),
+                        child: Center(
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              Icon(
+                                CupertinoIcons.star_fill,
+                                size: _starIconSize,
+                                color: Colors.white,
+                              ),
+                              Text(
+                                '${day.day}',
+                                style: TextStyle(
+                                  color: Colors.black,
+                                  fontSize: _fontSize * 0.85,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
                     ),
                   );
                 } else {
                   return Container(
                     margin: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
+                    child: ClayContainer(
                       color: theme.colorScheme.primary,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: Text(
-                        '${day.day}',
-                        style: TextStyle(
-                          color: theme.colorScheme.onPrimary,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
+                      borderRadius: _cellSize / 2,
+                      spread: dayButtonSpread,
+                      child: SizedBox(
+                        width: _cellSize - 8,
+                        height: _cellSize - 8,
+                        child: Center(
+                          child: Text(
+                            '${day.day}',
+                            style: TextStyle(
+                              color: theme.colorScheme.onPrimary,
+                              fontSize: _fontSize,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                       ),
                     ),

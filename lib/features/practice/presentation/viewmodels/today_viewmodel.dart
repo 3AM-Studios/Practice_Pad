@@ -3,6 +3,8 @@ import 'package:practice_pad/features/routines/models/day_of_week.dart';
 import 'package:practice_pad/features/routines/presentation/viewmodels/routines_viewmodel.dart';
 import 'package:practice_pad/models/practice_area.dart';
 import 'package:practice_pad/models/practice_item.dart';
+import 'package:practice_pad/models/statistics.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:developer' as developer;
 
 class TodayViewModel extends ChangeNotifier {
@@ -27,11 +29,21 @@ class TodayViewModel extends ChangeNotifier {
   bool _isLoading = false;
   bool get isLoading => _isLoading;
 
+  // Daily goal in minutes
+  int _dailyGoalMinutes = 10;
+  int get dailyGoalMinutes => _dailyGoalMinutes;
+
+  // Today's practice time in minutes
+  int _todaysPracticeMinutes = 0;
+  int get todaysPracticeMinutes => _todaysPracticeMinutes;
+
   TodayViewModel({required RoutinesViewModel routinesViewModel})
       : _routinesViewModel = routinesViewModel {
     developer.log(
         '[TodayViewModel] Initializing. RoutinesVM instance: ${_routinesViewModel.hashCode}',
         name: 'TodayVM');
+    _loadDailyGoal();
+    _loadTodaysPracticeTime();
     _loadTodaysItems();
     _routinesViewModel.addListener(_onRoutinesChanged);
   }
@@ -260,4 +272,62 @@ class TodayViewModel extends ChangeNotifier {
 
   // Get practice items that are currently selected for practice  
   List<PracticeItem> get todaysItems => _selectedPracticeItems;
+
+  // Load daily goal from SharedPreferences
+  Future<void> _loadDailyGoal() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _dailyGoalMinutes = prefs.getInt('daily_goal_minutes') ?? 30;
+      notifyListeners();
+    } catch (e) {
+      _dailyGoalMinutes = 30; // Default fallback
+    }
+  }
+
+  // Save daily goal to SharedPreferences
+  Future<void> _saveDailyGoal() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt('daily_goal_minutes', _dailyGoalMinutes);
+    } catch (e) {
+      developer.log('[TodayViewModel] Error saving daily goal: $e', name: 'TodayVM');
+    }
+  }
+
+  // Load today's practice time from statistics
+  Future<void> _loadTodaysPracticeTime() async {
+    try {
+      final todaysStats = await Statistics.getToday();
+      Duration totalTime = Duration.zero;
+      for (final stat in todaysStats) {
+        totalTime += stat.totalTime;
+      }
+      _todaysPracticeMinutes = totalTime.inMinutes;
+      notifyListeners();
+    } catch (e) {
+      _todaysPracticeMinutes = 0;
+      developer.log('[TodayViewModel] Error loading today\'s practice time: $e', name: 'TodayVM');
+    }
+  }
+
+  // Increase daily goal by 2 minutes
+  Future<void> increaseGoal() async {
+    _dailyGoalMinutes += 2;
+    await _saveDailyGoal();
+    notifyListeners();
+  }
+
+  // Decrease daily goal by 2 minutes (minimum 2 minutes)
+  Future<void> decreaseGoal() async {
+    if (_dailyGoalMinutes > 2) {
+      _dailyGoalMinutes -= 2;
+      await _saveDailyGoal();
+      notifyListeners();
+    }
+  }
+
+  // Refresh today's practice time (call this when practice sessions complete)
+  Future<void> refreshTodaysPracticeTime() async {
+    await _loadTodaysPracticeTime();
+  }
 }

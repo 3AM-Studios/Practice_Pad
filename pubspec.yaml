@@ -57,6 +57,7 @@ dependencies:
   clay_containers: ^0.3.4
   flex_color_scheme: ^8.0.2
   equatable: ^2.0.7
+  shared_preferences: ^2.2.2
 
   flutter_drawing_board: 
     path: packages/flutter_drawing_board

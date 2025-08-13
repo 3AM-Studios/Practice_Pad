@@ -1,4 +1,6 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+import 'package:clay_containers/clay_containers.dart';
 import 'package:practice_pad/models/practice_area.dart';
 import 'package:practice_pad/models/practice_item.dart';
 import 'package:practice_pad/models/statistics.dart';
@@ -30,10 +32,13 @@ class _PracticeAreaTileState extends State<PracticeAreaTile> {
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
-      child: Column(
-        children: [
-          // Area header
-          CupertinoListTile.notched(
+      child: ClayContainer(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: 12,
+        child: Column(
+          children: [
+            // Area header
+            CupertinoListTile.notched(
             title: Text(widget.area.name),
             subtitle: Text(
               widget.area.type == PracticeAreaType.song && widget.area.song != null
@@ -120,7 +125,8 @@ class _PracticeAreaTileState extends State<PracticeAreaTile> {
                 }).toList(),
               ),
             ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -153,7 +159,10 @@ class _PracticeItemSubTileState extends State<_PracticeItemSubTile> {
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(bottom: 4),
-      child: CupertinoListTile.notched(
+      child: ClayContainer(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: 8,
+        child: CupertinoListTile.notched(
         title: Text(
           widget.item.name,
           style: const TextStyle(fontSize: 16),
@@ -234,6 +243,7 @@ class _PracticeItemSubTileState extends State<_PracticeItemSubTile> {
             });
           }
         },
+        ),
       ),
     );
   }
