@@ -1,20 +1,14 @@
 import 'dart:convert';
 import 'dart:core';
 
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:music_sheet/index.dart';
-import 'package:music_sheet/simple_sheet_music.dart';
 import 'package:music_sheet/src/midi/midi_playback_mixin.dart';
-import 'package:music_sheet/src/music_objects/interface/musical_symbol.dart';
-import 'package:music_sheet/src/sheet_music_metrics.dart';
-import 'package:music_sheet/src/sheet_music_renderer.dart';
 import 'package:music_sheet/src/utils/interaction_overlay_painter.dart';
 import 'package:xml/xml.dart';
+import 'package:flutter_drawing_board/flutter_drawing_board.dart' as drawing_board;
 
-import 'music_objects/key_signature/keysignature_type.dart';
-import 'sheet_music_layout.dart';
 import 'widgets/note_editor_popup.dart';
 
 typedef OnTapMusicObjectCallback = void Function(
@@ -53,6 +47,10 @@ class SimpleSheetMusic extends StatefulWidget {
     this.onChordSymbolLongPressEnd,
     this.onChordSymbolHover,
     this.isChordSelected,
+    // Drawing-related parameters
+    this.drawingController,
+    this.isDrawingModeNotifier,
+    this.onDrawingPointerUp,
   });
 
   /// The list of measures to be displayed.
@@ -136,6 +134,15 @@ class SimpleSheetMusic extends StatefulWidget {
   /// Function to get the selection state of a chord symbol
   final bool Function(int globalChordIndex)? isChordSelected;
 
+  /// Drawing controller for annotations
+  final drawing_board.DrawingController? drawingController;
+
+  /// ValueNotifier for drawing mode state
+  final ValueNotifier<bool>? isDrawingModeNotifier;
+
+  /// Callback when drawing pointer is released
+  final Function(PointerUpEvent)? onDrawingPointerUp;
+
   @override
   SimpleSheetMusicState createState() => SimpleSheetMusicState();
 }
@@ -199,7 +206,8 @@ class SimpleSheetMusicState extends State<SimpleSheetMusic>
     super.didUpdateWidget(oldWidget);
     if (widget.measures != oldWidget.measures ||
         widget.width != oldWidget.width ||
-        widget.height != oldWidget.height) {
+        widget.height != oldWidget.height ||
+        widget.canvasScale != oldWidget.canvasScale) {
       _updateLayout();
     }
   }
@@ -536,20 +544,26 @@ void _resetInteractionState() {
         sheetMusicLayout: currentLayout,
         selectedSymbol: _selectedSymbol,
       );
-
+      
       return SingleChildScrollView(
         scrollDirection: Axis.vertical,
         physics: const BouncingScrollPhysics(
           parent: AlwaysScrollableScrollPhysics(),
         ),
         padding: const EdgeInsets.only(bottom: 200.0),
-        child: GestureDetector(
-          onTapDown: _handleTapDown,
-          onTapUp: _handleTapUp,
-          onPanUpdate: _handlePanUpdate,
-          onPanEnd: _handlePanEnd,
-          behavior: HitTestBehavior.deferToChild,
-          child: SizedBox(
+        child: ValueListenableBuilder<bool>(
+          valueListenable: widget.isDrawingModeNotifier ?? ValueNotifier<bool>(false),
+          builder: (context, isDrawingMode, child) {
+            return GestureDetector(
+              onTapDown: isDrawingMode ? null : (details) {
+                print('Sheet music tap detected - drawing mode: $isDrawingMode');
+                _handleTapDown(details);
+              },
+              onTapUp: isDrawingMode ? null : _handleTapUp,
+              onPanUpdate: isDrawingMode ? null : _handlePanUpdate,
+              onPanEnd: isDrawingMode ? null : _handlePanEnd,
+              behavior: HitTestBehavior.deferToChild,
+              child: SizedBox(
             width: widget.width,
             height: currentLayout.totalContentHeight,
             // The Stack is how we layer our static and dynamic painters.
@@ -566,11 +580,34 @@ void _resetInteractionState() {
                   ),
                 ),
 
-                // ===== LAYER 2: Other Overlays (Unchanged) =====
-                // Your existing logic for chord symbols and MIDI highlights remains the same.
+                // ===== LAYER 2: Drawing Board =====
+                // Drawing board positioned early so other overlays appear on top
+                if (widget.drawingController != null)
+                  Positioned.fill(
+                    child: Container(
+                      color: Colors.transparent, // Debug: visible overlay when drawing mode is active
+                      child: drawing_board.DrawingBoard(
+                        controller: widget.drawingController!,
+                        canvasScale: widget.canvasScale,
+                        verticalOffset: currentLayout.upperPaddingOnCanvas * widget.canvasScale,
+                        background: Container(
+                          width: widget.width,
+                          height: currentLayout.totalContentHeight,
+                          color: Colors.transparent,
+                        ),
+                        showDefaultActions: false,
+                        showDefaultTools: false,
+                        boardPanEnabled: false,
+                        boardScaleEnabled: false,
+                        onPointerUp: widget.onDrawingPointerUp,
+                      ),
+                    ),
+                  ),
 
+                // ===== LAYER 3: Chord Symbol Overlays =====
                 ...chordSymbolOverlays,
 
+                // ===== LAYER 4: MIDI Highlights =====
                 if (highlightedSymbolId != null)
                   RepaintBoundary(
                     key: const ValueKey('highlight_overlay'),
@@ -582,7 +619,7 @@ void _resetInteractionState() {
                     ),
                   ),
 
-                // ===== LAYER 3: The NEW Dynamic Interaction Painter =====
+                // ===== LAYER 5: Dynamic Interaction Painter =====
                 // This is the key to our performance gain. ValueListenableBuilder listens
                 // to our notifier and ONLY rebuilds its child (the lightweight CustomPaint)
                 // when the interaction state changes.
@@ -607,8 +644,10 @@ void _resetInteractionState() {
               ],
             ),
           ),
-        ),
         );
+          },
+        ),
+      );
       },
     );
   }

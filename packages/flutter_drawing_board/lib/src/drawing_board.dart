@@ -47,6 +47,8 @@ class DrawingBoard extends StatefulWidget {
     this.onInteractionUpdate,
     this.transformationController,
     this.alignment = Alignment.topCenter,
+    this.canvasScale = 1.0,
+    this.verticalOffset = 0.0,
   });
 
   /// 画板背景控件
@@ -91,6 +93,12 @@ class DrawingBoard extends StatefulWidget {
   final double boardScaleFactor;
   final TransformationController? transformationController;
   final AlignmentGeometry alignment;
+
+  /// Canvas scale factor for coordinate system synchronization
+  final double canvasScale;
+
+  /// Vertical offset for sheet music centering synchronization
+  final double verticalOffset;
 
   /// 默认工具项列表
   static List<DefToolItem> defaultTools(
@@ -232,21 +240,26 @@ class _DrawingBoardState extends State<DrawingBoard> {
 
   /// 构建绘制层
   Widget get _buildPainter {
-    return ExValueBuilder<DrawConfig>(
-      valueListenable: _controller.drawConfig,
-      shouldRebuild: (DrawConfig p, DrawConfig n) => p.size != n.size,
-      builder: (_, DrawConfig dc, Widget? child) {
-        return SizedBox(
-          width: dc.size?.width,
-          height: dc.size?.height,
-          child: child,
-        );
-      },
-      child: Painter(
-        drawingController: _controller,
-        onPointerDown: widget.onPointerDown,
-        onPointerMove: widget.onPointerMove,
-        onPointerUp: widget.onPointerUp,
+    return Transform(
+      transform: Matrix4.identity()
+        ..translate(0.0, widget.verticalOffset)
+        ..scale(widget.canvasScale),
+      child: ExValueBuilder<DrawConfig>(
+        valueListenable: _controller.drawConfig,
+        shouldRebuild: (DrawConfig p, DrawConfig n) => p.size != n.size,
+        builder: (_, DrawConfig dc, Widget? child) {
+          return SizedBox(
+            width: dc.size?.width,
+            height: dc.size?.height,
+            child: child,
+          );
+        },
+        child: Painter(
+          drawingController: _controller,
+          onPointerDown: widget.onPointerDown,
+          onPointerMove: widget.onPointerMove,
+          onPointerUp: widget.onPointerUp,
+        ),
       ),
     );
   }

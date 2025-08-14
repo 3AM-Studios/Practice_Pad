@@ -150,6 +150,9 @@ class SheetMusicLayout with ChangeNotifier {
     return (remainingVerticalSpace / 2) / canvasScale;
   }
 
+  // Public getter for drawing board synchronization
+  double get upperPaddingOnCanvas => _upperPaddingOnCanvas;
+
   // --- End of corrected logic ---
 
   double get totalContentHeight {

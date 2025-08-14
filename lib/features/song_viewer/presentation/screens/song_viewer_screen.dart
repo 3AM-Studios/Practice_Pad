@@ -25,6 +25,7 @@ import 'package:practice_pad/features/practice/presentation/pages/practice_sessi
 import 'package:practice_pad/features/edit_items/presentation/viewmodels/edit_items_viewmodel.dart';
 import 'package:provider/provider.dart';
 import 'package:music_sheet/index.dart';
+import 'package:music_sheet/src/music_objects/interface/musical_symbol.dart';
 import 'package:practice_pad/services/local_storage_service.dart';
 
 class SongViewerScreen extends StatefulWidget {
@@ -105,7 +106,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
   bool _extensionNumbersRelativeToChords = true;
 
   // Drawing functionality
-  bool _isDrawingMode = false;
+  late ValueNotifier<bool> _isDrawingModeNotifier;
   late DrawingController _drawingController;
   Color _currentDrawingColor = Colors.black;
   double _currentStrokeWidth = 2.0;
@@ -119,7 +120,8 @@ class _SongViewerScreenState extends State<SongViewerScreen>
     _beatNotifier = ValueNotifier<int>(0);
     _songBeatNotifier = ValueNotifier<int>(0);
 
-    // Initialize drawing controller with default settings
+    // Initialize drawing functionality
+    _isDrawingModeNotifier = ValueNotifier<bool>(false);
     _drawingController = DrawingController();
     
     // Set default drawing style - black color and thin stroke
@@ -1312,9 +1314,6 @@ class _SongViewerScreenState extends State<SongViewerScreen>
       */
       print('Metronome disabled - add proper audio assets to enable');
 
-      // Load any saved sheet music modifications before finishing
-      await _loadSheetMusic();
-      
       setState(() {
         _isLoading = false;
       });
@@ -1997,36 +1996,38 @@ class _SongViewerScreenState extends State<SongViewerScreen>
         ),
         const SizedBox(width: 8),
         // Drawing mode toggle button
-        ClayContainer(
-          color: _isDrawingMode 
-            ? CupertinoColors.systemBlue.withOpacity(0.8)
-            : surfaceColor,
-          borderRadius: 8,
-          depth: _isDrawingMode ? 2 : 4,
-          spread: 1,
-          child: IconButton(
-            icon: Icon(
-              _isDrawingMode ? Icons.edit_off : Icons.draw,
-              size: 20,
-              color: _isDrawingMode ? Colors.white : null,
-            ),
-            onPressed: () {
-              setState(() {
-                _isDrawingMode = !_isDrawingMode;
-                // Drawings are preserved automatically since we're not clearing the controller
-              });
-              // Save drawing state when exiting drawing mode
-              if (!_isDrawingMode) {
-                _saveDrawingData();
-              }
-            },
-            tooltip: _isDrawingMode ? 'Exit Drawing Mode' : 'Enter Drawing Mode',
-            constraints: const BoxConstraints(
-              minWidth: 36,
-              minHeight: 36,
-            ),
-            padding: const EdgeInsets.all(4),
-          ),
+        ValueListenableBuilder<bool>(
+          valueListenable: _isDrawingModeNotifier,
+          builder: (context, isDrawingMode, child) {
+            return ClayContainer(
+              color: isDrawingMode 
+                ? CupertinoColors.systemBlue.withOpacity(0.8)
+                : surfaceColor,
+              borderRadius: 8,
+              depth: isDrawingMode ? 2 : 4,
+              spread: 1,
+              child: IconButton(
+                icon: Icon(
+                  isDrawingMode ? Icons.edit_off : Icons.draw,
+                  size: 20,
+                  color: isDrawingMode ? Colors.white : null,
+                ),
+                onPressed: () {
+                  _isDrawingModeNotifier.value = !_isDrawingModeNotifier.value;
+                  // Save drawing state when exiting drawing mode
+                  if (!_isDrawingModeNotifier.value) {
+                    _saveDrawingData();
+                  }
+                },
+                tooltip: isDrawingMode ? 'Exit Drawing Mode' : 'Enter Drawing Mode',
+                constraints: const BoxConstraints(
+                  minWidth: 36,
+                  minHeight: 36,
+                ),
+                padding: const EdgeInsets.all(4),
+              ),
+            );
+          },
         ),
       ],
     );
@@ -2758,9 +2759,6 @@ class _SongViewerScreenState extends State<SongViewerScreen>
       print(
           '🎵 Inserted symbol ${symbol.runtimeType} at measure $measureIndex, position $positionIndex. Invalidating cache.');
     });
-    
-    // 4. Save sheet music to persistence
-    _saveSheetMusic();
   }
 
   /// Updates a musical symbol in a measure at a specific position.
@@ -2793,9 +2791,6 @@ class _SongViewerScreenState extends State<SongViewerScreen>
       print(
           '🎵 Updated symbol at measure $measureIndex, position $positionIndex. Invalidating cache.');
     });
-    
-    // 4. Save sheet music to persistence
-    _saveSheetMusic();
   }
 
   /// Deletes a musical symbol from a measure at a specific position.
@@ -2827,73 +2822,8 @@ class _SongViewerScreenState extends State<SongViewerScreen>
       print(
           '🎵 Deleted symbol at measure $measureIndex, position $positionIndex. Invalidating cache.');
     });
-    
-    // 4. Save sheet music to persistence
-    _saveSheetMusic();
   }
 
-  /// Save current sheet music state to local storage
-  Future<void> _saveSheetMusic() async {
-    try {
-      // Convert ChordMeasures to regular Measures for persistence
-      final measures = _chordMeasures.map((chordMeasure) => music_sheet.Measure(
-        chordMeasure.musicalSymbols,
-        isNewLine: chordMeasure.isNewLine,
-        // Note: chordSymbols will be saved separately later
-      )).toList();
-      
-      await LocalStorageService.saveSheetMusicForSong(widget.songAssetPath, measures);
-      developer.log('💾 Saved sheet music for ${widget.songAssetPath}');
-    } catch (e) {
-      developer.log('❌ Error saving sheet music: $e', error: e);
-    }
-  }
-
-  /// Load saved sheet music modifications from local storage
-  Future<void> _loadSheetMusic() async {
-    try {
-      final savedMeasures = await LocalStorageService.loadSheetMusicForSong(widget.songAssetPath);
-      if (savedMeasures.isNotEmpty) {
-        setState(() {
-          // Convert saved measures to ChordMeasures, merging with original symbols
-          final updatedMeasures = <ChordMeasure>[];
-          for (int i = 0; i < savedMeasures.length && i < _chordMeasures.length; i++) {
-            final savedMeasure = savedMeasures[i];
-            final originalChordMeasure = _chordMeasures[i];
-            
-            // Separate original symbols into clefs/time signatures vs modifiable symbols
-            final originalNonModifiableSymbols = originalChordMeasure.musicalSymbols.where((symbol) {
-              return symbol is Clef || symbol is KeySignature || symbol is TimeSignature;
-            }).toList();
-            
-            // Combine: original non-modifiable symbols + saved modifiable symbols
-            final combinedSymbols = <MusicalSymbol>[
-              ...originalNonModifiableSymbols,
-              ...savedMeasure.musicalSymbols,
-            ];
-            
-            updatedMeasures.add(ChordMeasure(
-              combinedSymbols,
-              chordSymbols: originalChordMeasure.chordSymbols, // Preserve original chord symbols
-              isNewLine: savedMeasure.isNewLine,
-            ));
-          }
-          
-          // If there are more original measures, keep them unchanged
-          if (_chordMeasures.length > savedMeasures.length) {
-            updatedMeasures.addAll(_chordMeasures.sublist(savedMeasures.length));
-          }
-          
-          _chordMeasures = updatedMeasures;
-          _cachedSheetMusicWidget = null; // Invalidate cache
-          _lastRenderedMeasures = null;
-        });
-        developer.log('📖 Loaded ${savedMeasures.length} modified measures for ${widget.songAssetPath}');
-      }
-    } catch (e) {
-      developer.log('❌ Error loading sheet music: $e', error: e);
-    }
-  }
 
   /// Builds the drawing overlay with sheet music as background
   Widget _buildDrawingOverlay() {
@@ -2918,36 +2848,6 @@ class _SongViewerScreenState extends State<SongViewerScreen>
     );
   }
 
-  /// Builds the sheet music with drawings always visible
-  Widget _buildSheetMusicWithDrawings() {
-    return Stack(
-      children: [
-        // Sheet music as base layer
-        _buildCachedSheetMusic(),
-        // Drawing board overlay - always shows drawings, only interactive when in drawing mode
-        IgnorePointer(
-          ignoring: !_isDrawingMode, // Ignore touches when not in drawing mode
-          child: SizedBox(
-            width: 1200, // Match sheet music width
-            height: 600, // Fixed height for drawing board stability
-            child: DrawingBoard(
-              controller: _drawingController,
-              background: Container(
-                width: 1200, // Match sheet music width
-                height: 600, // Fixed height for drawing board stability
-                color: Colors.transparent,
-              ),
-            showDefaultActions: false,
-            showDefaultTools: false,
-            onPointerUp: _isDrawingMode ? (details) {
-              _saveDrawingData();
-            } : null,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
 
   /// Builds the compact drawing controls toolbar
   Widget _buildDrawingControls() {
@@ -3253,6 +3153,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                     _currentMousePosition = event.position;
                   },
                   child: music_sheet.SimpleSheetMusic(
+                    key: ValueKey('sheet_music_${_isDrawingModeNotifier.value}'), // Force rebuild when drawing mode changes
                     width: 1200, // Adequate width for proper sheet music rendering
                     measures: _chordMeasures.cast<music_sheet.Measure>(),
                     debug: false, // Disable debug mode for clean rendering
@@ -3270,6 +3171,12 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                     onChordSymbolLongPressEnd: _onChordSymbolLongPressEnd,
                     onChordSymbolHover: _onChordSymbolHover,
                     isChordSelected: _isChordSelected,
+                    // Drawing parameters
+                    drawingController: _drawingController,
+                    isDrawingModeNotifier: _isDrawingModeNotifier,
+                    onDrawingPointerUp: (details) {
+                      _saveDrawingData();
+                    },
                   ),
                 ),
               ),
@@ -3563,6 +3470,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
     // Dispose ValueNotifiers
     _beatNotifier.dispose();
     _songBeatNotifier.dispose();
+    _isDrawingModeNotifier.dispose();
 
     super.dispose();
   }
@@ -3808,8 +3716,15 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                     // Controls row above sheet music
 
                     // Drawing controls (shown when in drawing mode)
-                    if (_isDrawingMode)
-                      Center(child: _buildDrawingControls()),
+                    ValueListenableBuilder<bool>(
+                      valueListenable: _isDrawingModeNotifier,
+                      builder: (context, isDrawingMode, child) {
+                        if (isDrawingMode) {
+                          return Center(child: _buildDrawingControls());
+                        }
+                        return const SizedBox.shrink();
+                      },
+                    ),
                     
                     // Sheet Music Display with Canvas-based Chord Symbols
                     if (_chordMeasures.isNotEmpty)
@@ -3827,7 +3742,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                                 padding: const EdgeInsets.all(16),
                                 child: SingleChildScrollView(
                                   scrollDirection: Axis.horizontal,
-                                  child: _buildSheetMusicWithDrawings(),
+                                  child: _buildCachedSheetMusic(),
                                 ),
                               ),
                               // Help button in top left

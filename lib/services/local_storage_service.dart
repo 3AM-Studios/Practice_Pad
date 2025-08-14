@@ -7,6 +7,7 @@ import 'package:practice_pad/models/practice_item.dart';
 import 'package:practice_pad/models/chord_progression.dart';
 import 'package:practice_pad/features/song_viewer/data/models/song.dart';
 import 'package:music_sheet/index.dart';
+import 'package:flutter_drawing_board/paint_contents.dart';
 import 'dart:developer' as developer;
 
 /// Local storage service for persisting app data
@@ -17,6 +18,7 @@ class LocalStorageService {
   static const String _songChangesFileName = 'song_changes.json';
   static const String _chordKeysFileName = 'chord_keys.json';
   static const String _sheetMusicFileName = 'sheet_music.json';
+  static const String _drawingsFileName = 'drawings.json';
 
   /// Save practice areas to local storage
   static Future<void> savePracticeAreas(List<PracticeArea> areas) async {
@@ -501,6 +503,106 @@ class LocalStorageService {
     }
   }
 
+  /// Save drawing data for a specific song
+  static Future<void> saveDrawingsForSong(String songId, List<Map<String, dynamic>> drawingData) async {
+    try {
+      final allDrawings = await loadAllDrawings();
+      allDrawings[songId] = drawingData;
+      
+      final file = await _getFile(_drawingsFileName);
+      await file.writeAsString(json.encode(allDrawings));
+      developer.log('Saved ${drawingData.length} drawing elements for song: $songId');
+    } catch (e) {
+      developer.log('Error saving drawings: $e', error: e);
+      throw Exception('Failed to save drawings: $e');
+    }
+  }
+
+  /// Load drawing data for a specific song
+  static Future<List<Map<String, dynamic>>> loadDrawingsForSong(String songId) async {
+    try {
+      final allDrawings = await loadAllDrawings();
+      final drawingData = allDrawings[songId] ?? [];
+      developer.log('Loaded ${drawingData.length} drawing elements for song: $songId');
+      return drawingData;
+    } catch (e) {
+      developer.log('Error loading drawings for $songId: $e', error: e);
+      return [];
+    }
+  }
+
+  /// Load all drawing data
+  static Future<Map<String, List<Map<String, dynamic>>>> loadAllDrawings() async {
+    try {
+      final file = await _getFile(_drawingsFileName);
+      if (!await file.exists()) {
+        developer.log('Drawings file does not exist, returning empty map');
+        return {};
+      }
+
+      final content = await file.readAsString();
+      if (content.trim().isEmpty) {
+        developer.log('Drawings file is empty, returning empty map');
+        return {};
+      }
+
+      final Map<String, dynamic> jsonData = json.decode(content);
+      final drawings = jsonData.map((songId, drawingList) => MapEntry(
+        songId,
+        List<Map<String, dynamic>>.from(drawingList as List),
+      ));
+      developer.log('Loaded drawings for ${drawings.length} songs');
+      return drawings;
+    } catch (e) {
+      developer.log('Error loading all drawings: $e', error: e);
+      return {};
+    }
+  }
+
+  /// Convert drawing JSON to PaintContent objects
+  static List<PaintContent> drawingJsonToPaintContents(List<Map<String, dynamic>> jsonList) {
+    final contents = <PaintContent>[];
+    
+    for (final json in jsonList) {
+      try {
+        final type = json['type'] as String?;
+        if (type == null || type.isEmpty) continue;
+        
+        PaintContent? content;
+        switch (type) {
+          case 'SimpleLine':
+            content = SimpleLine.fromJson(json);
+            break;
+          case 'SmoothLine':
+            content = SmoothLine.fromJson(json);
+            break;
+          case 'StraightLine':
+            content = StraightLine.fromJson(json);
+            break;
+          case 'Circle':
+            content = Circle.fromJson(json);
+            break;
+          case 'Rectangle':
+            content = Rectangle.fromJson(json);
+            break;
+          case 'Eraser':
+            content = Eraser.fromJson(json);
+            break;
+          default:
+            developer.log('Unsupported paint content type: $type');
+            continue;
+        }
+        
+        contents.add(content);
+      } catch (e) {
+        developer.log('Error deserializing paint content: $e');
+        // Continue with other items even if one fails
+      }
+    }
+    
+    return contents;
+  }
+
   /// Clear all local storage
   static Future<void> clearAll() async {
     try {
@@ -511,6 +613,7 @@ class LocalStorageService {
         _songChangesFileName,
         _chordKeysFileName,
         _sheetMusicFileName,
+        _drawingsFileName,
       ];
 
       for (final fileName in files) {
