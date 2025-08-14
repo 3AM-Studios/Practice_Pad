@@ -13,7 +13,7 @@ class ActiveSessionBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     // Use a warm, darker clay color for contrast with goal section
     const bannerColor = Color.fromARGB(255, 108, 119, 131); // Dark blue-gray
-    const surfaceColor = Color(0xFFE8EAF0); // Light clay surface
+    final surfaceColor = Theme.of(context).colorScheme.surface; // Light clay surface
     const textColor = Colors.white;
 
     return Consumer<PracticeSessionManager>(
@@ -27,7 +27,7 @@ class ActiveSessionBanner extends StatelessWidget {
           child: ClayContainer(
             color: Theme.of(context).colorScheme.surface,
             borderRadius: 20,
-            spread: 5,
+         
             child: GestureDetector(
               onTap: () {
                 if (sessionManager.activePracticeItem != null) {
@@ -57,7 +57,7 @@ class ActiveSessionBanner extends StatelessWidget {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Practicing: ${sessionManager.activePracticeItem?.name ?? 'Unknown'}',
+                        '${sessionManager.activePracticeItem?.name ?? 'Unknown'}',
                         style: TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
@@ -80,7 +80,7 @@ class ActiveSessionBanner extends StatelessWidget {
                                     sessionManager.decrementReps();
                                   }
                                 : null,
-                            child: const ClayContainer(
+                            child: ClayContainer(
                               color: surfaceColor,
                               borderRadius: 20,
                               width: 32,
@@ -146,16 +146,17 @@ class ActiveSessionBanner extends StatelessWidget {
                               }
                             },
                             child: ClayContainer(
-                              color: surfaceColor,
+                              color: const Color.fromARGB(255, 141, 110, 75),
                               borderRadius: 16,
                               width: 32,
                               height: 32,
-                              spread: 2,
+              
+                   
                               child: Icon(
                                 sessionManager.isTimerRunning
                                     ? CupertinoIcons.pause_fill
                                     : CupertinoIcons.play_fill,
-                                color: bannerColor,
+                                color: Colors.white,
                                 size: 16,
                               ),
                             ),

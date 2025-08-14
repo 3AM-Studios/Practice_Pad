@@ -19,14 +19,6 @@ Widget buildGoalRing(BuildContext context, TodayViewModel viewModel) {
       color: theme.colorScheme.surface,
       borderRadius: 20,
       child: Container(
-            decoration: BoxDecoration(
-                  image: DecorationImage(
-                    image: AssetImage('assets/images/wood_texture_rotated.jpg'),
-                    fit: BoxFit.cover,
-                  ),
-                 border: Border.all(color: theme.colorScheme.surface, width: 4),
-                  borderRadius: BorderRadius.circular(20),
-    ),
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [

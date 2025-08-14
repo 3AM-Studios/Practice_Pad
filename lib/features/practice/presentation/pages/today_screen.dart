@@ -91,14 +91,28 @@ Widget _buildBody(BuildContext context, TodayViewModel viewModel) {
             // Practice Areas header
             SliverToBoxAdapter(
               child: Container(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
                 child: Center(
-                  child: Text(
-                    'Today\'s Practice',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.onSurface,
+                  child: ClayContainer(
+                    borderRadius: 20,
+                    child: Container(
+                      padding: const EdgeInsets.fromLTRB(25, 5, 25, 5),
+                     decoration: BoxDecoration(
+                          image: DecorationImage(
+                            image: AssetImage('assets/images/wood_texture_rotated.jpg'),
+                            fit: BoxFit.cover,
+                          ),
+                        border: Border.all(color: Theme.of(context).colorScheme.surface, width: 4),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                      child: Text(
+                        'Today\'s Practice',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white
+                        ),
+                      ),
                     ),
                   ),
                 ),

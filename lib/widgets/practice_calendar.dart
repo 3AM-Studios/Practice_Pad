@@ -5,19 +5,19 @@ import 'package:practice_pad/models/statistics.dart';
 import 'package:clay_containers/clay_containers.dart';
 
 enum CalendarSize {
-  small,   // Compact size
-  medium,  // Default/current size
-  large,   // Expanded size
+  small, // Compact size
+  medium, // Default/current size
+  large, // Expanded size
 }
 
 class PracticeCalendar extends StatefulWidget {
   final VoidCallback? onStatsPressed;
   final CalendarSize calendarSize;
-  
+
   const PracticeCalendar({
-    super.key, 
+    super.key,
     this.onStatsPressed,
-    this.calendarSize = CalendarSize.medium, // Default to medium (current size)
+    this.calendarSize = CalendarSize.small, // Default to medium (current size)
   });
 
   @override
@@ -66,7 +66,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
   double get _starIconSize {
     switch (widget.calendarSize) {
       case CalendarSize.small:
-        return 28.0;
+        return 22.0;
       case CalendarSize.medium:
         return 30.0; // Current default
       case CalendarSize.large:
@@ -99,7 +99,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
     try {
       // Get all practice statistics
       final allStats = await Statistics.getAll();
-      
+
       // Create a set of unique days when practice was completed
       final completedDays = <DateTime>{};
       for (final stat in allStats) {
@@ -111,7 +111,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
         );
         completedDays.add(date);
       }
-      
+
       setState(() {
         _completedDays = completedDays;
         _isLoading = false;
@@ -161,51 +161,67 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
         mainAxisSize: MainAxisSize.min,
         children: [
           // Header with Stats button
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Practice Calendar',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: theme.colorScheme.onSurface,
-                ),
+          Container(
+            decoration: BoxDecoration(
+              image: DecorationImage(
+                image: AssetImage('assets/images/wood_texture_rotated.jpg'),
+                fit: BoxFit.cover,
               ),
+              border: Border.all(
+                  color: Theme.of(context).colorScheme.surface, width: 4),
+              borderRadius: BorderRadius.circular(20),
+            ),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
               CupertinoButton(
                 padding: EdgeInsets.zero,
                 onPressed: widget.onStatsPressed,
                 child: ClayContainer(
                   color: theme.colorScheme.surface,
                   borderRadius: 20,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          CupertinoIcons.chart_bar_square,
-                          size: 16,
-                          color: theme.colorScheme.onSurface,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Stats',
-                          style: TextStyle(
-                            color: theme.colorScheme.onSurface,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
+                  child: Container(
+                    decoration:
+                    BoxDecoration(
+                          image: const DecorationImage(
+                            image: AssetImage('assets/images/wood_texture_rotated.jpg'),
+                            fit: BoxFit.cover,
                           ),
+                        border: Border.all(color: Theme.of(context).colorScheme.surface, width: 4),
+                          borderRadius: BorderRadius.circular(20),
                         ),
-                      ],
+                    
+                    child: const Padding(
+                      padding:
+                           EdgeInsets.symmetric(horizontal: 100, vertical: 9),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            CupertinoIcons.chart_bar_square,
+                            size: 21,
+                            color: Colors.white
+                          ),
+                           SizedBox(width: 4),
+                          Text(
+                            'Stats',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 21,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          
+          const SizedBox(height: 10),
+
           // Calendar
           TableCalendar(
             firstDay: DateTime.utc(2020, 1, 1),
@@ -384,7 +400,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
               },
             ),
           ),
-          
+
           // Legend
           const SizedBox(height: 12),
           Row(

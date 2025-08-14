@@ -123,13 +123,13 @@ class _SongViewerScreenState extends State<SongViewerScreen>
     // Initialize drawing functionality
     _isDrawingModeNotifier = ValueNotifier<bool>(false);
     _drawingController = DrawingController();
-    
+
     // Set default drawing style - black color and thin stroke
     _drawingController.setStyle(
       color: _currentDrawingColor,
       strokeWidth: _currentStrokeWidth,
     );
-    
+
     // Load saved drawings
     _loadDrawingData();
 
@@ -182,7 +182,8 @@ class _SongViewerScreenState extends State<SongViewerScreen>
       // For now, we'll implement a simpler approach that works with the current library
       // The drawings will persist during the current session but will be lost on app restart
       // This can be enhanced later with proper JSON deserialization
-      developer.log('Drawing persistence placeholder - drawings will persist during session');
+      developer.log(
+          'Drawing persistence placeholder - drawings will persist during session');
     } catch (e) {
       developer.log('Error loading drawing data: $e');
     }
@@ -197,13 +198,14 @@ class _SongViewerScreenState extends State<SongViewerScreen>
         'drawingJson': jsonData,
         'lastModified': DateTime.now().toIso8601String(),
       };
-      await LocalStorageService.saveSongChanges('${widget.songAssetPath}_drawings', drawingData);
-      developer.log('Saved ${jsonData.length} drawing elements for ${widget.songAssetPath}');
+      await LocalStorageService.saveSongChanges(
+          '${widget.songAssetPath}_drawings', drawingData);
+      developer.log(
+          'Saved ${jsonData.length} drawing elements for ${widget.songAssetPath}');
     } catch (e) {
       developer.log('Error saving drawing data: $e');
     }
   }
-
 
   /// Save non-diatonic chord keys to local storage
   Future<void> _saveChordKeys() async {
@@ -1456,17 +1458,30 @@ class _SongViewerScreenState extends State<SongViewerScreen>
   Widget _buildOriginalKeyButton() {
     final theme = Theme.of(context);
     final primaryColor = theme.colorScheme.primary;
+    final keyParts = _keySignature.split(' / ');
+    if (keyParts.length != 2) {
+      return const SizedBox.shrink();
+    }
+
+    final isMinorKey = _originalKey.endsWith('m');
 
     return GestureDetector(
       onTap: _showKeySelectionDialog,
       behavior: HitTestBehavior.opaque,
       child: ClayContainer(
-        color: CupertinoColors.black,
+        color: theme.colorScheme.surface,
         borderRadius: 18,
-        depth: 12,
-        spread: 0,
         curveType: CurveType.concave,
         child: Container(
+          decoration: BoxDecoration(
+            image: const DecorationImage(
+              image: AssetImage('assets/images/wood_texture_rotated.jpg'),
+              fit: BoxFit.cover,
+            ),
+            border: Border.all(
+                color: Theme.of(context).colorScheme.surface, width: 4),
+            borderRadius: BorderRadius.circular(20),
+          ),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -1478,7 +1493,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
               ),
               const SizedBox(width: 8),
               Text(
-                'Key: $_originalKey',
+                'Key: $_originalKey ${isMinorKey ? 'Minor' : 'Major'}',
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -1946,11 +1961,11 @@ class _SongViewerScreenState extends State<SongViewerScreen>
           scale: 0.8,
           child: _buildOriginalKeyButton(),
         ),
-        const SizedBox(height: 4),
-        Transform.scale(
-          scale: 0.8,
-          child: _buildCurrentKeyIndicator(),
-        ),
+        // const SizedBox(height: 4),
+        // Transform.scale(
+        //   scale: 0.8,
+        //   child: _buildCurrentKeyIndicator(),
+        // ),
       ],
     );
   }
@@ -1964,8 +1979,6 @@ class _SongViewerScreenState extends State<SongViewerScreen>
         ClayContainer(
           color: surfaceColor,
           borderRadius: 8,
-          depth: 4,
-          spread: 1,
           child: IconButton(
             icon: const Icon(Icons.zoom_in, size: 20),
             onPressed: _zoomIn,
@@ -1981,8 +1994,6 @@ class _SongViewerScreenState extends State<SongViewerScreen>
         ClayContainer(
           color: surfaceColor,
           borderRadius: 8,
-          depth: 4,
-          spread: 1,
           child: IconButton(
             icon: const Icon(Icons.zoom_out, size: 20),
             onPressed: _zoomOut,
@@ -2000,12 +2011,10 @@ class _SongViewerScreenState extends State<SongViewerScreen>
           valueListenable: _isDrawingModeNotifier,
           builder: (context, isDrawingMode, child) {
             return ClayContainer(
-              color: isDrawingMode 
-                ? CupertinoColors.systemBlue.withOpacity(0.8)
-                : surfaceColor,
+              color: isDrawingMode
+                  ? CupertinoColors.systemBlue.withOpacity(0.8)
+                  : surfaceColor,
               borderRadius: 8,
-              depth: isDrawingMode ? 2 : 4,
-              spread: 1,
               child: IconButton(
                 icon: Icon(
                   isDrawingMode ? Icons.edit_off : Icons.draw,
@@ -2019,7 +2028,8 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                     _saveDrawingData();
                   }
                 },
-                tooltip: isDrawingMode ? 'Exit Drawing Mode' : 'Enter Drawing Mode',
+                tooltip:
+                    isDrawingMode ? 'Exit Drawing Mode' : 'Enter Drawing Mode',
                 constraints: const BoxConstraints(
                   minWidth: 36,
                   minHeight: 36,
@@ -2038,8 +2048,6 @@ class _SongViewerScreenState extends State<SongViewerScreen>
     return ClayContainer(
       color: surfaceColor,
       borderRadius: 12,
-      depth: 3,
-      spread: 1,
       child: Padding(
         padding: const EdgeInsets.all(8),
         child: Column(
@@ -2047,8 +2055,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
           children: [
             // Header text with improved styling
             Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 6, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
                 color: surfaceColor,
                 borderRadius: BorderRadius.circular(4),
@@ -2068,25 +2075,36 @@ class _SongViewerScreenState extends State<SongViewerScreen>
               mainAxisSize: MainAxisSize.min,
               children: [
                 ClayContainer(
-                  color: _extensionNumbersRelativeToChords
-                      ? CupertinoColors.systemBlue.withOpacity(0.3)
-                      : surfaceColor,
-                  borderRadius: 6,
-                  depth: _extensionNumbersRelativeToChords ? 1 : 2,
-                  spread: 0,
-                  child: GestureDetector(
-                    onTap: () => _toggleExtensionNumbering(true),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      child: Text(
-                        'chord',
-                        style: TextStyle(
-                          color: _extensionNumbersRelativeToChords
-                              ? Colors.white
-                              : Colors.black87,
-                          fontSize: 12.75,
-                          fontWeight: FontWeight.w600,
+                  color: surfaceColor,
+                  borderRadius: 20,
+                  child: Container(
+                    decoration: _extensionNumbersRelativeToChords
+                        ? BoxDecoration(
+                            image: DecorationImage(
+                              image: AssetImage(
+                                  'assets/images/wood_texture_rotated.jpg'),
+                              fit: BoxFit.cover,
+                            ),
+                            border: Border.all(
+                                color: Theme.of(context).colorScheme.surface,
+                                width: 4),
+                            borderRadius: BorderRadius.circular(20),
+                          )
+                        : null,
+                    child: GestureDetector(
+                      onTap: () => _toggleExtensionNumbering(true),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        child: Text(
+                          'chord',
+                          style: TextStyle(
+                            color: _extensionNumbersRelativeToChords
+                                ? Colors.white
+                                : Colors.black87,
+                            fontSize: 12.75,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ),
@@ -2094,25 +2112,36 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                 ),
                 const SizedBox(width: 2),
                 ClayContainer(
-                  color: !_extensionNumbersRelativeToChords
-                      ? CupertinoColors.systemBlue.withOpacity(0.3)
-                      : surfaceColor,
-                  borderRadius: 6,
-                  depth: !_extensionNumbersRelativeToChords ? 1 : 2,
-                  spread: 0,
-                  child: GestureDetector(
-                    onTap: () => _toggleExtensionNumbering(false),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      child: Text(
-                        'key',
-                        style: TextStyle(
-                          color: !_extensionNumbersRelativeToChords
-                              ? Colors.white
-                              : Colors.black87,
-                          fontSize: 12.75,
-                          fontWeight: FontWeight.w600,
+                  color: surfaceColor,
+                  borderRadius: 20,
+                  child: Container(
+                    decoration: !_extensionNumbersRelativeToChords
+                        ? BoxDecoration(
+                            image: DecorationImage(
+                              image: AssetImage(
+                                  'assets/images/wood_texture_rotated.jpg'),
+                              fit: BoxFit.cover,
+                            ),
+                            border: Border.all(
+                                color: Theme.of(context).colorScheme.surface,
+                                width: 4),
+                            borderRadius: BorderRadius.circular(20),
+                          )
+                        : null,
+                    child: GestureDetector(
+                      onTap: () => _toggleExtensionNumbering(false),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        child: Text(
+                          'key',
+                          style: TextStyle(
+                            color: !_extensionNumbersRelativeToChords
+                                ? Colors.white
+                                : Colors.black87,
+                            fontSize: 12.75,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ),
@@ -2636,25 +2665,25 @@ class _SongViewerScreenState extends State<SongViewerScreen>
           _showCreateGeneralPracticeItemDialog();
         },
         behavior: HitTestBehavior.opaque, // Block taps from going to parent
-        child: const ClayContainer(
-          color: CupertinoColors.black,
+        child:  ClayContainer(
+          color: Theme.of(context).colorScheme.surface,
           borderRadius: 20,
-          spread: 1,
+          depth: 5,
           curveType: CurveType.convex,
-          child: Padding(
+          child:  Padding(
             padding: EdgeInsets.symmetric(vertical: 12),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
                   Icons.add,
-                  color: Colors.white,
+                  color: Theme.of(context).colorScheme.primary,
                 ),
-                SizedBox(width: 8),
+                const SizedBox(width: 8),
                 Text(
                   'Add Practice Item',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: Theme.of(context).colorScheme.primary,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -2824,7 +2853,6 @@ class _SongViewerScreenState extends State<SongViewerScreen>
     });
   }
 
-
   /// Builds the drawing overlay with sheet music as background
   Widget _buildDrawingOverlay() {
     return SizedBox(
@@ -2835,19 +2863,21 @@ class _SongViewerScreenState extends State<SongViewerScreen>
         background: Container(
           width: 1200, // Match sheet music width
           height: 600, // Fixed height for drawing board stability
-          color: Colors.transparent, // Transparent to show sheet music underneath
+          color:
+              Colors.transparent, // Transparent to show sheet music underneath
           child: _buildCachedSheetMusic(),
         ),
-      showDefaultActions: false, // Disable default actions - we'll show custom controls
-      showDefaultTools: false,   // Disable default toolbar - we'll show custom controls
-      onPointerUp: (details) {
-        // Save drawing data whenever user finishes drawing
-        _saveDrawingData();
-      },
+        showDefaultActions:
+            false, // Disable default actions - we'll show custom controls
+        showDefaultTools:
+            false, // Disable default toolbar - we'll show custom controls
+        onPointerUp: (details) {
+          // Save drawing data whenever user finishes drawing
+          _saveDrawingData();
+        },
       ),
     );
   }
-
 
   /// Builds the compact drawing controls toolbar
   Widget _buildDrawingControls() {
@@ -2886,7 +2916,8 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                   decoration: BoxDecoration(
                     color: _currentDrawingColor,
                     shape: BoxShape.circle,
-                    border: Border.all(color: theme.colorScheme.outline, width: 1.5),
+                    border: Border.all(
+                        color: theme.colorScheme.outline, width: 1.5),
                   ),
                 ),
               ),
@@ -2934,12 +2965,12 @@ class _SongViewerScreenState extends State<SongViewerScreen>
         width: 32,
         height: 32,
         decoration: BoxDecoration(
-          color: isSelected 
+          color: isSelected
               ? theme.colorScheme.primary.withOpacity(0.2)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(6),
           border: Border.all(
-            color: isSelected 
+            color: isSelected
                 ? theme.colorScheme.primary
                 : theme.colorScheme.outline.withOpacity(0.3),
             width: 1,
@@ -2947,7 +2978,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
         ),
         child: Icon(
           icon,
-          color: isSelected 
+          color: isSelected
               ? theme.colorScheme.primary
               : theme.colorScheme.onSurface,
           size: 18,
@@ -2975,7 +3006,8 @@ class _SongViewerScreenState extends State<SongViewerScreen>
         child: Center(
           child: Container(
             width: 20,
-            height: _currentStrokeWidth.clamp(1.0, 8.0), // Visual representation of stroke width
+            height: _currentStrokeWidth.clamp(
+                1.0, 8.0), // Visual representation of stroke width
             decoration: BoxDecoration(
               color: theme.colorScheme.onSurface,
               borderRadius: BorderRadius.circular(_currentStrokeWidth / 2),
@@ -3061,9 +3093,13 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                 margin: const EdgeInsets.symmetric(vertical: 5),
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: isSelected ? Theme.of(context).colorScheme.primary.withOpacity(0.1) : null,
+                  color: isSelected
+                      ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
+                      : null,
                   borderRadius: BorderRadius.circular(8),
-                  border: isSelected ? Border.all(color: Theme.of(context).colorScheme.primary) : null,
+                  border: isSelected
+                      ? Border.all(color: Theme.of(context).colorScheme.primary)
+                      : null,
                 ),
                 height: 40,
                 child: Row(
@@ -3080,8 +3116,11 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                     Text(
                       '${width.toInt()}px',
                       style: TextStyle(
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                        color: isSelected ? Theme.of(context).colorScheme.primary : null,
+                        fontWeight:
+                            isSelected ? FontWeight.bold : FontWeight.normal,
+                        color: isSelected
+                            ? Theme.of(context).colorScheme.primary
+                            : null,
                       ),
                     ),
                     if (isSelected) ...[
@@ -3153,8 +3192,10 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                     _currentMousePosition = event.position;
                   },
                   child: music_sheet.SimpleSheetMusic(
-                    key: ValueKey('sheet_music_${_isDrawingModeNotifier.value}'), // Force rebuild when drawing mode changes
-                    width: 1200, // Adequate width for proper sheet music rendering
+                    key: ValueKey(
+                        'sheet_music_${_isDrawingModeNotifier.value}'), // Force rebuild when drawing mode changes
+                    width:
+                        1200, // Adequate width for proper sheet music rendering
                     measures: _chordMeasures.cast<music_sheet.Measure>(),
                     debug: false, // Disable debug mode for clean rendering
                     initialKeySignatureType:
@@ -3493,19 +3534,20 @@ class _SongViewerScreenState extends State<SongViewerScreen>
       child: ClayContainer(
         color: surfaceColor,
         borderRadius: 15,
-        depth: 12,
-        spread: 3,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
               padding: const EdgeInsets.all(12),
-              child: Text(
-                'Practice Items',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: primaryColor,
+
+              child: Center(
+                child: Text(
+                  'Practice Items',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: primaryColor,
+                  ),
                 ),
               ),
             ),
@@ -3532,42 +3574,53 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                         width: 200,
                         margin: const EdgeInsets.only(right: 12, bottom: 12),
                         child: ClayContainer(
-                          color: CupertinoColors.systemBlue.withOpacity(0.8),
-                          borderRadius: 12,
-                          depth: 8,
-                          spread: 2,
+                          color: Theme.of(context).colorScheme.surfaceContainerHigh,
+                          borderRadius: 20,
                           curveType: CurveType.none,
-                          child: Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  practiceItem.name,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  ),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  softWrap: true,
-                                ),
-                                if (practiceItem.description.isNotEmpty) ...[
-                                  const SizedBox(height: 6),
+                          child: Container(
+                            // decoration: BoxDecoration(
+                            //   image: const DecorationImage(
+                            //     image: AssetImage(
+                            //         'assets/images/wood_texture_rotated.jpg'),
+                            //     fit: BoxFit.cover,
+                            //   ),
+                            //   border: Border.all(
+                            //       color: Theme.of(context).colorScheme.surface,
+                            //       width: 4),
+                            //   borderRadius: BorderRadius.circular(20),
+                            // ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
                                   Text(
-                                    practiceItem.description,
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.white,
+                                    practiceItem.name,
+                                    style:  TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: Theme.of(context).colorScheme.primary
                                     ),
-                                    maxLines: 3,
+                                    maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
                                     softWrap: true,
                                   ),
+                                  if (practiceItem.description.isNotEmpty) ...[
+                                     SizedBox(height: 6),
+                                    Text(
+                                      practiceItem.description,
+                                      style:  TextStyle(
+                                        fontSize: 12,
+                                        color: Theme.of(context).colorScheme.primary,
+                                      ),
+                                      maxLines: 3,
+                                      overflow: TextOverflow.ellipsis,
+                                      softWrap: true,
+                                    ),
+                                  ],
                                 ],
-                              ],
+                              ),
                             ),
                           ),
                         ),
@@ -3654,30 +3707,32 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                 child: SingleChildScrollView(
                   child: Column(
                     children: [
-                    const SizedBox(height: 16),
-                    // Key signature controls
-                    Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 16),
-                      child: ClayContainer(
-                        color: surfaceColor,
-                        borderRadius: 20,
-                        depth: 10,
-                        spread: 3,
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            children:[
+                      const SizedBox(height: 16),
+                      // Key signature controls
+                      Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 16),
+                        child: ClayContainer(
+                          color: surfaceColor,
+                          borderRadius: 20,
+                          depth: 10,
+                          spread: 3,
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(children: [
                               // Main controls with responsive layout
                               LayoutBuilder(
                                 builder: (context, constraints) {
                                   // Check if we have enough width for single row layout
-                                  final isWideScreen = constraints.maxWidth > 600;
-                                  
+                                  final isWideScreen =
+                                      constraints.maxWidth > 600;
+
                                   if (isWideScreen) {
                                     // Wide screen: single row layout
                                     return Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      crossAxisAlignment: CrossAxisAlignment.center,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.center,
                                       children: [
                                         _buildKeyControls(),
                                         _buildZoomAndDrawControls(surfaceColor),
@@ -3690,116 +3745,117 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                                       children: [
                                         // Top row: Key controls and extension controls
                                         Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
                                           children: [
                                             _buildKeyControls(),
-                                            _buildExtensionControls(surfaceColor),
+                                            _buildExtensionControls(
+                                                surfaceColor),
                                           ],
                                         ),
-                                        const SizedBox(height: 8),
+                                        const SizedBox(height: 14),
                                         // Bottom row: Zoom/draw controls centered
-                                        Center(child: _buildZoomAndDrawControls(surfaceColor)),
+                                        Center(
+                                            child: _buildZoomAndDrawControls(
+                                                surfaceColor)),
                                       ],
                                     );
                                   }
                                 },
                               ),
-                            ]
+                            ]),
                           ),
                         ),
                       ),
-                    ),
-                    // Add the dial menu widget below the key indicator
-                    _buildDialMenuWidget(),
-                    const SizedBox(height: 20),
-                
-                    // Controls row above sheet music
+                      // Add the dial menu widget below the key indicator
+                      _buildDialMenuWidget(),
+                      const SizedBox(height: 20),
 
-                    // Drawing controls (shown when in drawing mode)
-                    ValueListenableBuilder<bool>(
-                      valueListenable: _isDrawingModeNotifier,
-                      builder: (context, isDrawingMode, child) {
-                        if (isDrawingMode) {
-                          return Center(child: _buildDrawingControls());
-                        }
-                        return const SizedBox.shrink();
-                      },
-                    ),
-                    
-                    // Sheet Music Display with Canvas-based Chord Symbols
-                    if (_chordMeasures.isNotEmpty)
-                      Container(
-                        height: 600,
-                        margin: const EdgeInsets.symmetric(vertical: 8),
-                        child: ClayContainer(
-                          color: surfaceColor,
-                          borderRadius: 20,
-                          depth: 10,
-                          spread: 3,
-                          child: Stack(
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.all(16),
-                                child: SingleChildScrollView(
-                                  scrollDirection: Axis.horizontal,
-                                  child: _buildCachedSheetMusic(),
-                                ),
-                              ),
-                              // Help button in top left
-                              Positioned(
-                                top: 8,
-                                left: 8,
-                                child: ClayContainer(
-                                  color: surfaceColor,
-                                  borderRadius: 15,
-                                  depth: 4,
-                                  spread: 1,
-                                  child: IconButton(
-                                    icon: const Icon(
-                                      Icons.help_outline,
-                                      size: 20,
-                                      color: Colors.grey,
-                                    ),
-                                    onPressed: _showSheetMusicHelp,
-                                    tooltip: 'Sheet Music Help',
-                                    constraints: const BoxConstraints(
-                                      minWidth: 30,
-                                      minHeight: 30,
-                                    ),
-                                    padding: const EdgeInsets.all(4),
+                      // Controls row above sheet music
+
+                      // Drawing controls (shown when in drawing mode)
+                      ValueListenableBuilder<bool>(
+                        valueListenable: _isDrawingModeNotifier,
+                        builder: (context, isDrawingMode, child) {
+                          if (isDrawingMode) {
+                            return Center(child: _buildDrawingControls());
+                          }
+                          return const SizedBox.shrink();
+                        },
+                      ),
+
+                      // Sheet Music Display with Canvas-based Chord Symbols
+                      if (_chordMeasures.isNotEmpty)
+                        Container(
+                          height: 600,
+                          margin: const EdgeInsets.symmetric(vertical: 8),
+                          child: ClayContainer(
+                            color: surfaceColor,
+                            borderRadius: 20,
+                            depth: 10,
+                            spread: 3,
+                            child: Stack(
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: SingleChildScrollView(
+                                    scrollDirection: Axis.horizontal,
+                                    child: _buildCachedSheetMusic(),
                                   ),
                                 ),
-                              ),
-                            ],
+                                // Help button in top left
+                                Positioned(
+                                  top: 8,
+                                  left: 8,
+                                  child: ClayContainer(
+                                    color: surfaceColor,
+                                    borderRadius: 15,
+                                    child: IconButton(
+                                      icon: const Icon(
+                                        Icons.help_outline,
+                                        size: 20,
+                                        color: Colors.grey,
+                                      ),
+                                      onPressed: _showSheetMusicHelp,
+                                      tooltip: 'Sheet Music Help',
+                                      constraints: const BoxConstraints(
+                                        minWidth: 30,
+                                        minHeight: 30,
+                                      ),
+                                      padding: const EdgeInsets.all(4),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                    const SizedBox(height: 20),
-                    // Chord progression creation button (appears when chords are selected)
-                    _buildChordProgressionButton(),
+                      const SizedBox(height: 20),
+                      // Chord progression creation button (appears when chords are selected)
+                      _buildChordProgressionButton(),
 
-                    // Center(
-                    //   child: SizedBox(
-                    //     width: MediaQuery.of(context).size.width * 0.8,
-                    //     child: BeatTimeline(
-                    //       beatsPerMeasure: _beatsPerMeasure,
-                    //       currentProgress:
-                    //           _currentBeatInMeasure + 1, // Convert to 1-indexed
-                    //       userInputMarkers: _userInputBeats,
-                    //       textColor: Theme.of(context).colorScheme.onSurface,
-                    //     ),
-                    //   ),
-                    // ),
-                    const ActiveSessionBanner(),
-                    // Practice items widget
-                    _buildPracticeItemsWidget(),
-                    // General practice item button (always shown)
-                    _buildGeneralPracticeItemButton(),
+                      // Center(
+                      //   child: SizedBox(
+                      //     width: MediaQuery.of(context).size.width * 0.8,
+                      //     child: BeatTimeline(
+                      //       beatsPerMeasure: _beatsPerMeasure,
+                      //       currentProgress:
+                      //           _currentBeatInMeasure + 1, // Convert to 1-indexed
+                      //       userInputMarkers: _userInputBeats,
+                      //       textColor: Theme.of(context).colorScheme.onSurface,
+                      //     ),
+                      //   ),
+                      // ),
+                      const ActiveSessionBanner(),
+                      // Practice items widget
+                      _buildPracticeItemsWidget(),
+                      // General practice item button (always shown)
+                      _buildGeneralPracticeItemButton(),
 
-                    const SizedBox(height: 20), // Bottom padding for scroll
-                  ],
+                      const SizedBox(height: 20), // Bottom padding for scroll
+                    ],
+                  ),
                 ),
-              ),
               ),
             ),
           ), // MouseRegio
