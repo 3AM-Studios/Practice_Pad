@@ -416,15 +416,15 @@ class NoteRenderer with DebugRenderMixin implements MusicalSymbolRenderer {
     final noteHeadCenter = noteHeadBounds.center;
 
     // Calculate container size with padding
-    const padding = 4.5;
-    final containerWidth = textPainter.width + (padding * 2.34);
+    const padding = 3.9;
+    final containerWidth = textPainter.width + (padding * 3);
     final containerHeight = textPainter.height + (padding * 2);
 
     // Position the container based on stem direction
     final containerX = noteHeadCenter.dx - containerWidth / 2;
     final containerY = noteMetrics.isStemUp
-        ? noteHeadBounds.bottom + (8 / layout.canvasScale)
-        : noteHeadBounds.top - containerHeight - (8 / layout.canvasScale);
+        ? noteHeadBounds.bottom + (3 / layout.canvasScale)
+        : noteHeadBounds.top - containerHeight - (3 / layout.canvasScale);
 
     // Create container rectangle with rounded corners
     final containerRect = Rect.fromLTWH(containerX, containerY, containerWidth, containerHeight);

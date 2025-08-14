@@ -52,7 +52,6 @@ Widget _buildBody(BuildContext context, TodayViewModel viewModel) {
   if (viewModel.todaysAreas.isEmpty) {
     return Column(
       children: [
-        const ActiveSessionBanner(),
         Expanded(
           child: Center(
             child: Padding(
@@ -69,6 +68,7 @@ Widget _buildBody(BuildContext context, TodayViewModel viewModel) {
           ),
         ),
         // Goal ring
+        const ActiveSessionBanner(),
         buildGoalRing(context, viewModel),
         // Calendar stays at bottom
         PracticeCalendar(
@@ -82,7 +82,7 @@ Widget _buildBody(BuildContext context, TodayViewModel viewModel) {
   return Column(
     children: [
       // Active session banner at top
-      const ActiveSessionBanner(),
+      
       
       // Scrollable practice areas in the middle (takes remaining space)
       Expanded(
@@ -126,7 +126,7 @@ Widget _buildBody(BuildContext context, TodayViewModel viewModel) {
           ],
         ),
       ),
-      
+      const ActiveSessionBanner(),
       // Goal ring between calendar and practice areas
       buildGoalRing(context, viewModel),
       

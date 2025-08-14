@@ -584,22 +584,25 @@ void _resetInteractionState() {
                 // Drawing board positioned early so other overlays appear on top
                 if (widget.drawingController != null)
                   Positioned.fill(
-                    child: Container(
-                      color: Colors.transparent, // Debug: visible overlay when drawing mode is active
-                      child: drawing_board.DrawingBoard(
-                        controller: widget.drawingController!,
-                        canvasScale: widget.canvasScale,
-                        verticalOffset: currentLayout.upperPaddingOnCanvas * widget.canvasScale,
-                        background: Container(
-                          width: widget.width / widget.canvasScale,
-                          height: (currentLayout.totalContentHeight + currentLayout.upperPaddingOnCanvas * widget.canvasScale) / widget.canvasScale,
-                          color: Colors.transparent,
+                    child: IgnorePointer(
+                      ignoring: !isDrawingMode, // Only accept touch events when in drawing mode
+                      child: Container(
+                        color: Colors.transparent, // Debug: visible overlay when drawing mode is active
+                        child: drawing_board.DrawingBoard(
+                          controller: widget.drawingController!,
+                          canvasScale: widget.canvasScale,
+                          verticalOffset: currentLayout.upperPaddingOnCanvas * widget.canvasScale,
+                          background: Container(
+                            width: widget.width / widget.canvasScale,
+                            height: (currentLayout.totalContentHeight + currentLayout.upperPaddingOnCanvas * widget.canvasScale) / widget.canvasScale,
+                            color: Colors.transparent,
+                          ),
+                          showDefaultActions: false,
+                          showDefaultTools: false,
+                          boardPanEnabled: false,
+                          boardScaleEnabled: false,
+                          onPointerUp: widget.onDrawingPointerUp,
                         ),
-                        showDefaultActions: false,
-                        showDefaultTools: false,
-                        boardPanEnabled: false,
-                        boardScaleEnabled: false,
-                        onPointerUp: widget.onDrawingPointerUp,
                       ),
                     ),
                   ),
@@ -753,12 +756,12 @@ void _resetInteractionState() {
                     chordX = measureX +
                         (spacing * chordIndex) +
                         (spacing / 2) -
-                        25; // Better centering
+                        10; // Better centering
                   }
 
                   // Position properly above the staff (much higher and more consistent)
                   final chordY = measureY -
-                      (140 *
+                      (180 *
                           layout
                               .canvasScale); // Higher and more appropriate positioning
 

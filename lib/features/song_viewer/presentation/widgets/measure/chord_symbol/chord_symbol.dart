@@ -887,8 +887,8 @@ class ChordSymbol {
 
   void render(Canvas canvas, Size size, double measureOriginX, double staffLineCenterY, double measureWidth) {
     // Position chord symbol well above the staff for visibility - use fixed offset
-    final chordY = staffLineCenterY - 120.0; // Fixed 120 pixel offset above staff
-    
+    final chordY = staffLineCenterY - 150.0; // Fixed 150 pixel offset above staff
+
     // Center the chord symbol horizontally in the measure
     final chordX = measureOriginX + (measureWidth / 2);
     
@@ -904,7 +904,7 @@ class ChordSymbol {
       text: TextSpan(
         text: chordText,
         style: const TextStyle(
-          fontSize: 50, // Much larger font
+          fontSize: 90, // Much larger font
           fontWeight: FontWeight.bold,
           color: Colors.black,
         ),
@@ -919,7 +919,7 @@ class ChordSymbol {
       text: TextSpan(
         text: romanText + getQualitySuperscript(),
         style: const TextStyle(
-          fontSize: 45, // Much larger font
+          fontSize: 85, // Much larger font
           fontWeight: FontWeight.w600,
           color: Colors.black,
         ),
@@ -930,8 +930,8 @@ class ChordSymbol {
     romanTextPainter.layout();
     
     // Calculate container size with substantial padding
-    final containerWidth = math.max(chordTextPainter.width, romanTextPainter.width) + 48; // More padding
-    final containerHeight = chordTextPainter.height + romanTextPainter.height + 32; // More padding
+    final containerWidth = math.max(chordTextPainter.width, romanTextPainter.width) + 20; // More padding
+    final containerHeight = chordTextPainter.height + romanTextPainter.height + 10; // More padding
     
     // Draw the container background with bright color for visibility
     final containerRect = Rect.fromCenter(
@@ -1096,7 +1096,7 @@ class ChordSymbol {
                         ? getRomanNumeral(original: false)
                         : getRomanNumeral(original: true),
                     style: TextStyle(
-                        fontSize: 23 * canvasScale,
+                        fontSize: 40 * canvasScale,
                         fontWeight: FontWeight.w600,
                         color: isSelected 
                             ? Colors.white
@@ -1110,7 +1110,7 @@ class ChordSymbol {
                     TextSpan(
                       text: getQualitySuperscript(),
                       style: TextStyle(
-                          fontSize: 22 * canvasScale,
+                          fontSize: 36 * canvasScale,
                           fontWeight: FontWeight.w600,
                           color: isSelected 
                               ? Colors.white
