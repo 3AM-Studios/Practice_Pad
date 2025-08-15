@@ -245,25 +245,11 @@ class _PracticeSessionScreenState extends State<PracticeSessionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Practice Session', style: TextStyle(
-              fontSize: 18,
-              color: Theme.of(context).colorScheme.onSurface,
-              fontWeight: FontWeight.w600,
-            ),),
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        elevation: 0,
-      ),
       body: DefaultTextStyle(
         style: CupertinoTheme.of(context).textTheme.textStyle,
         child: SafeArea(
           child: CustomScrollView(
             slivers: [
-              // Add padding for app bar
-              const SliverToBoxAdapter(
-                child: SizedBox(height: 20),
-              ),
-
               SliverPadding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 sliver: SliverList(
@@ -273,41 +259,37 @@ class _PracticeSessionScreenState extends State<PracticeSessionScreen> {
 
                     const SizedBox(height: 10),
 
-                    // Modern complete session button
-                    Container(
-                      width: double.infinity,
-                      margin: const EdgeInsets.symmetric(horizontal: 4),
-                      decoration: BoxDecoration(
-                        color: _hasAnyReps() || _elapsedSeconds > 0
-                            ? CupertinoColors.activeGreen
-                            : CupertinoColors.systemGrey4,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: _hasAnyReps() || _elapsedSeconds > 0
-                            ? [
-                                BoxShadow(
-                                  color: CupertinoColors.activeGreen
-                                      .withOpacity(0.4),
-                                  blurRadius: 15,
-                                  offset: const Offset(0, 6),
-                                ),
-                              ]
-                            : null,
-                      ),
-                      child: CupertinoButton(
-                        onPressed: _hasAnyReps() || _elapsedSeconds > 0
-                            ? _completePracticeSession
-                            : null,
-                        borderRadius: BorderRadius.circular(20),
-                        padding: const EdgeInsets.symmetric(vertical: 18),
-                        child: Text(
-                          'Complete Session',
-                          style: TextStyle(
-                            fontSize: 19,
-                            fontWeight: FontWeight.w800,
-                            color: _hasAnyReps() || _elapsedSeconds > 0
-                                ? CupertinoColors.white
-                                : CupertinoColors.systemGrey,
-                            letterSpacing: 0.8,
+                    // Complete session button with clay and wood styling
+                    ClayContainer(
+                      color: Theme.of(context).colorScheme.surface,
+                      borderRadius: 20,
+                      child: Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
+                        decoration: BoxDecoration(
+                          image: const DecorationImage(
+                            image: AssetImage('assets/images/wood_texture_rotated.jpg'),
+                            fit: BoxFit.cover,
+                          ),
+                          border: Border.all(color: Theme.of(context).colorScheme.surface, width: 4),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: CupertinoButton(
+                          onPressed: _hasAnyReps() || _elapsedSeconds > 0
+                              ? _completePracticeSession
+                              : null,
+                          borderRadius: BorderRadius.circular(20),
+                          padding: const EdgeInsets.symmetric(vertical: 18),
+                          child: Text(
+                            'Complete Session',
+                            style: TextStyle(
+                              fontSize: 19,
+                              fontWeight: FontWeight.w800,
+                              color: _hasAnyReps() || _elapsedSeconds > 0
+                                  ? CupertinoColors.white
+                                  : CupertinoColors.white.withOpacity(0.5),
+                              letterSpacing: 0.8,
+                            ),
                           ),
                         ),
                       ),
@@ -339,80 +321,86 @@ class _PracticeSessionScreenState extends State<PracticeSessionScreen> {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            // Modern timer section
-            Container(
-              width: double.infinity,
-              margin: const EdgeInsets.symmetric(horizontal: 4),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    CupertinoColors.systemGrey6.withOpacity(0.3),
-                    CupertinoColors.systemGrey6.withOpacity(0.1),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(
-                  color: CupertinoColors.systemGrey4.withOpacity(0.3),
-                  width: 0.5,
-                ),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(24),
-                child: Container(
-                  padding: const EdgeInsets.all(28),
-                  child: Column(
-                    children: [
+            // Timer section with regular clay container
+            ClayContainer(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: 24,
+              child: Container(
+                width: double.infinity,
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                padding: const EdgeInsets.all(28),
+                child: Column(
+                  children: [
+                    // Practice item name with X button
+                    Row(
+                      children: [
+                        ClayContainer(
+                          color: Theme.of(context).colorScheme.surface,
+                          borderRadius: 20,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              image: const DecorationImage(
+                                image: AssetImage('assets/images/wood_texture_rotated.jpg'),
+                                fit: BoxFit.cover,
+                              ),
+                              border: Border.all(color: Theme.of(context).colorScheme.surface, width: 4),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: CupertinoButton(
+                              padding: const EdgeInsets.all(8),
+                              onPressed: () => Navigator.of(context).pop(),
+                              child: const Icon(
+                                CupertinoIcons.xmark,
+                                color: CupertinoColors.white,
+                                size: 20,
+                              ),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            widget.practiceItem.name,
+                            style: TextStyle(
+                              fontSize: 34,
+                              fontWeight: FontWeight.w800,
+                              color: CupertinoTheme.of(context).textTheme.textStyle.color,
+                              letterSpacing: 0.5,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                        const SizedBox(width: 48), // Balance the X button width
+                      ],
+                    ),
+                    // Add description as subtitle if it exists
+                    if (widget.practiceItem.description.isNotEmpty) ...[
+                      const SizedBox(height: 8),
                       Text(
-                        widget.practiceItem.name,
+                        widget.practiceItem.description,
                         style: TextStyle(
-                          fontSize: 34,
-                          fontWeight: FontWeight.w800,
-                          color: CupertinoTheme.of(context)
-                              .textTheme
-                              .textStyle
-                              .color,
-                          letterSpacing: 0.5,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          color: CupertinoTheme.of(context).textTheme.textStyle.color?.withOpacity(0.7),
+                          letterSpacing: 0.3,
                         ),
                         textAlign: TextAlign.center,
                       ),
-                      // Add description as subtitle if it exists
-                      if (widget.practiceItem.description.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          widget.practiceItem.description,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                            color: CupertinoTheme.of(context)
-                                .textTheme
-                                .textStyle
-                                .color
-                                ?.withOpacity(0.7),
-                            letterSpacing: 0.3,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                      const SizedBox(height: 20),
+                    ],
+                    const SizedBox(height: 20),
 
-                      // Modern timer display
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 32, vertical: 16),
+                    // Timer display with wooden styling
+                    ClayContainer(
+                      color: Theme.of(context).colorScheme.surface,
+                      borderRadius: 20,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                         decoration: BoxDecoration(
-                          color: CupertinoTheme.of(context).primaryColor,
+                          image: const DecorationImage(
+                            image: AssetImage('assets/images/wood_texture_rotated.jpg'),
+                            fit: BoxFit.cover,
+                          ),
+                          border: Border.all(color: Theme.of(context).colorScheme.surface, width: 4),
                           borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              color: CupertinoTheme.of(context)
-                                  .primaryColor
-                                  .withOpacity(0.3),
-                              blurRadius: 15,
-                              offset: const Offset(0, 5),
-                            ),
-                          ],
                         ),
                         child: Text(
                           _formatTime(_elapsedSeconds),
@@ -425,13 +413,17 @@ class _PracticeSessionScreenState extends State<PracticeSessionScreen> {
                           textAlign: TextAlign.center,
                         ),
                       ),
+                    ),
 
-                      const SizedBox(height: 24),
+                    const SizedBox(height: 24),
 
-                      // Modern timer controls
-                      Row(
-                        children: [
-                          Expanded(
+                    // Timer controls with clay containers
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ClayContainer(
+                            color: Theme.of(context).colorScheme.surface,
+                            borderRadius: 16,
                             child: _buildModernButton(
                               text: _isTimerRunning ? 'Stop' : 'Start',
                               onPressed:
@@ -441,58 +433,53 @@ class _PracticeSessionScreenState extends State<PracticeSessionScreen> {
                                   : CupertinoColors.activeGreen,
                             ),
                           ),
-                          const SizedBox(width: 16),
-                          Expanded(
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: ClayContainer(
+                            color: Theme.of(context).colorScheme.surface,
+                            borderRadius: 16,
                             child: _buildModernButton(
                               text: 'Reset',
                               onPressed: _resetTimer,
                               color: CupertinoColors.systemGrey,
                             ),
                           ),
-                        ],
-                      ),
-                    ],
-                  ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ),
-
             const SizedBox(height: 40),
 
-            // Modern practice tracking section
-            Container(
-              width: double.infinity,
-              margin: const EdgeInsets.symmetric(horizontal: 4),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    CupertinoColors.systemGrey6.withOpacity(0.4),
-                    CupertinoColors.systemGrey6.withOpacity(0.1),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(32),
-                border: Border.all(
-                  color: CupertinoColors.systemGrey4.withOpacity(0.2),
-                  width: 0.5,
-                ),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(32),
-                child: Container(
-                  padding: const EdgeInsets.all(32),
-                  child: Column(
-                    children: [
-                      // Modern title
-                      Container(
+            // Keys Practiced section with regular clay container
+            ClayContainer(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: 32,
+              child: Container(
+                width: double.infinity,
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  children: [
+                    // Keys Practiced title with wooden styling
+                    ClayContainer(
+                      color: Theme.of(context).colorScheme.surface,
+                      borderRadius: 16,
+                      child: Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 20, vertical: 8),
                         decoration: BoxDecoration(
-                          color: CupertinoTheme.of(context).primaryColor,
+                          image: const DecorationImage(
+                            image: AssetImage('assets/images/wood_texture_rotated.jpg'),
+                            fit: BoxFit.cover,
+                          ),
+                          border: Border.all(color: Theme.of(context).colorScheme.surface, width: 4),
                           borderRadius: BorderRadius.circular(16),
                         ),
-                        child: Text(
+                        child: const Text(
                           'Keys Practiced',
                           style: TextStyle(
                             fontSize: 18,
@@ -503,6 +490,7 @@ class _PracticeSessionScreenState extends State<PracticeSessionScreen> {
                           textAlign: TextAlign.center,
                         ),
                       ),
+                    ),
 
                       const SizedBox(height: 28),
 
@@ -516,7 +504,7 @@ class _PracticeSessionScreenState extends State<PracticeSessionScreen> {
 
                       const SizedBox(height: 28),
 
-                      // Modern instructions
+                      // Instructions
                       Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 20, vertical: 12),
@@ -559,7 +547,6 @@ class _PracticeSessionScreenState extends State<PracticeSessionScreen> {
                   ),
                 ),
               ),
-            ),
           ],
         ),
       ),
@@ -846,7 +833,7 @@ class _CircularKeyBarGraphPainter extends CustomPainter {
           );
 
           // Use consistent color for today's progress
-          final todayColor = CupertinoColors.activeOrange;
+          const todayColor = CupertinoColors.activeOrange;
 
           final todayPaint = Paint()
             ..color = todayColor.withOpacity(0.95)

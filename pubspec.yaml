@@ -48,7 +48,6 @@ dependencies:
 
   # Bass walking feature dependencies
   flutter_midi_pro: any
-  metronome: any
   path_provider: any
   xml: any
   music_sheet:
@@ -61,6 +60,10 @@ dependencies:
 
   flutter_drawing_board: 
     path: packages/flutter_drawing_board
+  window_manager:
+    path: packages/window_manager
+  device_info_plus: ^11.3.0
+  home_widget: ^0.8.0
 
 dev_dependencies:
   flutter_test:

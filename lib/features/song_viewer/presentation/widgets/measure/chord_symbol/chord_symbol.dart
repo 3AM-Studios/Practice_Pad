@@ -2,7 +2,6 @@
 import 'package:music_sheet/index.dart';
 import 'package:flutter/material.dart';
 import 'package:clay_containers/clay_containers.dart';
-import 'package:music_sheet/src/constants.dart';
 import 'dart:math' as math;
 
 /// Represents a chord symbol with Roman numeral analysis capability and MusicXML support.

@@ -19,8 +19,8 @@ Color? stringToColor(String data) {
 }
 
 int colorToInt(Color color) {
-  return (color.alpha * 255).toInt() << 24 |
-      (color.red * 255).toInt() << 16 |
-      (color.green * 255).toInt() << 8 |
-      (color.blue * 255).toInt();
+  return (color.alpha * 255) << 24 |
+      (color.red * 255) << 16 |
+      (color.green * 255) << 8 |
+      (color.blue * 255);
 }

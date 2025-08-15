@@ -8,7 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:clay_containers/clay_containers.dart';
-import 'package:metronome/metronome.dart';
+import 'package:practice_pad/services/device_type.dart';
 import 'package:xml/xml.dart';
 import 'package:music_sheet/simple_sheet_music.dart' as music_sheet;
 import 'package:flutter_drawing_board/flutter_drawing_board.dart';
@@ -48,7 +48,6 @@ class SongViewerScreen extends StatefulWidget {
 class _SongViewerScreenState extends State<SongViewerScreen>
     with TickerProviderStateMixin {
   bool _isLoading = true;
-  final Metronome _metronome = Metronome();
   StreamSubscription<int>? _tickSubscription;
   final bool _isPlaying = false;
 
@@ -892,8 +891,9 @@ class _SongViewerScreenState extends State<SongViewerScreen>
 
   /// Gets the currently modified major key index for highlighting in the dial
   int? _getCurrentlyModifiedMajorKeyIndex(List<DialItem> outerItems) {
-    if (_selectedChordGroup == null || _selectedChordGroup!.isEmpty)
+    if (_selectedChordGroup == null || _selectedChordGroup!.isEmpty) {
       return null;
+    }
 
     // Get the modified key signature from the first chord in the group
     final firstChord = _selectedChordGroup!.first;
@@ -917,8 +917,9 @@ class _SongViewerScreenState extends State<SongViewerScreen>
 
   /// Gets the currently modified minor key index for highlighting in the dial
   int? _getCurrentlyModifiedMinorKeyIndex(List<DialItem> innerItems) {
-    if (_selectedChordGroup == null || _selectedChordGroup!.isEmpty)
+    if (_selectedChordGroup == null || _selectedChordGroup!.isEmpty) {
       return null;
+    }
 
     // Get the modified key signature from the first chord in the group
     final firstChord = _selectedChordGroup!.first;
@@ -1243,7 +1244,8 @@ class _SongViewerScreenState extends State<SongViewerScreen>
           final chordMeasure = ChordMeasure(
             musicalSymbols.cast(),
             chordSymbols: measureChords,
-            isNewLine: measureNumber % 6 ==
+            isNewLine: deviceType == DeviceType.phone?  measureNumber % 6 ==
+                1 : measureNumber % 7 ==
                 1, // Set to true every 4 measures (1, 5, 9, etc.)
           );
           chordMeasures.add(chordMeasure);
@@ -2080,7 +2082,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                   child: Container(
                     decoration: _extensionNumbersRelativeToChords
                         ? BoxDecoration(
-                            image: DecorationImage(
+                            image: const DecorationImage(
                               image: AssetImage(
                                   'assets/images/wood_texture_rotated.jpg'),
                               fit: BoxFit.cover,
@@ -2117,7 +2119,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                   child: Container(
                     decoration: !_extensionNumbersRelativeToChords
                         ? BoxDecoration(
-                            image: DecorationImage(
+                            image: const DecorationImage(
                               image: AssetImage(
                                   'assets/images/wood_texture_rotated.jpg'),
                               fit: BoxFit.cover,
@@ -2671,7 +2673,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
           depth: 5,
           curveType: CurveType.convex,
           child:  Padding(
-            padding: EdgeInsets.symmetric(vertical: 12),
+            padding: const EdgeInsets.symmetric(vertical: 12),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -3503,7 +3505,6 @@ class _SongViewerScreenState extends State<SongViewerScreen>
   @override
   void dispose() {
     _tickSubscription?.cancel();
-    _metronome.destroy();
 
     // Clean up auto-scroll timer
     _autoScrollTimer?.cancel();
@@ -3607,7 +3608,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                                     softWrap: true,
                                   ),
                                   if (practiceItem.description.isNotEmpty) ...[
-                                     SizedBox(height: 6),
+                                     const SizedBox(height: 6),
                                     Text(
                                       practiceItem.description,
                                       style:  TextStyle(

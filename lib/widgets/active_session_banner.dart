@@ -18,10 +18,6 @@ class ActiveSessionBanner extends StatelessWidget {
 
     return Consumer<PracticeSessionManager>(
       builder: (context, sessionManager, child) {
-        if (!sessionManager.hasActiveSession) {
-          return const SizedBox.shrink();
-        }
-
         return Container(
           margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           child: ClayContainer(
@@ -29,43 +25,46 @@ class ActiveSessionBanner extends StatelessWidget {
             borderRadius: 20,
          
             child: GestureDetector(
-              onTap: () {
-                if (sessionManager.activePracticeItem != null) {
-                  Navigator.push(
-                    context,
-                    CupertinoPageRoute(
-                      builder: (_) => PracticeSessionScreen(
-                        practiceItem: sessionManager.activePracticeItem!,
-                      ),
-                    ),
-                  );
-                }
-              },
+              onTap: sessionManager.hasActiveSession
+                ? () {
+                    if (sessionManager.activePracticeItem != null) {
+                      Navigator.push(
+                        context,
+                        CupertinoPageRoute(
+                          builder: (_) => PracticeSessionScreen(
+                            practiceItem: sessionManager.activePracticeItem!,
+                          ),
+                        ),
+                      );
+                    }
+                  }
+                : null,
               child: Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  image: DecorationImage(
+                  image: const DecorationImage(
                     image: AssetImage('assets/images/wood_texture_rotated.jpg'),
                     fit: BoxFit.cover,
                   ),
                  border: Border.all(color: surfaceColor, width: 4),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: Row(
-                  children: [
-                    // Session icon and name
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        '${sessionManager.activePracticeItem?.name ?? 'Unknown'}',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
+                child: sessionManager.hasActiveSession
+                  ? Row(
+                      children: [
+                        // Session icon and name
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            sessionManager.activePracticeItem?.name ?? 'Unknown',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
 
                     // Progress display and controls
                     if (sessionManager.isRepsBased) ...[
@@ -86,7 +85,7 @@ class ActiveSessionBanner extends StatelessWidget {
                               width: 32,
                               height: 32,
                               spread: 0,
-                              child: Icon(
+                              child: const Icon(
                                 CupertinoIcons.minus,
                                 color: bannerColor,
                                 size: 18,
@@ -115,7 +114,7 @@ class ActiveSessionBanner extends StatelessWidget {
                                       sessionManager.incrementReps();
                                     }
                                   : null,
-                              child: Icon(
+                              child: const Icon(
                                 CupertinoIcons.plus,
                                 color: bannerColor,
                                 size: 18,
@@ -164,8 +163,18 @@ class ActiveSessionBanner extends StatelessWidget {
                         ],
                       ),
                     ],
-                  ],
-                ),
+                      ],
+                    )
+                  : const Center(
+                      child: Text(
+                        'No active practice session',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
               ),
             ),
           ),

@@ -565,7 +565,7 @@ void _resetInteractionState() {
               behavior: HitTestBehavior.deferToChild,
               child: SizedBox(
             width: widget.width,
-            height: currentLayout.totalContentHeight,
+            height: (currentLayout.totalContentHeight / widget.canvasScale) + currentLayout.upperPaddingOnCanvas,
             // The Stack is how we layer our static and dynamic painters.
             child: Stack(
               children: [
@@ -591,10 +591,11 @@ void _resetInteractionState() {
                         child: drawing_board.DrawingBoard(
                           controller: widget.drawingController!,
                           canvasScale: widget.canvasScale,
-                          verticalOffset: currentLayout.upperPaddingOnCanvas * widget.canvasScale,
+                          verticalOffset: 0,
+
                           background: Container(
                             width: widget.width / widget.canvasScale,
-                            height: (currentLayout.totalContentHeight + currentLayout.upperPaddingOnCanvas * widget.canvasScale) / widget.canvasScale,
+                            height: (currentLayout.totalContentHeight / widget.canvasScale) + currentLayout.upperPaddingOnCanvas,
                             color: Colors.transparent,
                           ),
                           showDefaultActions: false,

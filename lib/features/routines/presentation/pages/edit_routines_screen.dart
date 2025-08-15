@@ -1,4 +1,6 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+import 'package:clay_containers/clay_containers.dart';
 import 'package:practice_pad/features/edit_items/presentation/viewmodels/edit_items_viewmodel.dart';
 import 'package:practice_pad/features/routines/models/day_of_week.dart';
 import 'package:practice_pad/features/routines/presentation/pages/add_areas_to_routine_screen.dart';
@@ -245,26 +247,40 @@ class _EditRoutinesScreenState extends State<EditRoutinesScreen> {
                     },
                   ),
                 ),
-                // Copy routine button
+                // Copy routine button with wooden styling
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: CupertinoButton(
-                      color: CupertinoColors.systemGrey5,
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(CupertinoIcons.doc_on_doc,
-                              color: CupertinoColors.systemBlue),
-                          SizedBox(width: 8),
-                          Text('Copy This Routine to Another Day',
-                              style:
-                                  TextStyle(color: CupertinoColors.systemBlue)),
-                        ],
+                  child: ClayContainer(
+                    color: Theme.of(context).colorScheme.surface,
+                    borderRadius: 20,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        image: const DecorationImage(
+                          image: AssetImage('assets/images/wood_texture_rotated.jpg'),
+                          fit: BoxFit.cover,
+                        ),
+                        border: Border.all(color: Theme.of(context).colorScheme.surface, width: 4),
+                        borderRadius: BorderRadius.circular(20),
                       ),
-                      onPressed: () =>
-                          _showCopyRoutineDialog(context, routinesViewModel),
+                      child: CupertinoButton(
+                        padding: const EdgeInsets.all(16),
+                        onPressed: () => _showCopyRoutineDialog(context, routinesViewModel),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(CupertinoIcons.doc_on_doc, color: CupertinoColors.white),
+                            SizedBox(width: 8),
+                            Text(
+                              'Copy This Routine to Another Day',
+                              style: TextStyle(
+                                color: CupertinoColors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -312,24 +328,28 @@ class _EditRoutinesScreenState extends State<EditRoutinesScreen> {
                           return Container(
                             margin: const EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 4),
-                            child: CupertinoListTile(
-                              title: Text(practiceArea.name),
-                              subtitle: Text(
-                                '${practiceArea.practiceItems.length} practice items',
-                                style: const TextStyle(
-                                  color: CupertinoColors.systemGrey,
+                            child: ClayContainer(
+                              color: Theme.of(context).colorScheme.surface,
+                              borderRadius: 12,
+                              child: CupertinoListTile(
+                                title: Text(practiceArea.name),
+                                subtitle: Text(
+                                  '${practiceArea.practiceItems.length} practice items',
+                                  style: const TextStyle(
+                                    color: CupertinoColors.systemGrey,
+                                  ),
                                 ),
-                              ),
-                              trailing: CupertinoButton(
-                                padding: EdgeInsets.zero,
-                                child: const Icon(
-                                  CupertinoIcons.delete,
-                                  color: CupertinoColors.destructiveRed,
+                                trailing: CupertinoButton(
+                                  padding: EdgeInsets.zero,
+                                  child: const Icon(
+                                    CupertinoIcons.delete,
+                                    color: CupertinoColors.destructiveRed,
+                                  ),
+                                  onPressed: () {
+                                    routinesViewModel.removePracticeAreaFromRoutine(
+                                        routinesViewModel.selectedDay, practiceArea);
+                                  },
                                 ),
-                                onPressed: () {
-                                  routinesViewModel.removePracticeAreaFromRoutine(
-                                      routinesViewModel.selectedDay, practiceArea);
-                                },
                               ),
                             ),
                           );

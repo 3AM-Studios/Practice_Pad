@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:clay_containers/clay_containers.dart';
@@ -6,6 +8,7 @@ import 'package:practice_pad/features/edit_items/presentation/viewmodels/edit_it
 import 'package:practice_pad/features/practice/presentation/viewmodels/today_viewmodel.dart';
 import 'package:practice_pad/features/practice/presentation/pages/today_screen.dart';
 import 'package:practice_pad/features/routines/presentation/viewmodels/routines_viewmodel.dart';
+import 'package:practice_pad/services/device_type.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:practice_pad/widgets/wooden_border_wrapper.dart';
@@ -16,13 +19,39 @@ import 'package:practice_pad/features/routines/presentation/pages/edit_routines_
 import 'package:practice_pad/services/practice_session_manager.dart';
 import 'package:practice_pad/models/statistics.dart';
 import 'package:practice_pad/models/practice_area.dart';
+import 'package:practice_pad/services/home_widget_service.dart';
+import 'package:practice_pad/services/widget_update_service.dart';
 import 'dart:math' as math;
+
+import 'package:window_manager/window_manager.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  deviceType = await getDeviceType();
+  print('device type: $deviceType');
 
   const String icloudContainerId = "iCloud.com.practicepad";
+  // 2. Only run this code on desktop platforms.
+  if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+    await windowManager.ensureInitialized();
 
+    WindowOptions windowOptions = const WindowOptions(
+      // --- SET YOUR FIXED DIMENSIONS HERE ---
+      size: Size(1152, 864),
+      minimumSize: Size(1152, 864), // Makes the window non-resizable
+      maximumSize: Size(1152, 864), // Makes the window non-resizable
+      // ------------------------------------
+      center: true,
+    );
+
+    // 3. Wait until the window is ready to show, then apply options.
+    windowManager.waitUntilReadyToShow(windowOptions, () async {
+      await windowManager.show();
+      await windowManager.focus();
+    });
+  }
+  
   try {
     await CloudKitService.initialize(icloudContainerId);
     print(
@@ -30,6 +59,9 @@ void main() async {
   } catch (e) {
     print("FATAL: CloudKitService initialization failed: $e");
   }
+
+  // Initialize home widget service
+  await HomeWidgetService.initialize();
 
   runApp(const PracticeLoverApp());
 }
@@ -114,6 +146,31 @@ class MainAppScaffold extends StatefulWidget {
 
 class MainAppScaffoldState extends State<MainAppScaffold> {
   int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize widget update service after the build completes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeWidgetService();
+    });
+  }
+
+  void _initializeWidgetService() {
+    final todayViewModel = Provider.of<TodayViewModel>(context, listen: false);
+    final sessionManager = Provider.of<PracticeSessionManager>(context, listen: false);
+    
+    WidgetUpdateService.instance.initialize(
+      todayViewModel: todayViewModel,
+      sessionManager: sessionManager,
+    );
+  }
+
+  @override
+  void dispose() {
+    WidgetUpdateService.instance.dispose();
+    super.dispose();
+  }
 
   List<Widget> get _tabs => [
     ChangeNotifierProxyProvider<RoutinesViewModel, TodayViewModel>(
@@ -379,16 +436,19 @@ class _StatsScreenState extends State<StatsScreen> {
                           children: [
                             const Text('Area: ', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                             Expanded(
-                              child: CupertinoButton(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                color: CupertinoColors.systemGrey6,
-                                child: Text(
-                                  _selectedAreaId == null 
-                                      ? 'Select Practice Area' 
-                                      : _practiceAreas.firstWhere((a) => a.recordName == _selectedAreaId).name,
-                                  style: const TextStyle(color: CupertinoColors.label),
+                              child: ClayContainer(
+                                color: Theme.of(context).colorScheme.surface,
+                                borderRadius: 12,
+                                child: CupertinoButton(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  child: Text(
+                                    _selectedAreaId == null 
+                                        ? 'Select Practice Area' 
+                                        : _practiceAreas.firstWhere((a) => a.recordName == _selectedAreaId).name,
+                                    style: const TextStyle(color: CupertinoColors.label),
+                                  ),
+                                  onPressed: () => _showAreaSelector(),
                                 ),
-                                onPressed: () => _showAreaSelector(),
                               ),
                             ),
                           ],
@@ -398,19 +458,21 @@ class _StatsScreenState extends State<StatsScreen> {
                       if (_selectedAreaId != null)
                         Container(
                           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: CupertinoColors.systemGrey6.resolveFrom(context),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                            children: [
-                              _ColorLegendItem(color: Color(0xFFE0E0E0), label: 'No practice'),
-                              _ColorLegendItem(color: Color(0xFF64B5F6), label: '1-2 sessions'),
-                              _ColorLegendItem(color: Color(0xFFFFB74D), label: '3-5 sessions'),
-                              _ColorLegendItem(color: Color(0xFFEF5350), label: '6+ sessions'),
-                            ],
+                          child: ClayContainer(
+                            color: Theme.of(context).colorScheme.surface,
+                            borderRadius: 12,
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              child: const Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                children: [
+                                  _ColorLegendItem(color: Color(0xFFE0E0E0), label: 'No practice'),
+                                  _ColorLegendItem(color: Color(0xFF64B5F6), label: '1-2 sessions'),
+                                  _ColorLegendItem(color: Color(0xFFFFB74D), label: '3-5 sessions'),
+                                  _ColorLegendItem(color: Color(0xFFEF5350), label: '6+ sessions'),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
                       // Bubble Visualization

@@ -163,7 +163,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
           // Header with Stats button
           Container(
             decoration: BoxDecoration(
-              image: DecorationImage(
+              image: const DecorationImage(
                 image: AssetImage('assets/images/wood_texture_rotated.jpg'),
                 fit: BoxFit.cover,
               ),

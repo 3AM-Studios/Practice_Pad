@@ -1,8 +1,10 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:clay_containers/clay_containers.dart';
 import 'package:practice_pad/features/practice/presentation/viewmodels/today_viewmodel.dart';
 import 'package:practice_pad/features/practice/presentation/widgets/goal_ring.dart';
+import 'package:practice_pad/services/device_type.dart';
 import 'package:practice_pad/widgets/practice_area_tile.dart';
 import 'package:practice_pad/widgets/active_session_banner.dart';
 import 'package:practice_pad/widgets/practice_calendar.dart';
@@ -40,7 +42,8 @@ class TodayScreen extends StatelessWidget {
 
 Widget _buildBody(BuildContext context, TodayViewModel viewModel) {
   final theme = Theme.of(context);
-  
+  final isTabletOrDesktop = deviceType == DeviceType.tablet || deviceType == DeviceType.macOS;
+
   if (viewModel.isLoading) {
     return Center(
       child: CupertinoActivityIndicator(
@@ -67,13 +70,7 @@ Widget _buildBody(BuildContext context, TodayViewModel viewModel) {
             ),
           ),
         ),
-        // Goal ring
-        const ActiveSessionBanner(),
-        buildGoalRing(context, viewModel),
-        // Calendar stays at bottom
-        PracticeCalendar(
-          onStatsPressed: onStatsPressed,
-        ),
+        _buildBottomSection(context, viewModel, onStatsPressed, isTabletOrDesktop),
       ],
     );
   }
@@ -94,18 +91,18 @@ Widget _buildBody(BuildContext context, TodayViewModel viewModel) {
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
                 child: Center(
                   child: ClayContainer(
-                    borderRadius: 20,
+                    borderRadius: 10,
                     child: Container(
-                      padding: const EdgeInsets.fromLTRB(25, 5, 25, 5),
+                      padding: const EdgeInsets.fromLTRB(35, 5, 35, 5),
                      decoration: BoxDecoration(
-                          image: DecorationImage(
+                          image: const DecorationImage(
                             image: AssetImage('assets/images/wood_texture_rotated.jpg'),
                             fit: BoxFit.cover,
                           ),
                         border: Border.all(color: Theme.of(context).colorScheme.surface, width: 4),
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                      child: Text(
+                      child: const Text(
                         'Today\'s Practice',
                         style: TextStyle(
                           fontSize: 20,
@@ -140,16 +137,59 @@ Widget _buildBody(BuildContext context, TodayViewModel viewModel) {
           ],
         ),
       ),
-      const ActiveSessionBanner(),
-      // Goal ring between calendar and practice areas
-      buildGoalRing(context, viewModel),
-      
-      // Calendar fixed at bottom (above nav bar)
-      PracticeCalendar(
-        onStatsPressed: onStatsPressed,
-      ),
-      SizedBox(height: 100),
+      // Responsive bottom section
+      _buildBottomSection(context, viewModel, onStatsPressed, isTabletOrDesktop),
+      const SizedBox(height: 100),
     ],
+  );
+}
+
+Widget _buildBottomSection(BuildContext context, TodayViewModel viewModel, VoidCallback? onStatsPressed, bool isTabletOrDesktop) {
+  // Get screen height and calculate 25% shorter bottom area
+  final screenHeight = MediaQuery.of(context).size.height;
+  final bottomAreaHeight = screenHeight * 0.54; // Reduced from ~30% to ~23% (25% reduction)
+  
+  return SizedBox(
+    height: bottomAreaHeight,
+    child: isTabletOrDesktop 
+      ? Row(
+          children: [
+            // Left side: Goal ring and Active session banner (centered)
+            Expanded(
+              flex: 1,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const ActiveSessionBanner(),
+                  buildGoalRing(context, viewModel, isLarge: true), // Large goal ring for tablets/desktop
+                ],
+              ),
+            ),
+            // Right side: Calendar
+            Expanded(
+              flex: 1,
+              child: PracticeCalendar(
+                onStatsPressed: onStatsPressed,
+                calendarSize: CalendarSize.small, // Use medium size for better visibility
+              ),
+            ),
+          ],
+        )
+      : Column(
+          children: [
+            const Expanded(child: ActiveSessionBanner()),
+            Expanded(
+              flex: 2,
+              child: buildGoalRing(context, viewModel), // Regular size for phones
+            ),
+            Expanded(
+              flex: 3,
+              child: PracticeCalendar(
+                onStatsPressed: onStatsPressed,
+              ),
+            ),
+          ],
+        ),
   );
 }
 }

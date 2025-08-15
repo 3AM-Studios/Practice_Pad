@@ -6,6 +6,8 @@ void main() {
 }
 
 class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -16,6 +18,8 @@ class MyApp extends StatelessWidget {
 }
 
 class DrawingTestScreen extends StatefulWidget {
+  const DrawingTestScreen({super.key});
+
   @override
   _DrawingTestScreenState createState() => _DrawingTestScreenState();
 }
@@ -75,7 +79,7 @@ class _DrawingTestScreenState extends State<DrawingTestScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Drawing Test'),
+        title: const Text('Drawing Test'),
         actions: [
           IconButton(
             icon: Icon(
@@ -95,7 +99,7 @@ class _DrawingTestScreenState extends State<DrawingTestScreen> {
         child: Container(
           width: 450,
           height: 450,
-          padding: EdgeInsets.all(25),
+          padding: const EdgeInsets.all(25),
           child: _isDrawingMode 
               ? _buildDrawingOverlay()
               : _buildBackground(),

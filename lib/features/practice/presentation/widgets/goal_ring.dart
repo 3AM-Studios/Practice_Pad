@@ -4,13 +4,22 @@ import 'package:clay_containers/clay_containers.dart';
 import 'package:practice_pad/features/practice/presentation/viewmodels/today_viewmodel.dart';
 
 
-Widget buildGoalRing(BuildContext context, TodayViewModel viewModel) {
+Widget buildGoalRing(BuildContext context, TodayViewModel viewModel, {bool isLarge = false}) {
   final theme = Theme.of(context);
   
   // Use actual data from viewModel
   final goalMinutes = viewModel.dailyGoalMinutes;
   final practiceMinutes = viewModel.todaysPracticeMinutes;
   final progress = goalMinutes > 0 ? practiceMinutes / goalMinutes : 0.0;
+  
+  // Size configurations based on isLarge parameter
+  final ringSize = isLarge ? 160.0 : 100.0;
+  final strokeWidth = isLarge ? 12.0 : 8.0;
+  final goalFontSize = isLarge ? 18.0 : 12.0;
+  final minutesFontSize = isLarge ? 24.0 : 16.0;
+  final containerPadding = isLarge ? 24.0 : 16.0;
+  final buttonSize = isLarge ? 40.0 : 30.0;
+  final iconSize = isLarge ? 24.0 : 18.0;
   
   return Container(
     margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -19,7 +28,7 @@ Widget buildGoalRing(BuildContext context, TodayViewModel viewModel) {
       color: theme.colorScheme.surface,
       borderRadius: 20,
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(containerPadding),
         child: Row(
           children: [
             // Minus button
@@ -27,12 +36,12 @@ Widget buildGoalRing(BuildContext context, TodayViewModel viewModel) {
               padding: EdgeInsets.zero,
               child: ClayContainer(
                 color: theme.colorScheme.surface,
-                borderRadius: 15,
-                width: 30,
-                height: 30,
-                child: const Icon(
+                borderRadius: isLarge ? 20 : 15,
+                width: buttonSize,
+                height: buttonSize,
+                child: Icon(
                   CupertinoIcons.minus,
-                  size: 18,
+                  size: iconSize,
                   color: CupertinoColors.systemRed,
                 ),
               ),
@@ -45,19 +54,19 @@ Widget buildGoalRing(BuildContext context, TodayViewModel viewModel) {
             // Goal ring in the middle
             Expanded(
               child: Center(
-                child: Container(
-                  width: 100,
-                  height: 100,
+                child: SizedBox(
+                  width: ringSize,
+                  height: ringSize,
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
                       // Background circle
                       SizedBox(
-                        width: 100,
-                        height: 100,
+                        width: ringSize,
+                        height: ringSize,
                         child: CircularProgressIndicator(
                           value: 1.0,
-                          strokeWidth: 8,
+                          strokeWidth: strokeWidth,
                           backgroundColor: theme.colorScheme.outline.withOpacity(0.2),
                           valueColor: AlwaysStoppedAnimation(
                             theme.colorScheme.outline.withOpacity(0.2),
@@ -66,11 +75,11 @@ Widget buildGoalRing(BuildContext context, TodayViewModel viewModel) {
                       ),
                       // Progress circle
                       SizedBox(
-                        width: 100,
-                        height: 100,
+                        width: ringSize,
+                        height: ringSize,
                         child: CircularProgressIndicator(
                           value: progress.clamp(0.0, 1.0),
-                          strokeWidth: 8,
+                          strokeWidth: strokeWidth,
                           backgroundColor: Colors.transparent,
                           valueColor: AlwaysStoppedAnimation(
                             progress >= 1.0 
@@ -86,7 +95,7 @@ Widget buildGoalRing(BuildContext context, TodayViewModel viewModel) {
                           Text(
                             'Goal:',
                             style: TextStyle(
-                              fontSize: 12,
+                              fontSize: goalFontSize,
                               fontWeight: FontWeight.w500,
                               color: theme.colorScheme.onSurface.withOpacity(0.7),
                             ),
@@ -94,7 +103,7 @@ Widget buildGoalRing(BuildContext context, TodayViewModel viewModel) {
                           Text(
                             '${goalMinutes}m',
                             style: TextStyle(
-                              fontSize: 16,
+                              fontSize: minutesFontSize,
                               fontWeight: FontWeight.bold,
                               color: theme.colorScheme.onSurface,
                             ),
@@ -112,12 +121,12 @@ Widget buildGoalRing(BuildContext context, TodayViewModel viewModel) {
               padding: EdgeInsets.zero,
               child: ClayContainer(
                 color: theme.colorScheme.surface,
-                borderRadius: 15,
-                width: 30,
-                height: 30,
-                child: const Icon(
+                borderRadius: isLarge ? 20 : 15,
+                width: buttonSize,
+                height: buttonSize,
+                child: Icon(
                   CupertinoIcons.plus,
-                  size: 18,
+                  size: iconSize,
                   color: CupertinoColors.systemGreen,
                 ),
               ),

@@ -147,7 +147,7 @@ class SheetMusicLayout with ChangeNotifier {
     final remainingVerticalSpace = widgetHeight - totalScaledHeight;
     // Prevent negative padding if content is taller than the widget height
     if (remainingVerticalSpace < 0) return 0;
-    return (remainingVerticalSpace / 2) / canvasScale;
+    return (remainingVerticalSpace / 2) + 250;
   }
 
   // Public getter for drawing board synchronization
@@ -157,11 +157,12 @@ class SheetMusicLayout with ChangeNotifier {
 
   double get totalContentHeight {
     double baseHeight = _staffsHeightsSum * canvasScale;
-    final chordSymbolHeight = 60.0;
+    final chordSymbolHeight = 90.0;
     final numberOfStaffs = metrics.staffsMetricses.length;
     baseHeight += chordSymbolHeight * numberOfStaffs;
-    baseHeight += 40.0;
-    baseHeight += 100.0;
+    baseHeight += 140.0;
+    // Add the upper padding that gets applied and scaled inside the canvas
+    baseHeight += _upperPaddingOnCanvas * canvasScale;
     return baseHeight;
   }
 
