@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -8,20 +9,42 @@ import 'package:practice_pad/services/device_type.dart';
 import 'package:practice_pad/widgets/practice_area_tile.dart';
 import 'package:practice_pad/widgets/active_session_banner.dart';
 import 'package:practice_pad/widgets/practice_calendar.dart';
+import 'package:practice_pad/services/practice_session_manager.dart';
+import 'package:practice_pad/features/edit_items/presentation/viewmodels/edit_items_viewmodel.dart';
+import 'package:practice_pad/services/widget_integration.dart';
 import 'package:provider/provider.dart';
 
-class TodayScreen extends StatelessWidget {
+class TodayScreen extends StatefulWidget {
   final VoidCallback? onStatsPressed;
 
   const TodayScreen({super.key, this.onStatsPressed});
 
   @override
+  State<TodayScreen> createState() => _TodayScreenState();
+}
+
+class _TodayScreenState extends State<TodayScreen> {
+  bool _widgetIntegrationSetup = false;
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Consumer<TodayViewModel>(
-      builder: (context, viewModel, child) {
-        return _buildBody(context, viewModel);
+    return Consumer3<TodayViewModel, PracticeSessionManager, EditItemsViewModel>(
+      builder: (context, todayViewModel, sessionManager, editItemsViewModel, child) {
+        // Set up widget integration once all providers are available
+        if (Platform.isIOS && !_widgetIntegrationSetup) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            WidgetIntegration.setupWidgetCallbacks(
+              todayViewModel: todayViewModel,
+              sessionManager: sessionManager,
+              editItemsViewModel: editItemsViewModel,
+            );
+            _widgetIntegrationSetup = true;
+          });
+        }
+
+        return _buildBody(context, todayViewModel);
         // return CupertinoPageScaffold(
         //   navigationBar:
         //       CupertinoNavigationBar(
@@ -70,7 +93,7 @@ Widget _buildBody(BuildContext context, TodayViewModel viewModel) {
             ),
           ),
         ),
-        _buildBottomSection(context, viewModel, onStatsPressed, isTabletOrDesktop),
+        _buildBottomSection(context, viewModel, widget.onStatsPressed, isTabletOrDesktop),
       ],
     );
   }
@@ -138,7 +161,7 @@ Widget _buildBody(BuildContext context, TodayViewModel viewModel) {
         ),
       ),
       // Responsive bottom section
-      _buildBottomSection(context, viewModel, onStatsPressed, isTabletOrDesktop),
+      _buildBottomSection(context, viewModel, widget.onStatsPressed, isTabletOrDesktop),
       const SizedBox(height: 100),
     ],
   );

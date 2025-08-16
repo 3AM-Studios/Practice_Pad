@@ -21,6 +21,7 @@ import 'package:practice_pad/models/statistics.dart';
 import 'package:practice_pad/models/practice_area.dart';
 import 'package:practice_pad/services/home_widget_service.dart';
 import 'package:practice_pad/services/widget_update_service.dart';
+import 'package:practice_pad/services/widget_action_handler.dart';
 import 'dart:math' as math;
 
 import 'package:window_manager/window_manager.dart';
@@ -62,6 +63,13 @@ void main() async {
 
   // Initialize home widget service
   await HomeWidgetService.initialize();
+  
+  // Initialize widget action handler
+  if (Platform.isIOS) {
+    await WidgetActionHandler.initialize();
+    // Clear any stale widget actions on startup to prevent errors
+    await WidgetActionHandler.clearAllWidgetData();
+  }
 
   runApp(const PracticeLoverApp());
 }

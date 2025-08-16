@@ -1,9 +1,13 @@
 import Flutter
 import UIKit
 import CloudKit
+import WidgetKit
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
+  private var widgetMethodChannel: FlutterMethodChannel?
+  private var widgetActionTimer: Timer?
+  
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
@@ -14,6 +18,7 @@ import CloudKit
       fatalError("rootViewController is not type FlutterViewController")
     }
 
+    // Set up CloudKit channel
     let cloudKitChannel = FlutterMethodChannel(name: "iCloud.com.practicepad",
                                                binaryMessenger: controller.binaryMessenger)
 
@@ -31,7 +36,41 @@ import CloudKit
       }
     })
 
+    // Set up Widget communication channel
+    widgetMethodChannel = FlutterMethodChannel(
+      name: "com.example.practicePad/widget",
+      binaryMessenger: controller.binaryMessenger
+    )
+    
+    widgetMethodChannel?.setMethodCallHandler { [weak self] (call, result) in
+      self?.handleWidgetMethodCall(call, result: result)
+    }
+    
+    // Start monitoring for widget actions
+    startMonitoringWidgetActions()
+    
+    // Check for any pending widget actions on app launch
+    checkPendingWidgetActions()
+
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+  
+  override func applicationWillEnterForeground(_ application: UIApplication) {
+    super.applicationWillEnterForeground(application)
+    // Check for widget actions when app comes to foreground
+    checkPendingWidgetActions()
+  }
+  
+  override func applicationDidBecomeActive(_ application: UIApplication) {
+    super.applicationDidBecomeActive(application)
+    // Start monitoring when app becomes active
+    startMonitoringWidgetActions()
+  }
+  
+  override func applicationWillResignActive(_ application: UIApplication) {
+    super.applicationWillResignActive(application)
+    // Stop monitoring when app becomes inactive
+    stopMonitoringWidgetActions()
   }
 
   private func getDatabase(containerId: String) -> CKDatabase {
@@ -175,5 +214,166 @@ import CloudKit
         result(nil) 
       }
     }
+  }
+  
+  // MARK: - Widget Action Handling
+  
+  private func handleWidgetMethodCall(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+    switch call.method {
+    case "reloadWidget":
+      reloadWidget()
+      result(nil)
+      
+    case "getWidgetAction":
+      let action = getPendingWidgetAction()
+      result(action)
+      
+    case "clearWidgetAction":
+      clearWidgetAction()
+      result(nil)
+      
+    case "updateWidgetData":
+      updateWidgetDataFromFlutter(call: call, result: result)
+      
+    case "getAreaFilter":
+      let filter = getAreaFilter()
+      result(filter)
+      
+    case "setAreaFilter":
+      setAreaFilter(call: call, result: result)
+      
+    case "clearAllWidgetData":
+      clearAllWidgetData()
+      result(nil)
+      
+    default:
+      result(FlutterMethodNotImplemented)
+    }
+  }
+  
+  private func startMonitoringWidgetActions() {
+    stopMonitoringWidgetActions() // Ensure we don't have duplicate timers
+    
+    // Check for widget actions every 0.5 seconds while app is active
+    widgetActionTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+      self?.checkPendingWidgetActions()
+    }
+  }
+  
+  private func stopMonitoringWidgetActions() {
+    widgetActionTimer?.invalidate()
+    widgetActionTimer = nil
+  }
+  
+  private func checkPendingWidgetActions() {
+    guard let userDefaults = UserDefaults(suiteName: "group.com.example.practicePad") else {
+      print("AppDelegate: Could not access shared UserDefaults")
+      return
+    }
+    
+    // Check if there's a pending widget action
+    if let actionString = userDefaults.string(forKey: "widget_action"),
+       !actionString.isEmpty {
+      
+      print("AppDelegate: Found pending widget action: \(actionString)")
+      
+      // Notify Flutter about the widget action
+      DispatchQueue.main.async { [weak self] in
+        self?.widgetMethodChannel?.invokeMethod("widgetActionReceived", arguments: nil)
+      }
+    }
+  }
+  
+  private func getPendingWidgetAction() -> String? {
+    guard let userDefaults = UserDefaults(suiteName: "group.com.example.practicePad") else {
+      return nil
+    }
+    
+    return userDefaults.string(forKey: "widget_action")
+  }
+  
+  private func clearWidgetAction() {
+    guard let userDefaults = UserDefaults(suiteName: "group.com.example.practicePad") else {
+      return
+    }
+    
+    userDefaults.removeObject(forKey: "widget_action")
+    userDefaults.synchronize()
+    print("AppDelegate: Cleared widget action")
+  }
+  
+  private func reloadWidget() {
+    if #available(iOS 14.0, *) {
+      WidgetCenter.shared.reloadAllTimelines()
+      print("AppDelegate: Triggered widget reload")
+    }
+  }
+  
+  private func updateWidgetDataFromFlutter(call: FlutterMethodCall, result: @escaping FlutterResult) {
+    guard let userDefaults = UserDefaults(suiteName: "group.com.example.practicePad") else {
+      result(FlutterError(code: "APP_GROUP_ERROR", message: "Could not access shared UserDefaults", details: nil))
+      return
+    }
+    
+    guard let args = call.arguments as? [String: Any] else {
+      result(FlutterError(code: "INVALID_ARGUMENTS", message: "Arguments must be a dictionary", details: nil))
+      return
+    }
+    
+    // Update each piece of data if provided
+    for (key, value) in args {
+      if let stringValue = value as? String {
+        userDefaults.set(stringValue, forKey: key)
+        print("AppDelegate: Updated \(key) with string value")
+      } else if value is NSNull {
+        userDefaults.removeObject(forKey: key)
+        print("AppDelegate: Cleared \(key)")
+      }
+    }
+    
+    userDefaults.synchronize()
+    print("AppDelegate: Widget data updated from Flutter")
+    result(nil)
+  }
+  
+  private func getAreaFilter() -> String {
+    guard let userDefaults = UserDefaults(suiteName: "group.com.example.practicePad") else {
+      return "all"
+    }
+    
+    return userDefaults.string(forKey: "selected_area_filter") ?? "all"
+  }
+  
+  private func setAreaFilter(call: FlutterMethodCall, result: @escaping FlutterResult) {
+    guard let userDefaults = UserDefaults(suiteName: "group.com.example.practicePad") else {
+      result(FlutterError(code: "APP_GROUP_ERROR", message: "Could not access shared UserDefaults", details: nil))
+      return
+    }
+    
+    guard let args = call.arguments as? [String: Any],
+          let filter = args["filter"] as? String else {
+      result(FlutterError(code: "INVALID_ARGUMENTS", message: "Filter argument is required", details: nil))
+      return
+    }
+    
+    userDefaults.set(filter, forKey: "selected_area_filter")
+    userDefaults.synchronize()
+    print("AppDelegate: Updated area filter to: \(filter)")
+    result(nil)
+  }
+  
+  private func clearAllWidgetData() {
+    guard let userDefaults = UserDefaults(suiteName: "group.com.example.practicePad") else {
+      return
+    }
+    
+    userDefaults.removeObject(forKey: "practice_areas")
+    userDefaults.removeObject(forKey: "active_session")
+    userDefaults.removeObject(forKey: "daily_goal")
+    userDefaults.removeObject(forKey: "todays_practice")
+    userDefaults.removeObject(forKey: "widget_action")
+    userDefaults.removeObject(forKey: "selected_area_filter")
+    userDefaults.synchronize()
+    print("AppDelegate: Cleared all widget data")
   }
 }
