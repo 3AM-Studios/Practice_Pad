@@ -81,8 +81,6 @@ class _PracticeSessionScreenState extends State<PracticeSessionScreen> {
         // Start new session
         _sessionManager!.startSession(
           item: widget.practiceItem,
-          isRepsBased: false, // Always time-based now
-          targetReps: 0,
           targetSeconds: _getTotalTargetSeconds(),
         );
       }

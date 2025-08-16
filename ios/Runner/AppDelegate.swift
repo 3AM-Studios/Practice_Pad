@@ -246,6 +246,10 @@ import WidgetKit
       clearAllWidgetData()
       result(nil)
       
+    case "getActiveSession":
+      let session = getActiveSession()
+      result(session)
+      
     default:
       result(FlutterMethodNotImplemented)
     }
@@ -360,6 +364,14 @@ import WidgetKit
     userDefaults.synchronize()
     print("AppDelegate: Updated area filter to: \(filter)")
     result(nil)
+  }
+  
+  private func getActiveSession() -> String? {
+    guard let userDefaults = UserDefaults(suiteName: "group.com.example.practicePad") else {
+      return nil
+    }
+    
+    return userDefaults.string(forKey: "active_session")
   }
   
   private func clearAllWidgetData() {

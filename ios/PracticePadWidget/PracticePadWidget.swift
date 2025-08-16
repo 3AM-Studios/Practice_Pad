@@ -28,13 +28,16 @@ struct PracticeItemData {
 
 struct ActiveSessionData {
     let itemName: String
-    let isRepsBased: Bool
-    let completedReps: Int
-    let targetReps: Int
     let elapsedSeconds: Int
     let targetSeconds: Int
     let isTimerRunning: Bool
     let progressPercentage: Double
+    let timerStartTime: Double? // Unix timestamp when timer was started
+    
+    // Widget displays whatever elapsed time is stored - no dynamic calculation
+    var currentElapsedSeconds: Int {
+        return elapsedSeconds
+    }
 }
 
 // MARK: - App Intents
@@ -68,7 +71,7 @@ struct StartPracticeItemIntent: AppIntent {
     @Parameter(title: "Practice Item ID")
     var itemId: String
     
-    @Parameter(title: "Practice Item Name")
+    @Parameter(title: "Practice Item Name") 
     var itemName: String
     
     init(itemId: String, itemName: String) {
@@ -80,11 +83,30 @@ struct StartPracticeItemIntent: AppIntent {
         self.itemId = ""
         self.itemName = ""
     }
+    
+    static var parameterSummary: some ParameterSummary {
+        Summary("Start practice for \(\.$itemName)")
+    }
 
     func perform() async throws -> some IntentResult {
-        NSLog("Widget: StartPracticeItemIntent called with itemId: \(itemId), itemName: \(itemName)")
+        NSLog("Widget: StartPracticeItemIntent.perform() called - DEBUG ENTRY POINT")
+        NSLog("Widget: StartPracticeItemIntent called with itemId: '\(itemId)', itemName: '\(itemName)'")
         
-        let userDefaults = UserDefaults(suiteName: "group.com.example.practicePad")
+        // Validate input parameters
+        if itemId.isEmpty {
+            NSLog("Widget: ERROR - itemId is empty!")
+            return .result()
+        }
+        
+        if itemName.isEmpty {
+            NSLog("Widget: ERROR - itemName is empty!")
+            return .result()
+        }
+        
+        guard let userDefaults = UserDefaults(suiteName: "group.com.example.practicePad") else {
+            NSLog("Widget: ERROR - Could not access UserDefaults with app group!")
+            return .result()
+        }
         
         let actionData = [
             "action": "start_practice_item",
@@ -93,14 +115,22 @@ struct StartPracticeItemIntent: AppIntent {
             "timestamp": Date().timeIntervalSince1970
         ] as [String: Any]
         
+        NSLog("Widget: Action data to save: \(actionData)")
+        
         if let jsonData = try? JSONSerialization.data(withJSONObject: actionData),
            let jsonString = String(data: jsonData, encoding: .utf8) {
-            userDefaults?.set(jsonString, forKey: "widget_action")
+            userDefaults.set(jsonString, forKey: "widget_action")
+            userDefaults.synchronize()
             NSLog("Widget: Successfully saved action to widget_action key: \(jsonString)")
+            
+            // Trigger immediate widget reload to reflect changes
+            WidgetCenter.shared.reloadTimelines(ofKind: "PracticePadWidget")
+            NSLog("Widget: Triggered widget timeline reload")
         } else {
-            NSLog("Widget: Failed to serialize action data")
+            NSLog("Widget: ERROR - Failed to serialize action data")
         }
         
+        NSLog("Widget: StartPracticeItemIntent.perform() completed successfully")
         return .result()
     }
 }
@@ -114,26 +144,53 @@ struct ToggleSessionIntent: AppIntent {
     func perform() async throws -> some IntentResult {
         NSLog("Widget: ToggleSessionIntent.perform() called - DEBUG ENTRY POINT")
         
-        let userDefaults = UserDefaults(suiteName: "group.com.example.practicePad")
+        guard let userDefaults = UserDefaults(suiteName: "group.com.example.practicePad") else {
+            NSLog("Widget: ERROR - Could not access UserDefaults with app group!")
+            return .result()
+        }
         
-        let actionData = [
-            "action": "toggle_session",
-            "timestamp": Date().timeIntervalSince1970
-        ] as [String: Any]
-        
-        NSLog("Widget: Action data to save: \(actionData)")
-        
-        if let jsonData = try? JSONSerialization.data(withJSONObject: actionData),
-           let jsonString = String(data: jsonData, encoding: .utf8) {
-            userDefaults?.set(jsonString, forKey: "widget_action")
-            NSLog("Widget: Successfully saved toggle action: \(jsonString)")
-            
-            Task {
-                await WidgetCenter.shared.reloadTimelines(ofKind: "PracticePadWidget")
+        // Read current active session from UserDefaults
+        var currentSessionData: [String: Any]? = nil
+        if let activeSessionJson = userDefaults.string(forKey: "active_session"),
+           !activeSessionJson.isEmpty,
+           let activeSessionDataRaw = activeSessionJson.data(using: .utf8) {
+            do {
+                currentSessionData = try JSONSerialization.jsonObject(with: activeSessionDataRaw) as? [String: Any]
+                NSLog("Widget: Found active session data: \(currentSessionData ?? [:])")
+            } catch {
+                NSLog("Widget: Error decoding active session: \(error)")
             }
-            NSLog("Widget: Triggered widget timeline reload")
-        } else {
-            NSLog("Widget: Failed to serialize toggle action data")
+        }
+        
+        guard var sessionData = currentSessionData else {
+            NSLog("Widget: No active session found to toggle")
+            return .result()
+        }
+        
+        // Toggle the isTimerRunning state
+        let currentlyRunning = sessionData["isTimerRunning"] as? Bool ?? false
+        let newRunningState = !currentlyRunning
+        sessionData["isTimerRunning"] = newRunningState
+        
+        // Widget only toggles the running state - Flutter app handles elapsed time
+        NSLog("Widget: Only toggling timer state, Flutter app will handle time tracking")
+        
+        NSLog("Widget: Toggling timer from \(currentlyRunning) to \(newRunningState)")
+        
+        // Save the updated session data back to UserDefaults
+        do {
+            let updatedJsonData = try JSONSerialization.data(withJSONObject: sessionData)
+            let updatedJsonString = String(data: updatedJsonData, encoding: .utf8) ?? ""
+            userDefaults.set(updatedJsonString, forKey: "active_session")
+            userDefaults.synchronize()
+            NSLog("Widget: Successfully updated active session state: \(updatedJsonString)")
+            
+            // Immediately trigger widget timeline reload to show the state change
+            WidgetCenter.shared.reloadTimelines(ofKind: "PracticePadWidget")
+            NSLog("Widget: Triggered widget timeline reload to reflect state change")
+            
+        } catch {
+            NSLog("Widget: ERROR - Failed to serialize updated session data: \(error)")
         }
         
         NSLog("Widget: ToggleSessionIntent.perform() completed successfully")
@@ -157,11 +214,43 @@ struct PracticePadTimelineProvider: TimelineProvider {
         let currentDate = Date()
         let entry = loadCurrentData()
         
-        // Update every 5 minutes
-        let nextUpdate = Calendar.current.date(byAdding: .minute, value: 5, to: currentDate)!
-        let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
+        // Create multiple timeline entries for real-time updates when timer is running
+        var entries: [PracticePadEntry] = []
         
-        completion(timeline)
+        if let activeSession = entry.activeSession, activeSession.isTimerRunning {
+            // Create entries that reload data every second when timer is running
+            NSLog("Widget: Timer is running, scheduling frequent reloads every second")
+            
+            // Create a few entries with 1-second intervals to force frequent reloads
+            for i in 0..<5 {
+                let entryDate = Calendar.current.date(byAdding: .second, value: i, to: currentDate)!
+                
+                // Each entry will reload current data from UserDefaults (updated by Flutter app)
+                let currentEntry = loadCurrentData()
+                let updatedEntry = PracticePadEntry(
+                    date: entryDate,
+                    practiceAreas: currentEntry.practiceAreas,
+                    activeSession: currentEntry.activeSession,
+                    dailyGoal: currentEntry.dailyGoal,
+                    todaysPractice: currentEntry.todaysPractice
+                )
+                
+                entries.append(updatedEntry)
+            }
+            
+            // Schedule next reload in 5 seconds
+            let nextUpdate = Calendar.current.date(byAdding: .second, value: 5, to: currentDate)!
+            let timeline = Timeline(entries: entries, policy: .after(nextUpdate))
+            completion(timeline)
+            
+        } else {
+            // Update every 5 minutes when no active timer
+            NSLog("Widget: No active timer, scheduling updates every 5 minutes")
+            entries = [entry]
+            let nextUpdate = Calendar.current.date(byAdding: .minute, value: 5, to: currentDate)!
+            let timeline = Timeline(entries: entries, policy: .after(nextUpdate))
+            completion(timeline)
+        }
     }
     
     private func loadCurrentData() -> PracticePadEntry {
@@ -204,6 +293,12 @@ struct PracticePadTimelineProvider: TimelineProvider {
                     return PracticeAreaData(name: name, type: type, items: items)
                 } ?? []
                 NSLog("Widget: Loaded \(practiceAreas.count) practice areas")
+                for area in practiceAreas {
+                    NSLog("Widget: Area '\(area.name)' has \(area.items.count) items")
+                    for item in area.items {
+                        NSLog("Widget: Item ID='\(item.id)', Name='\(item.name)'")
+                    }
+                }
             } catch {
                 NSLog("Widget: Error decoding practice areas: \(error)")
             }
@@ -220,13 +315,11 @@ struct PracticePadTimelineProvider: TimelineProvider {
                 if let sessionDict = try JSONSerialization.jsonObject(with: activeSessionData) as? [String: Any] {
                     activeSession = ActiveSessionData(
                         itemName: sessionDict["itemName"] as? String ?? "Unknown",
-                        isRepsBased: sessionDict["isRepsBased"] as? Bool ?? true,
-                        completedReps: sessionDict["completedReps"] as? Int ?? 0,
-                        targetReps: sessionDict["targetReps"] as? Int ?? 1,
                         elapsedSeconds: sessionDict["elapsedSeconds"] as? Int ?? 0,
                         targetSeconds: sessionDict["targetSeconds"] as? Int ?? 60,
                         isTimerRunning: sessionDict["isTimerRunning"] as? Bool ?? false,
-                        progressPercentage: sessionDict["progressPercentage"] as? Double ?? 0.0
+                        progressPercentage: sessionDict["progressPercentage"] as? Double ?? 0.0,
+                        timerStartTime: sessionDict["timerStartTime"] as? Double
                     )
                     NSLog("Widget: Loaded active session: \(activeSession?.itemName ?? "nil")")
                 }
@@ -261,13 +354,173 @@ struct PracticePadWidget: Widget {
     let kind: String = "PracticePadWidget"
     
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: kind, provider: PracticePadTimelineProvider()) { entry in
+        AppIntentConfiguration(kind: kind, intent: ConfigurationAppIntent.self, provider: PracticePadAppIntentTimelineProvider()) { entry in
             PracticePadWidgetEntryView(entry: entry)
         }
         .configurationDisplayName("Practice Pad")
         .description("Interactive practice widget with play controls")
         .supportedFamilies([.systemLarge])
         .contentMarginsDisabled()
+    }
+}
+
+struct ConfigurationAppIntent: WidgetConfigurationIntent {
+    static var title: LocalizedStringResource = "Configuration"
+    static var description = IntentDescription("This is an example widget.")
+}
+
+// MARK: - App Intent Timeline Provider
+struct PracticePadAppIntentTimelineProvider: AppIntentTimelineProvider {
+    typealias Entry = PracticePadEntry
+    typealias Intent = ConfigurationAppIntent
+    
+    func placeholder(in context: Context) -> PracticePadEntry {
+        return loadCurrentData()
+    }
+    
+    func snapshot(for configuration: ConfigurationAppIntent, in context: Context) async -> PracticePadEntry {
+        let entry = loadCurrentData()
+        NSLog("Widget: snapshot called, returning entry with \(entry.practiceAreas.count) areas")
+        return entry
+    }
+    
+    func timeline(for configuration: ConfigurationAppIntent, in context: Context) async -> Timeline<PracticePadEntry> {
+        let currentDate = Date()
+        let entry = loadCurrentData()
+        
+        // Create multiple timeline entries for real-time updates when timer is running
+        var entries: [PracticePadEntry] = []
+        
+        if let activeSession = entry.activeSession, activeSession.isTimerRunning {
+            // Create entries that reload data every second when timer is running
+            NSLog("Widget: Timer is running, scheduling frequent reloads every second")
+            
+            // Create a few entries with 1-second intervals to force frequent reloads
+            for i in 0..<5 {
+                let entryDate = Calendar.current.date(byAdding: .second, value: i, to: currentDate)!
+                
+                // Each entry will reload current data from UserDefaults (updated by Flutter app)
+                let currentEntry = loadCurrentData()
+                let updatedEntry = PracticePadEntry(
+                    date: entryDate,
+                    practiceAreas: currentEntry.practiceAreas,
+                    activeSession: currentEntry.activeSession,
+                    dailyGoal: currentEntry.dailyGoal,
+                    todaysPractice: currentEntry.todaysPractice
+                )
+                
+                entries.append(updatedEntry)
+            }
+            
+            // Schedule next reload in 5 seconds
+            let nextUpdate = Calendar.current.date(byAdding: .second, value: 5, to: currentDate)!
+            let timeline = Timeline(entries: entries, policy: .after(nextUpdate))
+            return timeline
+            
+        } else {
+            // Update every 5 minutes when no active timer
+            NSLog("Widget: No active timer, scheduling updates every 5 minutes")
+            entries = [entry]
+            let nextUpdate = Calendar.current.date(byAdding: .minute, value: 5, to: currentDate)!
+            let timeline = Timeline(entries: entries, policy: .after(nextUpdate))
+            return timeline
+        }
+    }
+    
+    private func loadCurrentData() -> PracticePadEntry {
+        let userDefaults = UserDefaults(suiteName: "group.com.example.practicePad")
+        
+        // Load practice areas
+        var practiceAreas: [PracticeAreaData] = []
+        if let practiceAreasJson = userDefaults?.string(forKey: "practice_areas"),
+           !practiceAreasJson.isEmpty,
+           let practiceAreasData = practiceAreasJson.data(using: .utf8) {
+            do {
+                let decoded = try JSONSerialization.jsonObject(with: practiceAreasData) as? [[String: Any]]
+                practiceAreas = decoded?.compactMap { areaDict in
+                    guard let name = areaDict["name"] as? String,
+                          let type = areaDict["type"] as? String,
+                          let itemsArray = areaDict["items"] as? [[String: Any]] else {
+                        return nil
+                    }
+                    
+                    let items = itemsArray.compactMap { itemDict -> PracticeItemData? in
+                        guard let id = itemDict["id"] as? String,
+                              let name = itemDict["name"] as? String,
+                              let description = itemDict["description"] as? String,
+                              let isCompleted = itemDict["isCompleted"] as? Bool,
+                              let completedCycles = itemDict["completedCycles"] as? Int,
+                              let targetCycles = itemDict["targetCycles"] as? Int else {
+                            return nil
+                        }
+                        
+                        return PracticeItemData(
+                            id: id,
+                            name: name,
+                            description: description,
+                            isCompleted: isCompleted,
+                            completedCycles: completedCycles,
+                            targetCycles: targetCycles
+                        )
+                    }
+                    
+                    return PracticeAreaData(name: name, type: type, items: items)
+                } ?? []
+                NSLog("Widget: Loaded \(practiceAreas.count) practice areas")
+                for area in practiceAreas {
+                    NSLog("Widget: Area '\(area.name)' has \(area.items.count) items")
+                    for item in area.items {
+                        NSLog("Widget: Item ID='\(item.id)', Name='\(item.name)'")
+                    }
+                }
+            } catch {
+                NSLog("Widget: Error decoding practice areas: \(error)")
+            }
+        } else {
+            NSLog("Widget: No practice areas data found or empty")
+        }
+        
+        // Load active session
+        var activeSession: ActiveSessionData? = nil
+        if let activeSessionJson = userDefaults?.string(forKey: "active_session"),
+           !activeSessionJson.isEmpty,
+           let activeSessionData = activeSessionJson.data(using: .utf8) {
+            do {
+                if let sessionDict = try JSONSerialization.jsonObject(with: activeSessionData) as? [String: Any] {
+                    activeSession = ActiveSessionData(
+                        itemName: sessionDict["itemName"] as? String ?? "Unknown",
+                        elapsedSeconds: sessionDict["elapsedSeconds"] as? Int ?? 0,
+                        targetSeconds: sessionDict["targetSeconds"] as? Int ?? 60,
+                        isTimerRunning: sessionDict["isTimerRunning"] as? Bool ?? false,
+                        progressPercentage: sessionDict["progressPercentage"] as? Double ?? 0.0,
+                        timerStartTime: sessionDict["timerStartTime"] as? Double
+                    )
+                    NSLog("Widget: Loaded active session: \(activeSession?.itemName ?? "nil")")
+                }
+            } catch {
+                NSLog("Widget: Error decoding active session: \(error)")
+            }
+        } else {
+            NSLog("Widget: No active session data found")
+        }
+        
+        // Load goal and progress
+        let dailyGoalString = userDefaults?.string(forKey: "daily_goal") ?? "30"
+        let dailyGoal = Int(dailyGoalString) ?? 30
+        let todaysPracticeString = userDefaults?.string(forKey: "todays_practice") ?? "0"
+        let todaysPractice = Int(todaysPracticeString) ?? 0
+        
+        let finalPracticeAreas = practiceAreas
+        
+        NSLog("Widget: Final entry - Areas: \(finalPracticeAreas.count), Goal: \(dailyGoal), Practice: \(todaysPractice)")
+        
+        return PracticePadEntry(
+            date: Date(),
+            practiceAreas: finalPracticeAreas,
+            activeSession: activeSession,
+            dailyGoal: dailyGoal,
+            todaysPractice: todaysPractice
+        )
     }
 }
 
@@ -369,17 +622,11 @@ struct ActiveSessionView: View {
                     .foregroundColor(.white)
                     .lineLimit(1)
                 
-                if session.isRepsBased {
-                    Text("\(session.completedReps)/\(session.targetReps) reps")
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.9))
-                } else {
-                    let minutes = session.elapsedSeconds / 60
-                    let seconds = session.elapsedSeconds % 60
-                    Text(String(format: "%02d:%02d", minutes, seconds))
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.9))
-                }
+                let minutes = session.elapsedSeconds / 60
+                let seconds = session.elapsedSeconds % 60
+                Text(String(format: "%02d:%02d", minutes, seconds))
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.9))
             }
             
             Spacer()
@@ -523,7 +770,9 @@ struct PracticeItemRowView: View {
                     .background(Color.blue.opacity(0.1))
                     .clipShape(Circle())
             }
-            .buttonStyle(PlainButtonStyle())
+            .buttonStyle(.plain)
+            .contentShape(Rectangle())
+            .accessibilityLabel("Start practice for \(item.name)")
         }
     }
 }

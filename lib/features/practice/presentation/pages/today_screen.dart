@@ -40,6 +40,12 @@ class _TodayScreenState extends State<TodayScreen> {
               sessionManager: sessionManager,
               editItemsViewModel: editItemsViewModel,
             );
+            
+            // Sync session state from widget when app starts/becomes active
+            WidgetIntegration.syncSessionStateFromWidget(
+              sessionManager: sessionManager,
+            );
+            
             _widgetIntegrationSetup = true;
           });
         }

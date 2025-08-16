@@ -3,21 +3,21 @@ import 'statistics.dart';
 
 /// Represents a practice session for a specific practice item.
 /// 
-/// A practice session tracks the amount of practice done, either by repetitions
-/// or by time spent practicing.
+/// A practice session tracks the time spent practicing. Legacy support
+/// for repetition-based sessions is maintained for historical data.
 /// 
 /// Example usage:
 /// ```dart
-/// // Practice session with repetitions
-/// final session = PracticeSession(
-///   item: practiceItem,
-///   practiceAmount: {'reps': 10},
-/// );
-/// 
-/// // Practice session with time
+/// // Practice session with time (primary method)
 /// final session = PracticeSession(
 ///   item: practiceItem,
 ///   practiceAmount: {'time': 300}, // 5 minutes in seconds
+/// );
+/// 
+/// // Legacy repetition-based support (for historical data)
+/// final legacySession = PracticeSession(
+///   item: practiceItem,
+///   practiceAmount: {'reps': 10},
 /// );
 /// ```
 class PracticeSession {
