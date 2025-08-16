@@ -142,58 +142,34 @@ struct ToggleSessionIntent: AppIntent {
     init() {}
 
     func perform() async throws -> some IntentResult {
-        NSLog("Widget: ToggleSessionIntent.perform() called - DEBUG ENTRY POINT")
+        NSLog("Widget: ToggleSessionIntent.perform() called")
         
         guard let userDefaults = UserDefaults(suiteName: "group.com.example.practicePad") else {
             NSLog("Widget: ERROR - Could not access UserDefaults with app group!")
             return .result()
         }
         
-        // Read current active session from UserDefaults
-        var currentSessionData: [String: Any]? = nil
-        if let activeSessionJson = userDefaults.string(forKey: "active_session"),
-           !activeSessionJson.isEmpty,
-           let activeSessionDataRaw = activeSessionJson.data(using: .utf8) {
-            do {
-                currentSessionData = try JSONSerialization.jsonObject(with: activeSessionDataRaw) as? [String: Any]
-                NSLog("Widget: Found active session data: \(currentSessionData ?? [:])")
-            } catch {
-                NSLog("Widget: Error decoding active session: \(error)")
-            }
-        }
+        // Create action data for Flutter to process
+        let actionData = [
+            "action": "toggle_session",
+            "timestamp": Date().timeIntervalSince1970
+        ] as [String: Any]
         
-        guard var sessionData = currentSessionData else {
-            NSLog("Widget: No active session found to toggle")
-            return .result()
-        }
+        NSLog("Widget: Toggle session action data: \(actionData)")
         
-        // Toggle the isTimerRunning state
-        let currentlyRunning = sessionData["isTimerRunning"] as? Bool ?? false
-        let newRunningState = !currentlyRunning
-        sessionData["isTimerRunning"] = newRunningState
-        
-        // Widget only toggles the running state - Flutter app handles elapsed time
-        NSLog("Widget: Only toggling timer state, Flutter app will handle time tracking")
-        
-        NSLog("Widget: Toggling timer from \(currentlyRunning) to \(newRunningState)")
-        
-        // Save the updated session data back to UserDefaults
-        do {
-            let updatedJsonData = try JSONSerialization.data(withJSONObject: sessionData)
-            let updatedJsonString = String(data: updatedJsonData, encoding: .utf8) ?? ""
-            userDefaults.set(updatedJsonString, forKey: "active_session")
+        if let jsonData = try? JSONSerialization.data(withJSONObject: actionData),
+           let jsonString = String(data: jsonData, encoding: .utf8) {
+            userDefaults.set(jsonString, forKey: "widget_action")
             userDefaults.synchronize()
-            NSLog("Widget: Successfully updated active session state: \(updatedJsonString)")
+            NSLog("Widget: Successfully saved toggle session action to widget_action key: \(jsonString)")
             
-            // Immediately trigger widget timeline reload to show the state change
+            // Trigger immediate widget reload to reflect any state changes
             WidgetCenter.shared.reloadTimelines(ofKind: "PracticePadWidget")
-            NSLog("Widget: Triggered widget timeline reload to reflect state change")
-            
-        } catch {
-            NSLog("Widget: ERROR - Failed to serialize updated session data: \(error)")
+            NSLog("Widget: Triggered widget timeline reload")
+        } else {
+            NSLog("Widget: ERROR - Failed to serialize toggle session action data")
         }
         
-        NSLog("Widget: ToggleSessionIntent.perform() completed successfully")
         return .result()
     }
 }
@@ -691,16 +667,37 @@ struct PracticeAreasView: View {
         let userDefaults = UserDefaults(suiteName: "group.com.example.practicePad")
         let selectedFilter = userDefaults?.string(forKey: "selected_area_filter") ?? "all"
         
-        guard selectedFilter != "all" else { return entry.practiceAreas }
+        // Get the active item name to filter it out
+        let activeItemName = entry.activeSession?.itemName
         
-        return entry.practiceAreas.filter { area in
-            switch selectedFilter {
-            case "songs": return area.type.lowercased() == "song"
-            case "exercises": return area.type.lowercased() == "exercise"
-            case "chordProgressions": return area.type.lowercased() == "chordprogression"
-            default: return true
+        var filteredAreas = entry.practiceAreas
+        
+        // Apply type filter
+        if selectedFilter != "all" {
+            filteredAreas = filteredAreas.filter { area in
+                switch selectedFilter {
+                case "songs": return area.type.lowercased() == "song"
+                case "exercises": return area.type.lowercased() == "exercise"
+                case "chordProgressions": return area.type.lowercased() == "chordprogression"
+                default: return true
+                }
             }
         }
+        
+        // Filter out the currently active practice item
+        if let activeItemName = activeItemName {
+            filteredAreas = filteredAreas.map { area in
+                let filteredItems = area.items.filter { item in
+                    item.name != activeItemName
+                }
+                return PracticeAreaData(name: area.name, type: area.type, items: filteredItems)
+            }.filter { area in
+                // Only keep areas that still have items after filtering
+                !area.items.isEmpty
+            }
+        }
+        
+        return filteredAreas
     }
 }
 

@@ -22,6 +22,7 @@ import 'package:practice_pad/models/practice_area.dart';
 import 'package:practice_pad/services/home_widget_service.dart';
 import 'package:practice_pad/services/widget_update_service.dart';
 import 'package:practice_pad/services/widget_action_handler.dart';
+import 'package:practice_pad/services/widget_integration.dart';
 import 'dart:math' as math;
 
 import 'package:window_manager/window_manager.dart';
@@ -65,11 +66,10 @@ void main() async {
   await HomeWidgetService.initialize();
   
   // Initialize widget action handler
-  if (Platform.isIOS) {
     await WidgetActionHandler.initialize();
     // Clear any stale widget actions on startup to prevent errors
     await WidgetActionHandler.clearAllWidgetData();
-  }
+
 
   runApp(const PracticeLoverApp());
 }
@@ -167,10 +167,18 @@ class MainAppScaffoldState extends State<MainAppScaffold> {
   void _initializeWidgetService() {
     final todayViewModel = Provider.of<TodayViewModel>(context, listen: false);
     final sessionManager = Provider.of<PracticeSessionManager>(context, listen: false);
+    final editItemsViewModel = Provider.of<EditItemsViewModel>(context, listen: false);
     
     WidgetUpdateService.instance.initialize(
       todayViewModel: todayViewModel,
       sessionManager: sessionManager,
+    );
+    
+    // Set up widget action callbacks
+    WidgetIntegration.setupWidgetCallbacks(
+      todayViewModel: todayViewModel,
+      sessionManager: sessionManager,
+      editItemsViewModel: editItemsViewModel,
     );
   }
 
