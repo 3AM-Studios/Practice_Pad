@@ -38,7 +38,7 @@ class _EditRoutinesScreenState extends State<EditRoutinesScreen> {
     final List<PracticeArea>? selectedAreas =
         await Navigator.of(context).push<List<PracticeArea>>(
       CupertinoPageRoute(
-        builder: (_) => _AddAreasToAllDaysScreen(),
+        builder: (_) => const _AddAreasToAllDaysScreen(),
         fullscreenDialog: true,
       ),
     );
@@ -375,6 +375,7 @@ class _EditRoutinesScreenState extends State<EditRoutinesScreen> {
                 ),
                 // Shared practice areas section
                 _buildSharedAreasSection(context, routinesViewModel),
+                const SizedBox(height: 80)
               ],
             ),
           ),
@@ -388,6 +389,7 @@ class _EditRoutinesScreenState extends State<EditRoutinesScreen> {
     
     return Container(
       padding: const EdgeInsets.all(16),
+      height: MediaQuery.of(context).size.height * 0.3, // Cap at 40% of screen height
       child: ClayContainer(
         color: Theme.of(context).colorScheme.surface,
         borderRadius: 20,
@@ -424,47 +426,56 @@ class _EditRoutinesScreenState extends State<EditRoutinesScreen> {
                 ],
               ),
               const SizedBox(height: 12),
-              if (sharedAreas.isEmpty)
-                const Text(
-                  'No practice areas are shared across all days yet. Add some to practice them every day!',
-                  style: TextStyle(
-                    color: CupertinoColors.systemGrey,
-                    fontSize: 14,
-                  ),
-                )
-              else
-                ...sharedAreas.map((area) => Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  child: Row(
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(
-                        area.type == PracticeAreaType.song 
-                            ? CupertinoIcons.music_note_2 
-                            : CupertinoIcons.chart_bar_square,
-                        color: area.type == PracticeAreaType.song 
-                            ? CupertinoColors.systemBlue 
-                            : CupertinoColors.systemOrange,
-                        size: 16,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          area.name,
-                          style: const TextStyle(fontSize: 14),
-                        ),
-                      ),
-                      CupertinoButton(
-                        padding: EdgeInsets.zero,
-                        child: const Icon(
-                          CupertinoIcons.delete,
-                          color: CupertinoColors.destructiveRed,
-                          size: 16,
-                        ),
-                        onPressed: () => _showRemoveSharedAreaDialog(context, routinesViewModel, area),
-                      ),
+                      if (sharedAreas.isEmpty)
+                        const Text(
+                          'No practice areas are shared across all days yet. Add some to practice them every day!',
+                          style: TextStyle(
+                            color: CupertinoColors.systemGrey,
+                            fontSize: 14,
+                          ),
+                        )
+                      else
+                        ...sharedAreas.map((area) => Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: Row(
+                            children: [
+                              Icon(
+                                area.type == PracticeAreaType.song 
+                                    ? CupertinoIcons.music_note_2 
+                                    : CupertinoIcons.chart_bar_square,
+                                color: area.type == PracticeAreaType.song 
+                                    ? CupertinoColors.systemBlue 
+                                    : CupertinoColors.systemOrange,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  area.name,
+                                  style: const TextStyle(fontSize: 14),
+                                ),
+                              ),
+                              CupertinoButton(
+                                padding: EdgeInsets.zero,
+                                child: const Icon(
+                                  CupertinoIcons.delete,
+                                  color: CupertinoColors.destructiveRed,
+                                  size: 16,
+                                ),
+                                onPressed: () => _showRemoveSharedAreaDialog(context, routinesViewModel, area),
+                              ),
+                            ],
+                          ),
+                        )),
                     ],
                   ),
-                )),
+                ),
+              ),
             ],
           ),
         ),
