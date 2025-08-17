@@ -80,7 +80,7 @@ class _EditItemsScreenState extends State<EditItemsScreen> {
                     subtitle: '${viewModel.allExerciseAreas.length} exercises',
                     icon: CupertinoIcons.chart_bar_square,
                     color: CupertinoColors.systemOrange,
-                    description: 'Scales, arpeggios,\nand custom exercises',
+                    description: 'Add custom exercises like scales, arpeggios, etc',
                     onTap: () => _navigateToExercises(context, viewModel),
                   ),
                 ),

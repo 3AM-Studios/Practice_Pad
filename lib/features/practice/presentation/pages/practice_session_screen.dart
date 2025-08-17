@@ -145,8 +145,6 @@ class _PracticeSessionScreenState extends State<PracticeSessionScreen> {
     if (_sessionManager == null) return;
 
     try {
-      print('DEBUG: Starting practice session completion');
-
       // Update the practice item with the new keys practiced counts
       widget.practiceItem.keysPracticed.clear();
       widget.practiceItem.keysPracticed.addAll(_keysPracticed);
@@ -154,8 +152,6 @@ class _PracticeSessionScreenState extends State<PracticeSessionScreen> {
       // Calculate total reps across all keys
       final totalReps =
           _keysPracticed.values.fold(0, (sum, reps) => sum + reps);
-
-      print('DEBUG: Total reps calculated: $totalReps');
 
       Map<String, dynamic> practiceAmount = {
         'time': _elapsedSeconds,
@@ -172,21 +168,14 @@ class _PracticeSessionScreenState extends State<PracticeSessionScreen> {
         metadata: practiceAmount,
       );
 
-      print('DEBUG: Statistics object created');
-
       // Save to statistics
       await statistics.save();
-
-      print('DEBUG: Statistics saved successfully');
 
       // Complete the session in the global manager
       _sessionManager!.completeSession();
 
-      print('DEBUG: Session completed in manager');
-
       // Show success message
       if (mounted) {
-        print('DEBUG: Showing success dialog');
         showCupertinoDialog(
           context: context,
           barrierDismissible: false, // Prevent dismissing by tapping outside
@@ -200,7 +189,6 @@ class _PracticeSessionScreenState extends State<PracticeSessionScreen> {
               CupertinoDialogAction(
                 child: const Text('Continue'),
                 onPressed: () {
-                  print('DEBUG: Dialog continue pressed');
                   Navigator.of(dialogContext)
                       .pop(); // Close dialog using dialog context
                   Navigator.of(context).pop(
@@ -212,9 +200,6 @@ class _PracticeSessionScreenState extends State<PracticeSessionScreen> {
         );
       }
     } catch (e, stackTrace) {
-      print('DEBUG: Error in _completePracticeSession: $e');
-      print('DEBUG: Stack trace: $stackTrace');
-
       // Show error message
       if (mounted) {
         showCupertinoDialog(
@@ -266,10 +251,13 @@ class _PracticeSessionScreenState extends State<PracticeSessionScreen> {
                         margin: const EdgeInsets.symmetric(horizontal: 4),
                         decoration: BoxDecoration(
                           image: const DecorationImage(
-                            image: AssetImage('assets/images/wood_texture_rotated.jpg'),
+                            image: AssetImage(
+                                'assets/images/wood_texture_rotated.jpg'),
                             fit: BoxFit.cover,
                           ),
-                          border: Border.all(color: Theme.of(context).colorScheme.surface, width: 4),
+                          border: Border.all(
+                              color: Theme.of(context).colorScheme.surface,
+                              width: 4),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: CupertinoButton(
@@ -338,10 +326,13 @@ class _PracticeSessionScreenState extends State<PracticeSessionScreen> {
                           child: Container(
                             decoration: BoxDecoration(
                               image: const DecorationImage(
-                                image: AssetImage('assets/images/wood_texture_rotated.jpg'),
+                                image: AssetImage(
+                                    'assets/images/wood_texture_rotated.jpg'),
                                 fit: BoxFit.cover,
                               ),
-                              border: Border.all(color: Theme.of(context).colorScheme.surface, width: 4),
+                              border: Border.all(
+                                  color: Theme.of(context).colorScheme.surface,
+                                  width: 4),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: CupertinoButton(
@@ -361,7 +352,10 @@ class _PracticeSessionScreenState extends State<PracticeSessionScreen> {
                             style: TextStyle(
                               fontSize: 34,
                               fontWeight: FontWeight.w800,
-                              color: CupertinoTheme.of(context).textTheme.textStyle.color,
+                              color: CupertinoTheme.of(context)
+                                  .textTheme
+                                  .textStyle
+                                  .color,
                               letterSpacing: 0.5,
                             ),
                             textAlign: TextAlign.center,
@@ -378,7 +372,11 @@ class _PracticeSessionScreenState extends State<PracticeSessionScreen> {
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w500,
-                          color: CupertinoTheme.of(context).textTheme.textStyle.color?.withOpacity(0.7),
+                          color: CupertinoTheme.of(context)
+                              .textTheme
+                              .textStyle
+                              .color
+                              ?.withOpacity(0.7),
                           letterSpacing: 0.3,
                         ),
                         textAlign: TextAlign.center,
@@ -391,13 +389,17 @@ class _PracticeSessionScreenState extends State<PracticeSessionScreen> {
                       color: Theme.of(context).colorScheme.surface,
                       borderRadius: 20,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 32, vertical: 16),
                         decoration: BoxDecoration(
                           image: const DecorationImage(
-                            image: AssetImage('assets/images/wood_texture_rotated.jpg'),
+                            image: AssetImage(
+                                'assets/images/wood_texture_rotated.jpg'),
                             fit: BoxFit.cover,
                           ),
-                          border: Border.all(color: Theme.of(context).colorScheme.surface, width: 4),
+                          border: Border.all(
+                              color: Theme.of(context).colorScheme.surface,
+                              width: 4),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
@@ -471,10 +473,13 @@ class _PracticeSessionScreenState extends State<PracticeSessionScreen> {
                             horizontal: 20, vertical: 8),
                         decoration: BoxDecoration(
                           image: const DecorationImage(
-                            image: AssetImage('assets/images/wood_texture_rotated.jpg'),
+                            image: AssetImage(
+                                'assets/images/wood_texture_rotated.jpg'),
                             fit: BoxFit.cover,
                           ),
-                          border: Border.all(color: Theme.of(context).colorScheme.surface, width: 4),
+                          border: Border.all(
+                              color: Theme.of(context).colorScheme.surface,
+                              width: 4),
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: const Text(
@@ -490,61 +495,61 @@ class _PracticeSessionScreenState extends State<PracticeSessionScreen> {
                       ),
                     ),
 
-                      const SizedBox(height: 28),
+                    const SizedBox(height: 28),
 
-                      // Combined Circle of Fifths with Internal Bar Graph
-                      SizedBox(
-                        height: 420,
-                        child: Center(
-                          child: _buildCircularKeysWithBarGraph(),
+                    // Combined Circle of Fifths with Internal Bar Graph
+                    SizedBox(
+                      height: 420,
+                      child: Center(
+                        child: _buildCircularKeysWithBarGraph(),
+                      ),
+                    ),
+
+                    const SizedBox(height: 28),
+
+                    // Instructions
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: CupertinoColors.systemGrey6.withOpacity(0.5),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: CupertinoColors.systemGrey4.withOpacity(0.3),
+                          width: 0.5,
                         ),
                       ),
-
-                      const SizedBox(height: 28),
-
-                      // Instructions
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: CupertinoColors.systemGrey6.withOpacity(0.5),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: CupertinoColors.systemGrey4.withOpacity(0.3),
-                            width: 0.5,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: CupertinoTheme.of(context).primaryColor,
+                              shape: BoxShape.circle,
+                            ),
                           ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              width: 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                color: CupertinoTheme.of(context).primaryColor,
-                                shape: BoxShape.circle,
-                              ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Tap a key to add a rep',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: CupertinoTheme.of(context)
+                                  .textTheme
+                                  .textStyle
+                                  .color
+                                  ?.withOpacity(0.8),
                             ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Tap a key to add a rep',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                                color: CupertinoTheme.of(context)
-                                    .textTheme
-                                    .textStyle
-                                    .color
-                                    ?.withOpacity(0.8),
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
+            ),
           ],
         ),
       ),
@@ -653,7 +658,8 @@ class _PracticeSessionScreenState extends State<PracticeSessionScreen> {
 
     // Use the same radius calculations as in the painter
     const outerRadius = customPaintSize / 2 * 0.8; // 350/2 * 0.8 = 140
-    const buttonRadius = customPaintSize / 2 * 0.14; // Match painter buttonRadius
+    const buttonRadius =
+        customPaintSize / 2 * 0.14; // Match painter buttonRadius
 
     double minDistance = double.infinity;
     String? closestKey;

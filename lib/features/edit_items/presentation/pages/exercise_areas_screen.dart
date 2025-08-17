@@ -171,7 +171,7 @@ class _ExerciseAreasScreenState extends State<ExerciseAreasScreen> {
           ),
         // Add padding for navigation bar
         const SliverToBoxAdapter(
-          child: SizedBox(height: 50),
+          child: SizedBox(height: 80),
         ),
         
         // Always show Chord Progressions area at the top

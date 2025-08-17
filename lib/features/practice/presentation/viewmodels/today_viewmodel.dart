@@ -62,6 +62,14 @@ class TodayViewModel extends ChangeNotifier {
     developer.log(
         '[TodayViewModel] > _loadTodaysItems: areas fetched from RoutinesVM for $currentDay = ${areasFromRoutine.map((e) => e.name).toList()}',
         name: 'TodayVM');
+    developer.log(
+        '[TodayViewModel] > _loadTodaysItems: RoutinesVM.routines has ${_routinesViewModel.routines.length} days configured',
+        name: 'TodayVM');
+    for (final entry in _routinesViewModel.routines.entries) {
+      developer.log(
+          '[TodayViewModel] > _loadTodaysItems: ${entry.key} has ${entry.value.length} areas: ${entry.value.map((e) => e.name).toList()}',
+          name: 'TodayVM');
+    }
 
     _todaysAreas = List<PracticeArea>.from(areasFromRoutine);
     _completedItemIds
@@ -302,12 +310,28 @@ class TodayViewModel extends ChangeNotifier {
       for (final stat in todaysStats) {
         totalTime += stat.totalTime;
       }
-      _todaysPracticeMinutes = totalTime.inMinutes;
-      notifyListeners();
+      final newTodaysPracticeMinutes = totalTime.inMinutes;
+      
+      // Only notify listeners if the practice time actually changed
+      if (newTodaysPracticeMinutes != _todaysPracticeMinutes) {
+        _todaysPracticeMinutes = newTodaysPracticeMinutes;
+        developer.log('[TodayViewModel] Practice time changed to: $_todaysPracticeMinutes minutes', name: 'TodayVM');
+        notifyListeners();
+      } else {
+        developer.log('[TodayViewModel] Practice time unchanged: $_todaysPracticeMinutes minutes', name: 'TodayVM');
+      }
     } catch (e) {
-      _todaysPracticeMinutes = 0;
-      developer.log('[TodayViewModel] Error loading today\'s practice time: $e', name: 'TodayVM');
+      if (_todaysPracticeMinutes != 0) {
+        _todaysPracticeMinutes = 0;
+        developer.log('[TodayViewModel] Error loading today\'s practice time: $e', name: 'TodayVM');
+        notifyListeners();
+      }
     }
+  }
+
+  /// Public method to reload today's practice time (call after session completion)
+  Future<void> reloadTodaysPracticeTime() async {
+    await _loadTodaysPracticeTime();
   }
 
   // Increase daily goal by 2 minutes

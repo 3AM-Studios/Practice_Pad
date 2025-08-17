@@ -1196,7 +1196,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
               }
             }
           }
-          // else add rest of measure length
+          // else add rest of measure length 
           else {
             // Add a rest for the remaining measure length
             musicalSymbols.add(music_sheet.Rest(music_sheet.RestType.quarter));
@@ -3410,7 +3410,8 @@ class _SongViewerScreenState extends State<SongViewerScreen>
   /// Increase sheet music scale (zoom in)
   void _zoomIn() {
     setState(() {
-      _sheetMusicScale = (_sheetMusicScale + 0.1).clamp(0.3, 2.0);
+      _sheetMusicScale = (_sheetMusicScale + 0.1).clamp(0.3, 0.8);
+      print('Zooming in to scale: $_sheetMusicScale');
       // Invalidate sheet music cache to force rebuild with new scale
       _cachedSheetMusicWidget = null;
       _lastRenderedMeasures = null;
@@ -3422,7 +3423,8 @@ class _SongViewerScreenState extends State<SongViewerScreen>
   /// Decrease sheet music scale (zoom out)
   void _zoomOut() {
     setState(() {
-      _sheetMusicScale = (_sheetMusicScale - 0.1).clamp(0.3, 2.0);
+      _sheetMusicScale = (_sheetMusicScale - 0.1).clamp(0.3, 0.8);
+      print('Zooming out to scale: $_sheetMusicScale');
       // Invalidate sheet music cache to force rebuild with new scale
       _cachedSheetMusicWidget = null;
       _lastRenderedMeasures = null;

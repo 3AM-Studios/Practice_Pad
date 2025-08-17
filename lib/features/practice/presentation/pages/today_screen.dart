@@ -84,6 +84,7 @@ Widget _buildBody(BuildContext context, TodayViewModel viewModel) {
   if (viewModel.todaysAreas.isEmpty) {
     return Column(
       children: [
+        const SizedBox(height: 10),
         Expanded(
           child: Center(
             child: Padding(
@@ -100,6 +101,7 @@ Widget _buildBody(BuildContext context, TodayViewModel viewModel) {
           ),
         ),
         _buildBottomSection(context, viewModel, widget.onStatsPressed, isTabletOrDesktop),
+        const SizedBox(height: 45),
       ],
     );
   }
@@ -107,9 +109,7 @@ Widget _buildBody(BuildContext context, TodayViewModel viewModel) {
   // Main change: Use Column instead of CustomScrollView
   return Column(
     children: [
-      // Active session banner at top
-      
-      
+      const SizedBox(height: 10),
       // Scrollable practice areas in the middle (takes remaining space)
       Expanded(
         child: CustomScrollView(
@@ -168,7 +168,7 @@ Widget _buildBody(BuildContext context, TodayViewModel viewModel) {
       ),
       // Responsive bottom section
       _buildBottomSection(context, viewModel, widget.onStatsPressed, isTabletOrDesktop),
-      const SizedBox(height: 100),
+      const SizedBox(height: 45),
     ],
   );
 }

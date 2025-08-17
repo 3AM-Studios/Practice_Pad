@@ -234,7 +234,10 @@ class RoutinesViewModel extends ChangeNotifier {
     // Load schedule whenever practice areas are available
     if (_editItemsViewModel.areas.isNotEmpty) {
       developer.log('Practice areas changed, reloading weekly schedule', name: 'RoutinesVM');
+      developer.log('EditItemsViewModel now has ${_editItemsViewModel.areas.length} areas', name: 'RoutinesVM');
       _loadWeeklySchedule();
+    } else {
+      developer.log('Practice areas changed but EditItemsViewModel still has no areas', name: 'RoutinesVM');
     }
   }
 
@@ -242,6 +245,61 @@ class RoutinesViewModel extends ChangeNotifier {
   void dispose() {
     _editItemsViewModel.removeListener(_onPracticeAreasChanged);
     super.dispose();
+  }
+
+  /// Get practice areas that are shared across all days of the week
+  List<PracticeArea> getSharedPracticeAreas() {
+    if (_routines.isEmpty) return [];
+    
+    // Start with areas from the first day
+    final firstDay = DayOfWeek.values.first;
+    final firstDayAreas = _routines[firstDay] ?? [];
+    
+    if (firstDayAreas.isEmpty) return [];
+    
+    // Find areas that appear in all days
+    final sharedAreas = <PracticeArea>[];
+    
+    for (final area in firstDayAreas) {
+      bool isInAllDays = true;
+      
+      for (final day in DayOfWeek.values) {
+        final dayAreas = _routines[day] ?? [];
+        if (!dayAreas.any((a) => a.recordName == area.recordName)) {
+          isInAllDays = false;
+          break;
+        }
+      }
+      
+      if (isInAllDays) {
+        sharedAreas.add(area);
+      }
+    }
+    
+    return sharedAreas;
+  }
+
+  /// Remove a practice area from all days of the week
+  void removeSharedPracticeArea(PracticeArea area) {
+    for (final day in DayOfWeek.values) {
+      _routines[day]?.removeWhere((a) => a.recordName == area.recordName);
+    }
+    _saveWeeklySchedule();
+    notifyListeners();
+  }
+
+  /// Add practice areas to all days of the week
+  void addPracticeAreasToAllDays(List<PracticeArea> areas) {
+    for (final area in areas) {
+      for (final day in DayOfWeek.values) {
+        final dayRoutine = _routines[day];
+        if (dayRoutine != null && !dayRoutine.any((a) => a.recordName == area.recordName)) {
+          dayRoutine.add(area);
+        }
+      }
+    }
+    _saveWeeklySchedule();
+    notifyListeners();
   }
 
   // More methods will be added here for loading, saving, reordering items, etc.

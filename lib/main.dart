@@ -67,8 +67,9 @@ void main() async {
   
   // Initialize widget action handler
     await WidgetActionHandler.initialize();
-    // Clear any stale widget actions on startup to prevent errors
+    // Clear any stale widget data on startup to ensure fresh data
     await WidgetActionHandler.clearAllWidgetData();
+    print('Main: Cleared all widget data on startup');
 
 
   runApp(const PracticeLoverApp());
@@ -137,9 +138,7 @@ class PracticeLoverApp extends StatelessWidget {
         supportedLocales: const [
           Locale('en', ''),
         ],
-        home: const WoodenBorderWrapper(
-          child: MainAppScaffold(),
-        ),
+        home: MainAppScaffold(),
       ),
     );
   }
@@ -179,7 +178,16 @@ class MainAppScaffoldState extends State<MainAppScaffold> {
       todayViewModel: todayViewModel,
       sessionManager: sessionManager,
       editItemsViewModel: editItemsViewModel,
+      onNavigateToPractice: (itemId) {
+        // For now, this just starts the practice session
+        // TODO: Later enhance this to navigate to the practice session screen
+        print('Main: Navigation requested for practice item: $itemId');
+      },
     );
+    
+    // Force initial widget update after initialization
+    print('Main: Forcing initial widget update after setup');
+    WidgetUpdateService.instance.updateWidget();
   }
 
   @override

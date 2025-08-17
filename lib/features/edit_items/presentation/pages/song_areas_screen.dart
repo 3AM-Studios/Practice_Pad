@@ -134,7 +134,7 @@ class _SongAreasScreenState extends State<SongAreasScreen> {
             ),
           ),
         const SliverToBoxAdapter(
-          child: SizedBox(height: 50),
+          child: SizedBox(height: 80),
         ),  
         if (viewModel.songAreas.isEmpty &&
             !viewModel.isLoadingAreas &&

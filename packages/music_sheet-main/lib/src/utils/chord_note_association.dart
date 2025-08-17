@@ -109,7 +109,6 @@ String getChordExtension(Note note, ChordSymbol chordSymbol) {
   // Calculate how many semitones the note is ABOVE the chord root
   // This gives us the ascending interval from root to note
   int interval = (notePitchClass - chordRootPitchClass + 12) % 12;
-  print('DEBUG: Note (midi: $noteMidi, pc: ${noteName}) vs Chord ${chordSymbol.effectiveRootName} (pc: $chordRootPitchClass) = interval $interval');
   // Debug logging to help troubleshoot  
 
   // Convert semitone interval to scale degree

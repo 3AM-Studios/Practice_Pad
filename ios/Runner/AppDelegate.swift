@@ -56,6 +56,37 @@ import WidgetKit
         GeneratedPluginRegistrant.register(with: self)
         return super.application(application, didFinishLaunchingWithOptions: launchOptions)
     }
+    
+    // Handle URL scheme deep links
+    override func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey : Any] = [:]) -> Bool {
+        print("iOS: Received URL: \(url)")
+        
+        // Parse the URL scheme: practicepad://practice/{itemId}
+        if url.scheme == "practicepad" && url.host == "practice" {
+            let itemId = url.lastPathComponent
+            print("iOS: Deep link to practice item: \(itemId)")
+            
+            // Save the deep link action for Flutter to process
+            let actionData = [
+                "action": "open_practice_item",
+                "itemId": itemId,
+                "timestamp": Date().timeIntervalSince1970
+            ] as [String: Any]
+            
+            if let jsonData = try? JSONSerialization.data(withJSONObject: actionData),
+               let jsonString = String(data: jsonData, encoding: .utf8) {
+                userDefaults?.set(jsonString, forKey: "widget_action")
+                print("iOS: Saved deep link action: \(jsonString)")
+                
+                // Notify Flutter if the app is already running
+                widgetMethodChannel?.invokeMethod("widgetActionReceived", arguments: nil)
+            }
+            
+            return true
+        }
+        
+        return super.application(app, open: url, options: options)
+    }
 
     // MARK: - Widget Action Handling (Polling Method)
     

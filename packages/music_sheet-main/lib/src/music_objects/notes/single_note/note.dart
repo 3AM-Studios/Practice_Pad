@@ -401,7 +401,7 @@ class NoteRenderer with DebugRenderMixin implements MusicalSymbolRenderer {
         text: extension,
         style: TextStyle(
           color: Colors.white,
-          fontSize: 13 / layout.canvasScale,
+          fontSize: 16 / layout.canvasScale,
           fontWeight: FontWeight.bold,
         ),
       ),
@@ -416,9 +416,10 @@ class NoteRenderer with DebugRenderMixin implements MusicalSymbolRenderer {
     final noteHeadCenter = noteHeadBounds.center;
 
     // Calculate container size with padding
-    const padding = 3.9;
-    final containerWidth = textPainter.width + (padding * 3);
-    final containerHeight = textPainter.height + (padding * 2);
+    const width_padding = 4.5 * 3.6;
+    const vertical_padding = 4.5 * 2;
+    final containerWidth = textPainter.width + (width_padding);
+    final containerHeight = textPainter.height + (vertical_padding);
 
     // Position the container based on stem direction
     final containerX = noteHeadCenter.dx - containerWidth / 2;
@@ -437,8 +438,8 @@ class NoteRenderer with DebugRenderMixin implements MusicalSymbolRenderer {
     canvas.drawRRect(rrect, borderPaint);
 
     // Draw the text centered in the container
-    final textX = containerX + padding;
-    final textY = containerY + padding;
+    final textX = containerX + width_padding/2;
+    final textY = containerY + vertical_padding/2;
     textPainter.paint(canvas, Offset(textX, textY));
   }
 }

@@ -108,6 +108,7 @@ struct StartPracticeItemIntent: AppIntent {
             return .result()
         }
         
+        // Save action data for the app to process when it opens
         let actionData = [
             "action": "start_practice_item",
             "itemId": itemId,
@@ -122,15 +123,20 @@ struct StartPracticeItemIntent: AppIntent {
             userDefaults.set(jsonString, forKey: "widget_action")
             userDefaults.synchronize()
             NSLog("Widget: Successfully saved action to widget_action key: \(jsonString)")
-            
-            // Trigger immediate widget reload to reflect changes
-            WidgetCenter.shared.reloadTimelines(ofKind: "PracticePadWidget")
-            NSLog("Widget: Triggered widget timeline reload")
         } else {
             NSLog("Widget: ERROR - Failed to serialize action data")
         }
         
+        // Return result with intent to open app - use standard result for now
         NSLog("Widget: StartPracticeItemIntent.perform() completed successfully")
+        
+        // Open the app directly using the URL scheme
+        if let url = URL(string: "practicepad://practice/\(itemId)") {
+            NSLog("Widget: Attempting to open URL: \(url)")
+            // Since we can't use UIApplication in widget extension, we'll return a simple result
+            // The URL scheme will be handled by the AppDelegate when the app opens
+        }
+        
         return .result()
     }
 }
@@ -406,11 +412,14 @@ struct PracticePadAppIntentTimelineProvider: AppIntentTimelineProvider {
     private func loadCurrentData() -> PracticePadEntry {
         let userDefaults = UserDefaults(suiteName: "group.com.example.practicePad")
         
+        NSLog("Widget: Loading current data from UserDefaults")
+        
         // Load practice areas
         var practiceAreas: [PracticeAreaData] = []
         if let practiceAreasJson = userDefaults?.string(forKey: "practice_areas"),
            !practiceAreasJson.isEmpty,
            let practiceAreasData = practiceAreasJson.data(using: .utf8) {
+            NSLog("Widget: Raw practice_areas JSON: \(practiceAreasJson)")
             do {
                 let decoded = try JSONSerialization.jsonObject(with: practiceAreasData) as? [[String: Any]]
                 practiceAreas = decoded?.compactMap { areaDict in

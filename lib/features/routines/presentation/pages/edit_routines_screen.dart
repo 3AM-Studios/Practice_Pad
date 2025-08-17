@@ -33,6 +33,21 @@ class _EditRoutinesScreenState extends State<EditRoutinesScreen> {
     }
   }
 
+  Future<void> _navigateToAddAreasToAllDaysScreen(
+      BuildContext context, RoutinesViewModel routinesViewModel) async {
+    final List<PracticeArea>? selectedAreas =
+        await Navigator.of(context).push<List<PracticeArea>>(
+      CupertinoPageRoute(
+        builder: (_) => _AddAreasToAllDaysScreen(),
+        fullscreenDialog: true,
+      ),
+    );
+
+    if (selectedAreas != null && selectedAreas.isNotEmpty) {
+      routinesViewModel.addPracticeAreasToAllDays(selectedAreas);
+    }
+  }
+
   Future<void> _showCopyRoutineDialog(
       BuildContext context, RoutinesViewModel viewModel) async {
     final DayOfWeek sourceDay = viewModel.selectedDay;
@@ -358,11 +373,128 @@ class _EditRoutinesScreenState extends State<EditRoutinesScreen> {
                     },
                   ),
                 ),
+                // Shared practice areas section
+                _buildSharedAreasSection(context, routinesViewModel),
               ],
             ),
           ),
         );
       },
+    );
+  }
+
+  Widget _buildSharedAreasSection(BuildContext context, RoutinesViewModel routinesViewModel) {
+    final sharedAreas = routinesViewModel.getSharedPracticeAreas();
+    
+    return Container(
+      padding: const EdgeInsets.all(16),
+      child: ClayContainer(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: 20,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(
+                    CupertinoIcons.calendar,
+                    color: CupertinoColors.activeBlue,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Practice Areas Shared Across All Days',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    child: const Icon(
+                      CupertinoIcons.add,
+                      color: CupertinoColors.activeBlue,
+                    ),
+                    onPressed: () => _navigateToAddAreasToAllDaysScreen(context, routinesViewModel),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (sharedAreas.isEmpty)
+                const Text(
+                  'No practice areas are shared across all days yet. Add some to practice them every day!',
+                  style: TextStyle(
+                    color: CupertinoColors.systemGrey,
+                    fontSize: 14,
+                  ),
+                )
+              else
+                ...sharedAreas.map((area) => Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    children: [
+                      Icon(
+                        area.type == PracticeAreaType.song 
+                            ? CupertinoIcons.music_note_2 
+                            : CupertinoIcons.chart_bar_square,
+                        color: area.type == PracticeAreaType.song 
+                            ? CupertinoColors.systemBlue 
+                            : CupertinoColors.systemOrange,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          area.name,
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      ),
+                      CupertinoButton(
+                        padding: EdgeInsets.zero,
+                        child: const Icon(
+                          CupertinoIcons.delete,
+                          color: CupertinoColors.destructiveRed,
+                          size: 16,
+                        ),
+                        onPressed: () => _showRemoveSharedAreaDialog(context, routinesViewModel, area),
+                      ),
+                    ],
+                  ),
+                )),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showRemoveSharedAreaDialog(BuildContext context, RoutinesViewModel routinesViewModel, PracticeArea area) {
+    showCupertinoDialog(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: const Text('Remove from All Days'),
+        content: Text(
+          'Are you sure you want to remove "${area.name}" from all days of the week?',
+        ),
+        actions: [
+          CupertinoDialogAction(
+            child: const Text('Cancel'),
+            onPressed: () => Navigator.of(dialogContext).pop(),
+          ),
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            child: const Text('Remove'),
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              routinesViewModel.removeSharedPracticeArea(area);
+            },
+          ),
+        ],
+      ),
     );
   }
 
@@ -383,5 +515,113 @@ class _EditRoutinesScreenState extends State<EditRoutinesScreen> {
       case DayOfWeek.sunday:
         return 'Sunday';
     }
+  }
+}
+
+class _AddAreasToAllDaysScreen extends StatefulWidget {
+  const _AddAreasToAllDaysScreen();
+
+  @override
+  State<_AddAreasToAllDaysScreen> createState() => _AddAreasToAllDaysScreenState();
+}
+
+class _AddAreasToAllDaysScreenState extends State<_AddAreasToAllDaysScreen> {
+  final Set<PracticeArea> _selectedAreas = {};
+
+  @override
+  Widget build(BuildContext context) {
+    final editItemsViewModel = Provider.of<EditItemsViewModel>(context);
+    final practiceAreas = editItemsViewModel.areas;
+
+    return CupertinoPageScaffold(
+      navigationBar: CupertinoNavigationBar(
+        middle: const Text('Add To All Days'),
+        leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Text('Cancel'),
+          onPressed: () {
+            Navigator.of(context).pop();
+          },
+        ),
+        trailing: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Text('Done', style: TextStyle(fontWeight: FontWeight.bold)),
+          onPressed: () {
+            Navigator.of(context).pop(_selectedAreas.toList());
+          },
+        ),
+      ),
+      child: _buildBody(practiceAreas),
+    );
+  }
+
+  Widget _buildBody(List<PracticeArea> practiceAreas) {
+    if (practiceAreas.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                CupertinoIcons.folder,
+                size: 64,
+                color: CupertinoColors.systemGrey,
+              ),
+              SizedBox(height: 16),
+              Text(
+                'No Practice Areas Found',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              SizedBox(height: 8),
+              Text(
+                'Create some songs or exercises first in the Items tab.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: CupertinoColors.secondaryLabel),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      itemCount: practiceAreas.length,
+      itemBuilder: (context, index) {
+        final area = practiceAreas[index];
+        final isSelected = _selectedAreas.contains(area);
+        
+        return CupertinoListTile.notched(
+          title: Text(area.name),
+          subtitle: Text(
+            '${area.type == PracticeAreaType.song ? 'Song' : 'Exercise'} • ${area.practiceItems.length} practice items',
+          ),
+          leading: Icon(
+            area.type == PracticeAreaType.song 
+                ? CupertinoIcons.music_note_2 
+                : CupertinoIcons.chart_bar_square,
+            color: area.type == PracticeAreaType.song 
+                ? CupertinoColors.systemBlue 
+                : CupertinoColors.systemOrange,
+          ),
+          trailing: Icon(
+            isSelected ? CupertinoIcons.check_mark_circled_solid : CupertinoIcons.circle,
+            color: isSelected ? CupertinoColors.activeGreen : CupertinoColors.systemGrey,
+          ),
+          onTap: () {
+            setState(() {
+              if (isSelected) {
+                _selectedAreas.remove(area);
+              } else {
+                _selectedAreas.add(area);
+              }
+            });
+          },
+        );
+      },
+    );
   }
 }

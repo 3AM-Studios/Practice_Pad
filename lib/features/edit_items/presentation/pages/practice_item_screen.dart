@@ -213,7 +213,7 @@ class _PracticeItemScreenState extends State<PracticeItemScreen> {
           onRefresh: _loadItems,
         ),
                 const SliverToBoxAdapter(
-          child: SizedBox(height: 50),
+          child: SizedBox(height: 80),
         ),
         SliverList(
           delegate: SliverChildBuilderDelegate(

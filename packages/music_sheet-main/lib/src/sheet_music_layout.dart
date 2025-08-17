@@ -127,12 +127,6 @@ class SheetMusicLayout with ChangeNotifier {
   // Canvas scale for zooming in/out
   double get canvasScale => _canvasScale;
   
-  /// Update the canvas scale and rebuild the layout
-  void updateCanvasScale(double newScale) {
-    _canvasScale = newScale.clamp(0.3, 2.0); // Limit scale between 30% and 200%
-    _buildRenderers();
-    notifyListeners();
-  }
 
   // Minimal left padding
   double get _leftPaddingOnCanvas => (_kHorizontalScreenPadding / 2);

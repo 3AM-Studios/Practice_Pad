@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:practice_pad/models/practice_item.dart';
+import 'package:practice_pad/models/statistics.dart';
 
 /// Global manager for tracking active practice sessions across the app
 class PracticeSessionManager extends ChangeNotifier {
@@ -73,9 +74,23 @@ class PracticeSessionManager extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Complete the session
-  void completeSession() {
+  /// Complete the session and save statistics
+  Future<void> completeSession() async {
     _timer?.cancel();
+    
+    // Save statistics if there was an active session with time
+    if (_activePracticeItem != null && _elapsedSeconds > 0) {
+      try {
+        await Statistics.addToStats(_activePracticeItem!, {
+          'time': _elapsedSeconds,
+          'reps': 1, // Default to 1 rep for time-based practice
+        });
+        print('PracticeSessionManager: Saved statistics for ${_activePracticeItem!.name}: ${_elapsedSeconds} seconds');
+      } catch (e) {
+        print('PracticeSessionManager: Error saving statistics: $e');
+      }
+    }
+    
     _activePracticeItem = null;
     _targetSeconds = 60;
     _elapsedSeconds = 0;
