@@ -82,7 +82,7 @@ class SheetMusicLayout with ChangeNotifier {
 
       // 3. Calculate the stretch factor
       // Always stretch measures to use more of the available width
-      double stretchFactor = 2.5; // Much more aggressive stretch for proper spacing
+      double stretchFactor = 4; // Much more aggressive stretch for proper spacing
       if (naturalTotalWidth > 0) {
         final calculatedStretch = availableWidthForMeasures / naturalTotalWidth;
         // Use the larger of calculated stretch or minimum stretch

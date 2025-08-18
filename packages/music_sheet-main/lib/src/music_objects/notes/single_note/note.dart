@@ -386,7 +386,7 @@ class NoteRenderer with DebugRenderMixin implements MusicalSymbolRenderer {
 
     // Create a paint for the clay container background
     final containerPaint = Paint()
-      ..color = CupertinoColors.systemBlue.withOpacity(0.8)
+      ..color = CupertinoColors.systemBrown .withOpacity(0.9)
       ..style = PaintingStyle.fill;
 
     // Create a paint for the container border

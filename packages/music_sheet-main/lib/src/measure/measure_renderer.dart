@@ -41,7 +41,6 @@ class MeasureRenderer {
   List<BeamRenderer> beamRenderers = [];
   final Map<Note, Offset> _beamedNoteCustomStems = {};
 
-  final double? targetWidth;
   final double stretchFactor;
   final double measurePadding;
 
@@ -55,8 +54,7 @@ class MeasureRenderer {
     required this.glyphMetadata,
     required this.glyphPaths,
     this.symbolPositionCallback,
-    this.targetWidth,
-    this.stretchFactor = 1.0,
+    this.stretchFactor = 1,
     this.measurePadding = 6.0
   }) {
     // Set the initial metrics and build the renderers for the first time

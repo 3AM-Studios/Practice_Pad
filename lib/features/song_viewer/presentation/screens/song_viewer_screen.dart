@@ -99,7 +99,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
   final GlobalKey _sheetMusicKey = GlobalKey();
 
   // Sheet music zoom control
-  double _sheetMusicScale = 0.7;
+  double _sheetMusicScale = 0.4;
 
   // Extension numbering control
   bool _extensionNumbersRelativeToChords = true;
@@ -145,7 +145,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
         setState(() {
           if (songChanges.containsKey('canvasScale')) {
             _sheetMusicScale =
-                (songChanges['canvasScale'] as double).clamp(0.3, 2.0);
+                (songChanges['canvasScale'] as double).clamp(0.3, 0.8);
           }
           if (songChanges.containsKey('extensionNumbersRelativeToChords')) {
             _extensionNumbersRelativeToChords =
@@ -215,11 +215,32 @@ class _SongViewerScreenState extends State<SongViewerScreen>
       for (int i = 0; i < _chordSymbols.length; i++) {
         final chord = _chordSymbols[i];
         if (chord.modifiedKeySignature != null) {
-          chordKeys[i.toString()] = {
+          final chordData = <String, dynamic>{
             'modifiedKeySignature': chord.modifiedKeySignature.toString(),
-            'chordRoot': chord.rootName,
-            'chordQuality': chord.quality,
           };
+          
+          // Save both direct creation and MusicXML data for proper reconstruction
+          if (chord.rootStep != null && chord.kind != null) {
+            // MusicXML chord - save MusicXML data
+            chordData['isMusicXML'] = true;
+            chordData['rootStep'] = chord.rootStep;
+            chordData['rootAlter'] = chord.rootAlter;
+            chordData['kind'] = chord.kind;
+            chordData['durationBeats'] = chord.durationBeats;
+            chordData['measureNumber'] = chord.measureNumber;
+          } else {
+            // Direct creation chord - save root/quality
+            chordData['isMusicXML'] = false;
+            chordData['chordRoot'] = chord.rootName;
+            chordData['chordQuality'] = chord.quality;
+          }
+          
+          // Always save these common fields
+          chordData['position'] = chord.position;
+          chordData['originalKeySignature'] = chord.originalKeySignature?.toString();
+          chordData['preservedRomanNumeral'] = chord.preservedRomanNumeral;
+          
+          chordKeys[i.toString()] = chordData;
         }
       }
 
@@ -252,13 +273,69 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                 if (keySignature != null) {
                   // Create new chord symbol with modified key signature
                   final originalChord = _chordSymbols[index];
-                  final modifiedChord = ChordSymbol(
-                    originalChord.rootName ?? '',
-                    originalChord.quality ?? '',
-                    position: originalChord.position,
-                    originalKeySignature: originalChord.originalKeySignature,
-                    modifiedKeySignature: keySignature,
-                  );
+                  final ChordSymbol modifiedChord;
+                  
+                  // Parse additional saved data
+                  final originalKeySignatureStr = keyData['originalKeySignature'] as String?;
+                  final originalKeySignature = originalKeySignatureStr != null 
+                      ? _stringToKeySignatureType(originalKeySignatureStr) 
+                      : originalChord.originalKeySignature;
+                  final preservedRomanNumeral = keyData['preservedRomanNumeral'] as String?;
+                  final position = keyData['position'] as int? ?? originalChord.position;
+                  
+                  // Check if saved data indicates MusicXML or if we need to fall back to original chord inspection
+                  final isMusicXML = keyData['isMusicXML'] as bool?;
+                  
+                  if (isMusicXML == true && keyData['rootStep'] != null && keyData['kind'] != null) {
+                    // Use saved MusicXML data
+                    modifiedChord = ChordSymbol.fromMusicXML(
+                      keyData['rootStep'] as String,
+                      keyData['rootAlter'] as int? ?? 0,
+                      keyData['kind'] as String,
+                      keyData['durationBeats'] as double? ?? 1.0,
+                      keyData['measureNumber'] as int? ?? 1,
+                      position: position,
+                      originalKeySignature: originalKeySignature,
+                      modifiedKeySignature: keySignature,
+                      preservedRomanNumeral: preservedRomanNumeral,
+                    );
+                  } else if (isMusicXML == false && keyData['chordRoot'] != null && keyData['chordQuality'] != null) {
+                    // Use saved direct creation data
+                    modifiedChord = ChordSymbol(
+                      keyData['chordRoot'] as String,
+                      keyData['chordQuality'] as String,
+                      position: position,
+                      originalKeySignature: originalKeySignature,
+                      modifiedKeySignature: keySignature,
+                      preservedRomanNumeral: preservedRomanNumeral,
+                    );
+                  } else {
+                    // Fall back to original chord inspection (for backward compatibility)
+                    if (originalChord.rootStep != null && originalChord.kind != null) {
+                      // Original was from MusicXML - preserve that data
+                      modifiedChord = ChordSymbol.fromMusicXML(
+                        originalChord.rootStep!,
+                        originalChord.rootAlter ?? 0,
+                        originalChord.kind!,
+                        originalChord.durationBeats ?? 1.0,
+                        originalChord.measureNumber ?? 1,
+                        position: position,
+                        originalKeySignature: originalKeySignature,
+                        modifiedKeySignature: keySignature,
+                        preservedRomanNumeral: preservedRomanNumeral,
+                      );
+                    } else {
+                      // Original was direct creation - use effective values
+                      modifiedChord = ChordSymbol(
+                        originalChord.effectiveRootName,
+                        originalChord.effectiveQuality,
+                        position: position,
+                        originalKeySignature: originalKeySignature,
+                        modifiedKeySignature: keySignature,
+                        preservedRomanNumeral: preservedRomanNumeral,
+                      );
+                    }
+                  }
                   _chordSymbols[index] = modifiedChord;
 
                   // Update in measures as well
@@ -2624,7 +2701,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
           color: primaryColor,
           borderRadius: 20,
           depth: 15,
-          spread: 4,
+          spread: 0,
           curveType: CurveType.none,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),

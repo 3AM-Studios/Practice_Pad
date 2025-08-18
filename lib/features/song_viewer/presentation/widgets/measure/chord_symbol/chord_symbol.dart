@@ -1094,6 +1094,7 @@ class ChordSymbol {
         scale: isAnimating ? 1.2 : 1.0,
         duration: const Duration(milliseconds: 150),
         child: _buildClayContainer(
+          context: context,
           globalKey: globalKey,
           isSelected: isSelected,
           isCurrentChord: isCurrentChord,
@@ -1112,6 +1113,7 @@ class ChordSymbol {
 
   Widget _buildClayContainer({
     GlobalKey? globalKey,
+    required BuildContext context,
     required bool isSelected,
     required bool isCurrentChord,
     required bool isNonDiatonic,
@@ -1124,8 +1126,22 @@ class ChordSymbol {
     required double canvasScale,
   }) {
     final bool isReharmonized = modifiedKeySignature != null;
-    const Color reharmonizeColor =
-        Colors.purple; // Color for reharmonized chords
+    
+    // Container color variables
+    final Color reharmonizedColor = Colors.purple.withOpacity(0.8);
+    final Color reharmonizedTextColor = Colors.white;
+    final Color reharmonizedBorderColor = Colors.purple.withOpacity(0.8);
+
+    final Color selectedColor = primaryColor;
+    final Color selectedTextColor = Colors.white;
+    final Color selectedBorderColor = Colors.white;
+
+    final Color nonDiatonicColor = Theme.of(context).colorScheme.tertiary.withOpacity(0.8);
+    final Color nonDiatonicTextColor = Colors.white;
+    final Color nonDiatonicBorderColor = Theme.of(context).colorScheme.tertiary;
+
+    final Color diatonicColor = surfaceColor;
+    final Color diatonicTextColor = onSurfaceColor;
 
     return Stack(
       clipBehavior: Clip.none,
@@ -1134,24 +1150,18 @@ class ChordSymbol {
         ClayContainer(
           key: globalKey,
           color: isSelected
-              ? primaryColor // Strong primary color for selected
-              : isCurrentChord
-                  ? primaryColor.withOpacity(0.3) // Light primary for current
-                  : isReharmonized
-                      ? reharmonizeColor
-                          .withOpacity(0.8) // Purple for reharmonized
-                      : isNonDiatonic
-                          ? Colors.orange
-                              .withOpacity(0.8) // Orange for non-diatonic
-                          : surfaceColor, // Clean surface for diatonic
+              ? selectedColor
+              : isReharmonized
+                  ? reharmonizedColor
+                  : isNonDiatonic
+                      ? nonDiatonicColor
+                      : diatonicColor,
           borderRadius: 12,
-          depth: isSelected ? 5 : (isReharmonized || isNonDiatonic ? 6 : 8),
-          spread: isSelected ? 0.5 : 0.5,
+          depth: 0,
+          spread: 0,
           curveType: isSelected
               ? CurveType.concave
-              : isCurrentChord
-                  ? CurveType.convex
-                  : CurveType.none,
+              : CurveType.none,
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
             decoration: BoxDecoration(
@@ -1159,14 +1169,14 @@ class ChordSymbol {
               border: isNewMeasure
                   ? Border(left: BorderSide(color: primaryColor, width: 3.0))
                   : isSelected
-                      ? Border.all(color: Colors.white, width: 2.0)
+                      ? Border.all(color: selectedBorderColor, width: 2.0)
                       : isReharmonized
                           ? Border.all(
-                              color: reharmonizeColor.withOpacity(0.8),
+                              color: reharmonizedBorderColor,
                               width: 1.5)
                           : isNonDiatonic
                               ? Border.all(
-                                  color: Colors.orange.withOpacity(0.8),
+                                  color: nonDiatonicBorderColor,
                                   width: 1.5)
                               : null,
             ),
@@ -1184,12 +1194,12 @@ class ChordSymbol {
                             fontSize: 40 * canvasScale,
                             fontWeight: FontWeight.w600,
                             color: isSelected
-                                ? Colors.white
-                                : isNonDiatonic
-                                    ? Colors.white
-                                    : isCurrentChord
-                                        ? primaryColor
-                                        : primaryColor),
+                                ? selectedTextColor
+                                : isReharmonized
+                                    ? reharmonizedTextColor
+                                    : isNonDiatonic
+                                        ? nonDiatonicTextColor
+                                        : diatonicTextColor),
                       ),
                       if (getQualitySuperscript().isNotEmpty)
                         TextSpan(
@@ -1198,12 +1208,12 @@ class ChordSymbol {
                               fontSize: 36 * canvasScale,
                               fontWeight: FontWeight.w600,
                               color: isSelected
-                                  ? Colors.white
-                                  : isNonDiatonic
-                                      ? Colors.white
-                                      : isCurrentChord
-                                          ? primaryColor
-                                          : primaryColor),
+                                  ? selectedTextColor
+                                  : isReharmonized
+                                      ? reharmonizedTextColor
+                                      : isNonDiatonic
+                                          ? nonDiatonicTextColor
+                                          : diatonicTextColor),
                         ),
                     ],
                   ),
@@ -1218,12 +1228,12 @@ class ChordSymbol {
                           fontSize: 34 * canvasScale,
                           fontWeight: FontWeight.bold,
                           color: isSelected
-                              ? Colors.white
-                              : isCurrentChord
-                                  ? Colors.white
+                              ? selectedTextColor
+                              : isReharmonized
+                                  ? reharmonizedTextColor
                                   : isNonDiatonic
-                                      ? Colors.white
-                                      : onSurfaceColor,
+                                      ? nonDiatonicTextColor
+                                      : diatonicTextColor,
                         ),
                       );
                     }).toList(),
@@ -1240,12 +1250,12 @@ class ChordSymbol {
             left: 0,
             right: 0,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
               decoration: BoxDecoration(
-                color: reharmonizeColor.withOpacity(0.2),
+                color: reharmonizedColor.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: reharmonizeColor.withOpacity(0.6),
+                  color: reharmonizedColor.withOpacity(0.6),
                   width: 1,
                 ),
               ),
@@ -1253,9 +1263,9 @@ class ChordSymbol {
                 _getKeyNameFromSignature(modifiedKeySignature!),
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 9 * canvasScale,
+                  fontSize: 30 * canvasScale,
                   fontWeight: FontWeight.bold,
-                  color: reharmonizeColor.withOpacity(0.8),
+                  color: reharmonizedColor.withOpacity(0.8),
                 ),
               ),
             ),
