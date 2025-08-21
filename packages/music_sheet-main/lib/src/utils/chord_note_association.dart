@@ -38,7 +38,7 @@ String getKeyExtension(Note note, String keySignature) {
     accidental = 'b';
   }
   if (note.accidental.toString() == 'Accidental.sharp') {
-    accidental = '#';
+    accidental = '♯';
   }
   
   final String noteName = note.pitch.name.replaceAll(RegExp(r'\d'), '').trim().toUpperCase() + accidental;
@@ -94,7 +94,7 @@ String getChordExtension(Note note, ChordSymbol chordSymbol) {
     accidental = 'b';
   }
   if (note.accidental.toString() == 'Accidental.sharp') {
-    accidental = '#';
+    accidental = '♯';
   }
   
   final String noteName = note.pitch.name.replaceAll(RegExp(r'\d'), '').trim().toUpperCase() + accidental;
@@ -156,24 +156,24 @@ String convertKeySignatureTypeToString(dynamic keySignatureType) {
 int _getMidiValueFromNoteName(String noteName) {
   final noteValues = {
     'C': 0,   // C
-    'C#': 1,  // C# / Db
+    'C♯': 1,  // C♯ / Db
     'Db': 1,
     'D♭': 1,
     'D': 2,   // D
-    'D#': 3,  // D# / Eb  
+    'D♯': 3,  // D♯ / Eb  
     'Eb': 3,
     'E♭': 3,
     'E': 4,   // E
     'F': 5,   // F
-    'F#': 6,  // F# / Gb
+    'F♯': 6,  // F♯ / Gb
     'Gb': 6,
     'G♭': 6,
     'G': 7,   // G
-    'G#': 8,  // G# / Ab
+    'G♯': 8,  // G♯ / Ab
     'Ab': 8,
     'A♭': 8,
     'A': 9,   // A
-    'A#': 10, // A# / Bb
+    'A♯': 10, // A♯ / Bb
     'Bb': 10,
     'B♭': 10,
     'B': 11,  // B

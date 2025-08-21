@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui';
 import 'dart:math' as math;
 import 'dart:developer' as developer;
 
@@ -13,7 +12,6 @@ import 'package:xml/xml.dart';
 import 'package:music_sheet/simple_sheet_music.dart' as music_sheet;
 import 'package:flutter_drawing_board/flutter_drawing_board.dart';
 
-import 'package:practice_pad/features/song_viewer/presentation/widgets/beat_timeline.dart';
 import 'package:practice_pad/features/song_viewer/presentation/widgets/measure/chord_symbol/chord_symbol.dart';
 import 'package:practice_pad/features/song_viewer/presentation/widgets/measure/chord_measure.dart';
 import 'package:practice_pad/features/song_viewer/presentation/widgets/concentric_dial_menu.dart';
@@ -25,7 +23,6 @@ import 'package:practice_pad/features/practice/presentation/pages/practice_sessi
 import 'package:practice_pad/features/edit_items/presentation/viewmodels/edit_items_viewmodel.dart';
 import 'package:provider/provider.dart';
 import 'package:music_sheet/index.dart';
-import 'package:music_sheet/src/music_objects/interface/musical_symbol.dart';
 import 'package:practice_pad/services/local_storage_service.dart';
 
 class SongViewerScreen extends StatefulWidget {
@@ -46,7 +43,13 @@ class SongViewerScreen extends StatefulWidget {
 }
 
 class _SongViewerScreenState extends State<SongViewerScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
+  // Static controller disposal locks to prevent race conditions
+  static final Map<String, Completer<void>> _controllerDisposalLocks = {};
+  
+  // Static map to store stable GlobalKeys per song
+  static final Map<String, GlobalKey> _drawingGlobalKeys = {};
+  
   bool _isLoading = true;
   StreamSubscription<int>? _tickSubscription;
   final bool _isPlaying = false;
@@ -107,6 +110,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
   // Drawing functionality
   late ValueNotifier<bool> _isDrawingModeNotifier;
   late DrawingController _drawingController;
+  late GlobalKey _drawingKey;
   Color _currentDrawingColor = Colors.black;
   double _currentStrokeWidth = 2.0;
 
@@ -114,6 +118,9 @@ class _SongViewerScreenState extends State<SongViewerScreen>
   void initState() {
     super.initState();
     _currentBpm = widget.bpm;
+    
+    // Register for app lifecycle changes
+    WidgetsBinding.instance.addObserver(this);
 
     // Initialize ValueNotifiers for performance optimization
     _beatNotifier = ValueNotifier<int>(0);
@@ -121,19 +128,64 @@ class _SongViewerScreenState extends State<SongViewerScreen>
 
     // Initialize drawing functionality
     _isDrawingModeNotifier = ValueNotifier<bool>(false);
-    _drawingController = DrawingController();
+    
+    // Reuse or create a stable GlobalKey for this song
+    print('🔑 GLOBALKEY DEBUG: Starting GlobalKey lookup for: ${widget.songAssetPath}');
+    print('🔑 GLOBALKEY DEBUG: Static map size: ${_drawingGlobalKeys.length}');
+    print('🔑 GLOBALKEY DEBUG: Static map keys: ${_drawingGlobalKeys.keys.toList()}');
+    
+    final existingKey = _drawingGlobalKeys[widget.songAssetPath];
+    print('🔑 GLOBALKEY DEBUG: Existing key for ${widget.songAssetPath}: ${existingKey?.toString() ?? 'null'}');
+    
+    _drawingKey = _drawingGlobalKeys.putIfAbsent(
+      widget.songAssetPath,
+      () {
+        final newKey = GlobalKey(debugLabel: 'drawing_${widget.songAssetPath}');
+        print('🔑 GLOBALKEY DEBUG: Creating NEW GlobalKey: ${newKey.toString()}');
+        return newKey;
+      },
+    );
+    
+    print('🔑 GLOBALKEY DEBUG: Final selected key: ${_drawingKey.toString()}');
+    print('🔑 GLOBALKEY DEBUG: Static map size after: ${_drawingGlobalKeys.length}');
+    // Initialize controller after waiting for any pending disposal
+    _initializeControllerSafely();
+
+    // Note: Drawing loading moved to after song loading completes
+
+    _loadAndParseSong();
+    _loadSongViewerSettings();
+  }
+
+  /// Safely initialize the drawing controller, waiting for any pending disposal
+  Future<void> _initializeControllerSafely() async {
+    // Wait for any pending disposal of previous controller for this song
+    if (_controllerDisposalLocks.containsKey(widget.songAssetPath)) {
+      print('🎨 CONTROLLER SYNC: Waiting for previous disposal to complete for ${widget.songAssetPath}');
+      await _controllerDisposalLocks[widget.songAssetPath]!.future;
+      print('🎨 CONTROLLER SYNC: Previous disposal completed for ${widget.songAssetPath}');
+    }
+    
+    // Now safe to create new controller with stable GlobalKey
+    _drawingController = DrawingController(
+      uniqueId: widget.songAssetPath,
+      globalKey: _drawingKey,
+    );
+
+    // Debug: Log controller creation and validate clean state
+    print('🎨 CONTROLLER LIFECYCLE: Created new DrawingController for ${widget.songAssetPath}');
+    print('🎨 CONTROLLER INITIAL STATE: currentIndex=${_drawingController.currentIndex}, historyLength=${_drawingController.getHistory.length}');
+    print('🎨 CONTROLLER PAINTER KEY: ${_drawingController.painterKey.toString()}');
+
+    // Validate that we start with a completely clean state
+    assert(_drawingController.currentIndex == 0, 'DrawingController should start with currentIndex = 0');
+    assert(_drawingController.getHistory.isEmpty, 'DrawingController should start with empty history');
 
     // Set default drawing style - black color and thin stroke
     _drawingController.setStyle(
       color: _currentDrawingColor,
       strokeWidth: _currentStrokeWidth,
     );
-
-    // Load saved drawings
-    _loadDrawingData();
-
-    _loadAndParseSong();
-    _loadSongViewerSettings();
   }
 
   /// Load saved song viewer settings from local storage
@@ -145,7 +197,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
         setState(() {
           if (songChanges.containsKey('canvasScale')) {
             _sheetMusicScale =
-                (songChanges['canvasScale'] as double).clamp(0.3, 0.8);
+                (songChanges['canvasScale'] as double).clamp(0.4, 0.8);
           }
           if (songChanges.containsKey('extensionNumbersRelativeToChords')) {
             _extensionNumbersRelativeToChords =
@@ -156,7 +208,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
             .log('Loaded song viewer settings for ${widget.songAssetPath}');
       }
     } catch (e) {
-      developer.log('Error loading song viewer settings: $e');
+      print('Error loading song viewer settings: $e');
     }
   }
 
@@ -169,40 +221,91 @@ class _SongViewerScreenState extends State<SongViewerScreen>
         'lastModified': DateTime.now().toIso8601String(),
       };
       await LocalStorageService.saveSongChanges(widget.songAssetPath, settings);
-      developer.log('Saved song viewer settings for ${widget.songAssetPath}');
+      print('Saved song viewer settings for ${widget.songAssetPath}');
     } catch (e) {
-      developer.log('Error saving song viewer settings: $e');
+      print('Error saving song viewer settings: $e');
+    }
+  }
+
+  /// Reset all drawing data (for debugging)
+  Future<void> _resetDrawingData() async {
+    try {
+      print('🎨 RESET: Clearing all drawing data for ${widget.songAssetPath}');
+      
+      // Clear the controller
+      _drawingController.clear();
+      
+      // Clear from storage
+      await LocalStorageService.saveDrawingsForSong(widget.songAssetPath, []);
+      
+      print('🎨 RESET: Complete');
+    } catch (e) {
+      print('🎨 RESET ERROR: $e');
     }
   }
 
   /// Load saved drawing data from local storage
   Future<void> _loadDrawingData() async {
     try {
-      // For now, we'll implement a simpler approach that works with the current library
-      // The drawings will persist during the current session but will be lost on app restart
-      // This can be enhanced later with proper JSON deserialization
-      developer.log(
-          'Drawing persistence placeholder - drawings will persist during session');
+      if (!mounted) return;
+      
+      print('🎨 LOADING DRAWINGS: Starting load for ${widget.songAssetPath}');
+      print('🎨 CONTROLLER STATE BEFORE LOAD: currentIndex=${_drawingController.currentIndex}, historyLength=${_drawingController.getHistory.length}');
+      
+      // Load saved drawings from LocalStorageService
+      final drawingData = await LocalStorageService.loadDrawingsForSong(widget.songAssetPath);
+      print('🎨 LOADING DRAWINGS: Retrieved ${drawingData.length} drawing elements from storage');
+      print('🎨 LOADING DRAWINGS: Raw JSON data: $drawingData');
+      
+      if (drawingData.isNotEmpty && mounted) {
+        // Convert JSON data back to PaintContent objects
+        print('🎨 LOADING DRAWINGS: Converting JSON to PaintContent objects...');
+        final paintContents = LocalStorageService.drawingJsonToPaintContents(drawingData);
+        print('🎨 LOADING DRAWINGS: Converted to ${paintContents.length} PaintContent objects');
+        
+        // Debug each paint content
+        for (int i = 0; i < paintContents.length; i++) {
+          final content = paintContents[i];
+          print('🎨 LOADING DRAWINGS: Content $i - type: ${content.runtimeType}, toString: ${content.toString()}');
+        }
+        
+        if (paintContents.isNotEmpty) {
+          // Clear existing drawings first, then load new ones
+          _drawingController.clear();
+          print('🎨 CONTROLLER STATE AFTER CLEAR: currentIndex=${_drawingController.currentIndex}, historyLength=${_drawingController.getHistory.length}');
+          
+          _drawingController.addContents(paintContents);
+          print('🎨 LOADING DRAWINGS: Added ${paintContents.length} painting contents to controller');
+          print('🎨 CONTROLLER STATE AFTER LOAD: currentIndex=${_drawingController.currentIndex}, historyLength=${_drawingController.getHistory.length}');
+        }
+      } else {
+        print('🎨 LOADING DRAWINGS: No saved drawings found for ${widget.songAssetPath}');
+        // Ensure controller is cleared when no drawings exist
+        _drawingController.clear();
+        print('🎨 CONTROLLER STATE AFTER CLEAR (no drawings): currentIndex=${_drawingController.currentIndex}, historyLength=${_drawingController.getHistory.length}');
+      }
     } catch (e) {
-      developer.log('Error loading drawing data: $e');
+      print('🎨 LOADING DRAWINGS ERROR: $e');
     }
   }
 
   /// Save drawing data to local storage
   Future<void> _saveDrawingData() async {
     try {
-      // Save the JSON data for future implementation of full persistence
+      if (!mounted) return;
+      
+      print('🎨 CONTROLLER STATE BEFORE SAVE: currentIndex=${_drawingController.currentIndex}, historyLength=${_drawingController.getHistory.length}');
+      
+      // Save the JSON data using LocalStorageService
       final jsonData = _drawingController.getJsonList();
-      final drawingData = {
-        'drawingJson': jsonData,
-        'lastModified': DateTime.now().toIso8601String(),
-      };
-      await LocalStorageService.saveSongChanges(
-          '${widget.songAssetPath}_drawings', drawingData);
-      developer.log(
-          'Saved ${jsonData.length} drawing elements for ${widget.songAssetPath}');
+      print('🎨 SAVING DRAWINGS: Retrieved ${jsonData.length} drawing elements from controller for ${widget.songAssetPath}');
+      print('🎨 SAVING DRAWINGS: JSON data being saved: $jsonData');
+      
+      // Always save, even if empty (to clear old data)
+      await LocalStorageService.saveDrawingsForSong(widget.songAssetPath, jsonData);
+      print('🎨 SAVING DRAWINGS: Saved ${jsonData.length} drawing elements for ${widget.songAssetPath}');
     } catch (e) {
-      developer.log('Error saving drawing data: $e');
+      print('🎨 SAVING DRAWINGS ERROR: $e');
     }
   }
 
@@ -247,11 +350,11 @@ class _SongViewerScreenState extends State<SongViewerScreen>
       if (chordKeys.isNotEmpty) {
         await LocalStorageService.saveChordKeys(
             widget.songAssetPath, chordKeys);
-        developer.log(
+        print(
             'Saved chord keys for ${chordKeys.length} chords in ${widget.songAssetPath}');
       }
     } catch (e) {
-      developer.log('Error saving chord keys: $e');
+      print('Error saving chord keys: $e');
     }
   }
 
@@ -345,11 +448,11 @@ class _SongViewerScreenState extends State<SongViewerScreen>
             }
           });
         });
-        developer.log(
+        print(
             'Loaded chord keys for ${chordKeys.length} chords in ${widget.songAssetPath}');
       }
     } catch (e) {
-      developer.log('Error loading chord keys: $e');
+      print('Error loading chord keys: $e');
     }
   }
 
@@ -1394,10 +1497,14 @@ class _SongViewerScreenState extends State<SongViewerScreen>
       }
       */
       print('Metronome disabled - add proper audio assets to enable');
+      await _loadDrawingData();
 
       setState(() {
         _isLoading = false;
       });
+      
+      // Load drawings after song is fully loaded
+      
     } catch (e) {
       print('Error loading song: $e');
       setState(() {
@@ -2102,6 +2209,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                 ),
                 onPressed: () {
                   _isDrawingModeNotifier.value = !_isDrawingModeNotifier.value;
+                  
                   // Save drawing state when exiting drawing mode
                   if (!_isDrawingModeNotifier.value) {
                     _saveDrawingData();
@@ -2270,7 +2378,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                   Text('• ', style: TextStyle(fontWeight: FontWeight.bold)),
                   Expanded(
                     child: Text(
-                      'Orange chord symbols represent a sequence of non-diatonic chords. Press an orange chord symbol to change the relative key for that chord sequence',
+                      'Grey chord symbols represent a sequence of non-diatonic chords. Press a grey chord symbol to change the relative key for that chord sequence',
                       style: TextStyle(fontSize: 14),
                     ),
                   ),
@@ -2932,31 +3040,6 @@ class _SongViewerScreenState extends State<SongViewerScreen>
     });
   }
 
-  /// Builds the drawing overlay with sheet music as background
-  Widget _buildDrawingOverlay() {
-    return SizedBox(
-      width: 1200, // Match sheet music width
-      height: 600, // Fixed height for drawing board stability
-      child: DrawingBoard(
-        controller: _drawingController,
-        background: Container(
-          width: 1200, // Match sheet music width
-          height: 600, // Fixed height for drawing board stability
-          color:
-              Colors.transparent, // Transparent to show sheet music underneath
-          child: _buildCachedSheetMusic(),
-        ),
-        showDefaultActions:
-            false, // Disable default actions - we'll show custom controls
-        showDefaultTools:
-            false, // Disable default toolbar - we'll show custom controls
-        onPointerUp: (details) {
-          // Save drawing data whenever user finishes drawing
-          _saveDrawingData();
-        },
-      ),
-    );
-  }
 
   /// Builds the compact drawing controls toolbar
   Widget _buildDrawingControls() {
@@ -3251,6 +3334,10 @@ class _SongViewerScreenState extends State<SongViewerScreen>
     if (_cachedSheetMusicWidget == null ||
         _lastRenderedMeasures == null ||
         !listEquals(_lastRenderedMeasures, _chordMeasures)) {
+      
+      print('🎵 WIDGET REBUILD: SimpleSheetMusic widget being recreated for ${widget.songAssetPath}');
+      print('🎵 WIDGET KEY: sheet_music_${widget.songAssetPath}');
+      print('🎵 DRAWING MODE: ${_isDrawingModeNotifier.value}');
       // Use listEquals for proper comparison
 
       _cachedSheetMusicWidget = _chordMeasures.isNotEmpty
@@ -3272,7 +3359,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
                   },
                   child: music_sheet.SimpleSheetMusic(
                     key: ValueKey(
-                        'sheet_music_${_isDrawingModeNotifier.value}'), // Force rebuild when drawing mode changes
+                        'sheet_music_${widget.songAssetPath}'), // Stable key based on song path, not drawing mode
                     width:
                         1200, // Adequate width for proper sheet music rendering
                     measures: _chordMeasures.cast<music_sheet.Measure>(),
@@ -3487,7 +3574,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
   /// Increase sheet music scale (zoom in)
   void _zoomIn() {
     setState(() {
-      _sheetMusicScale = (_sheetMusicScale + 0.1).clamp(0.3, 0.8);
+      _sheetMusicScale = (_sheetMusicScale + 0.1).clamp(0.4, 0.8);
       print('Zooming in to scale: $_sheetMusicScale');
       // Invalidate sheet music cache to force rebuild with new scale
       _cachedSheetMusicWidget = null;
@@ -3500,7 +3587,7 @@ class _SongViewerScreenState extends State<SongViewerScreen>
   /// Decrease sheet music scale (zoom out)
   void _zoomOut() {
     setState(() {
-      _sheetMusicScale = (_sheetMusicScale - 0.1).clamp(0.3, 0.8);
+      _sheetMusicScale = (_sheetMusicScale - 0.1).clamp(0.4, 0.8);
       print('Zooming out to scale: $_sheetMusicScale');
       // Invalidate sheet music cache to force rebuild with new scale
       _cachedSheetMusicWidget = null;
@@ -3588,12 +3675,65 @@ class _SongViewerScreenState extends State<SongViewerScreen>
     // Clean up auto-scroll timer
     _autoScrollTimer?.cancel();
 
-    // Dispose ValueNotifiers
-    _beatNotifier.dispose();
-    _songBeatNotifier.dispose();
-    _isDrawingModeNotifier.dispose();
+    // CRITICAL: Synchronously dispose controller with proper race condition prevention
+    _disposeControllerSafely();
 
     super.dispose();
+  }
+
+  /// Safely dispose controller with synchronization to prevent race conditions
+  void _disposeControllerSafely() {
+    // Create a completer to track disposal completion
+    final completer = Completer<void>();
+    _controllerDisposalLocks[widget.songAssetPath] = completer;
+    
+    print('🎨 DISPOSE: Starting synchronous disposal for ${widget.songAssetPath}');
+    
+    // Schedule the disposal work but don't block the dispose method
+    () async {
+      try {
+        // Save drawings synchronously
+        print('🎨 DISPOSE: Starting save of drawing data');
+        await _saveDrawingData();
+        print('🎨 DISPOSE: Drawing data save completed successfully');
+        
+        // Remove app lifecycle observer
+        WidgetsBinding.instance.removeObserver(this);
+
+        // Dispose ValueNotifiers
+        _beatNotifier.dispose();
+        _songBeatNotifier.dispose();
+        _isDrawingModeNotifier.dispose();
+
+        // CRITICAL: Dispose the drawing controller to prevent memory leaks and state conflicts
+        print('🎨 CONTROLLER LIFECYCLE: Disposing DrawingController for ${widget.songAssetPath}');
+        print('🎨 CONTROLLER FINAL STATE: currentIndex=${_drawingController.currentIndex}, historyLength=${_drawingController.getHistory.length}');
+        print('🎨 CONTROLLER PAINTER KEY BEFORE DISPOSE: ${_drawingController.painterKey.toString()}');
+        _drawingController.dispose();
+        print('🎨 CONTROLLER LIFECYCLE: DrawingController disposed successfully');
+        
+      } catch (error) {
+        print('🎨 DISPOSE: Error during disposal: $error');
+      } finally {
+        // Always complete the disposal lock
+        completer.complete();
+        // Clean up the lock after a brief delay to ensure any waiting operations complete
+        Future.delayed(const Duration(milliseconds: 100), () {
+          _controllerDisposalLocks.remove(widget.songAssetPath);
+        });
+        print('🎨 DISPOSE: Disposal completed for ${widget.songAssetPath}');
+      }
+    }();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    
+    // Save drawings when app goes to background or becomes inactive
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      _saveDrawingData();
+    }
   }
 
   /// Builds the practice items widget at the bottom of the screen

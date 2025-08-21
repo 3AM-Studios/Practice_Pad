@@ -19,13 +19,19 @@ abstract class PaintContent {
   /// * [deeper] 当前是否为底层绘制
   /// * 出于性能考虑
   /// * 绘制过程为表层绘制，绘制完成抬起手指时会进行底层绘制
-  void draw(Canvas canvas, Size size, bool deeper);
+  void draw(Canvas canvas, Size size, bool deeper) {
+    print('🎨 PAINT_CONTENT: draw called - type: $runtimeType, deeper: $deeper, size: $size');
+  }
 
   /// 正在绘制
-  void drawing(Offset nowPoint);
+  void drawing(Offset nowPoint) {
+    print('🎨 PAINT_CONTENT: drawing called - type: $runtimeType, point: $nowPoint');
+  }
 
   /// 开始绘制
-  void startDraw(Offset startPoint);
+  void startDraw(Offset startPoint) {
+    print('🎨 PAINT_CONTENT: startDraw called - type: $runtimeType, point: $startPoint');
+  }
 
   /// toJson
   Map<String, dynamic> toContentJson();

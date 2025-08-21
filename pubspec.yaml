@@ -64,6 +64,7 @@ dependencies:
     path: packages/window_manager
   device_info_plus: ^11.3.0
   home_widget: ^0.8.0
+  easy_rich_text: ^2.2.0
 
 dev_dependencies:
   flutter_test:

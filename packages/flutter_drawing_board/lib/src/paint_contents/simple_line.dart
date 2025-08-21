@@ -27,15 +27,26 @@ class SimpleLine extends PaintContent {
   String get contentType => 'SimpleLine';
 
   @override
-  void startDraw(Offset startPoint) =>
-      path.moveTo(startPoint.dx, startPoint.dy);
+  void startDraw(Offset startPoint) {
+    super.startDraw(startPoint);
+    print('🎨 SIMPLE_LINE: startDraw - moveTo(${startPoint.dx}, ${startPoint.dy})');
+    path.moveTo(startPoint.dx, startPoint.dy);
+  }
 
   @override
-  void drawing(Offset nowPoint) => path.lineTo(nowPoint.dx, nowPoint.dy);
+  void drawing(Offset nowPoint) {
+    super.drawing(nowPoint);
+    print('🎨 SIMPLE_LINE: drawing - lineTo(${nowPoint.dx}, ${nowPoint.dy})');
+    path.lineTo(nowPoint.dx, nowPoint.dy);
+  }
 
   @override
-  void draw(Canvas canvas, Size size, bool deeper) =>
-      canvas.drawPath(path.path, paint);
+  void draw(Canvas canvas, Size size, bool deeper) {
+    super.draw(canvas, size, deeper);
+    print('🎨 SIMPLE_LINE: draw - path bounds: ${path.path.getBounds()}');
+    print('🎨 SIMPLE_LINE: draw - paint color: ${paint.color}, strokeWidth: ${paint.strokeWidth}');
+    canvas.drawPath(path.path, paint);
+  }
 
   @override
   SimpleLine copy() => SimpleLine();

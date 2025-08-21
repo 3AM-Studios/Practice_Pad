@@ -1,7 +1,9 @@
 //import simple sheet music package
+import 'package:flutter/cupertino.dart';
 import 'package:music_sheet/index.dart';
 import 'package:flutter/material.dart';
 import 'package:clay_containers/clay_containers.dart';
+import 'package:easy_rich_text/easy_rich_text.dart';
 import 'dart:math' as math;
 
 /// Represents a chord symbol with Roman numeral analysis capability and MusicXML support.
@@ -20,7 +22,7 @@ import 'dart:math' as math;
 ///
 /// ```
 class ChordSymbol {
-  /// The root note name (e.g., 'C', 'F#', 'Bb') - for direct creation
+  /// The root note name (e.g., 'C', 'F♯', 'Bb') - for direct creation
   final String? rootName;
 
   /// The chord quality (e.g., 'maj', 'min', '7', 'maj7', 'dim', 'm7b5') - for direct creation
@@ -64,7 +66,7 @@ class ChordSymbol {
 
   /// Creates a new chord symbol directly from root name and quality.
   ///
-  /// [rootName] - The root note (e.g., 'C', 'F#', 'Bb')
+  /// [rootName] - The root note (e.g., 'C', 'F♯', 'Bb')
   /// [quality] - The chord quality (e.g., 'maj', 'min', '7', 'maj7')
   /// [position] - Beat position in the measure (default: 0)
   /// [originalKeySignature] - Original key context for Roman numeral analysis (optional)
@@ -119,7 +121,7 @@ class ChordSymbol {
     if (rootName != null) return rootName!;
     if (rootStep != null && rootAlter != null) {
       String alterSymbol = '';
-      if (rootAlter == 1) alterSymbol = '#';
+      if (rootAlter == 1) alterSymbol = '♯';
       if (rootAlter == -1) alterSymbol = '♭';
       return '$rootStep$alterSymbol';
     }
@@ -140,7 +142,7 @@ class ChordSymbol {
     }
     if (rootStep != null && kind != null) {
       String alterSymbol = '';
-      if (rootAlter == 1) alterSymbol = '#';
+      if (rootAlter == 1) alterSymbol = '♯';
       if (rootAlter == -1) alterSymbol = 'b';
       return '$rootStep$alterSymbol$kind';
     }
@@ -181,12 +183,12 @@ class ChordSymbol {
         return '9';
       case '7b9':
         return '7b9';
-      case '7#9':
-        return '7#9';
+      case '7♯9':
+        return '7♯9';
       case '7b5':
         return '7b5';
-      case '7#5':
-        return '7#5';
+      case '7♯5':
+        return '7♯5';
       case 'diminished':
       case 'dim':
         return 'dim';
@@ -227,12 +229,11 @@ class ChordSymbol {
     }
   }
 
-  /// Gets formatted chord symbol with proper superscript notation
+  /// Gets formatted chord symbol with proper superscript notation using font features
   /// Returns a list of TextSpan for rich text display
   List<TextSpan> getFormattedChordSymbol() {
     final rootName = effectiveRootName;
-    final quality = effectiveQuality;
-    final formattedQuality = formatChordQuality(quality);
+    final quality = _getDisplayQuality();
 
     List<TextSpan> spans = [
       TextSpan(
@@ -242,16 +243,29 @@ class ChordSymbol {
       ),
     ];
 
-    // Add quality with proper superscript formatting
-    if (formattedQuality.isNotEmpty) {
+    // Add quality with native superscript font features
+    if (quality.isNotEmpty) {
       spans.add(TextSpan(
-        text: formattedQuality,
+        text: quality,
         style: const TextStyle(
-            fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            fontFeatures: [FontFeature.superscripts()]),
       ));
     }
 
     return spans;
+  }
+
+  /// Gets the display quality with symbol replacements (maj7 -> M7, min7 -> -7)
+  String _getDisplayQuality() {
+    String quality = effectiveQuality;
+
+    // Replace maj7 with M7 and min7 with -7
+    quality = quality.replaceAll('maj7', 'M7').replaceAll('min7', '-7');
+
+    return quality;
   }
 
   /// Formats chord quality text with proper superscript notation
@@ -262,7 +276,7 @@ class ChordSymbol {
     return quality
         // Handle diminished chords first (most specific)
 
-        .replaceAll('m7b5', 'ø') // Half-diminished (just the symbol, no 7)
+        .replaceAll('m7♭5', 'ø') // Half-diminished (just the symbol, no 7)
         .replaceAll('half-diminished', 'ø')
         .replaceAll('dim7', '°') // Fully diminished (just the symbol, no 7)
         .replaceAll('diminished-seventh', '°')
@@ -270,10 +284,10 @@ class ChordSymbol {
         .replaceAll('dim', '°') // Diminished triad
 
         // Handle complex 7th chords with alterations
-        .replaceAll('7b9', '⁷ᵇ⁹') // Dominant 7th flat 9
-        .replaceAll('7#9', '⁷♯⁹') // Dominant 7th sharp 9
-        .replaceAll('7b5', '⁷ᵇ⁵') // Dominant 7th flat 5
-        .replaceAll('7#5', '⁷♯⁵') // Dominant 7th sharp 5
+        .replaceAll('7♭9', '⁷ᵇ⁹') // Dominant 7th flat 9
+        .replaceAll('7♯9', '⁷♯⁹') // Dominant 7th sharp 9
+        .replaceAll('7♭5', '⁷ᵇ⁵') // Dominant 7th flat 5
+        .replaceAll('7♯5', '⁷♯⁵') // Dominant 7th sharp 5
         .replaceAll('7+', '⁷⁺') // Dominant 7th augmented 5
         .replaceAll('aug7', '⁺⁷') // Augmented 7th
         .replaceAll('augmented-seventh', '⁺⁷')
@@ -285,17 +299,17 @@ class ChordSymbol {
         .replaceAll('M7', 'ᴹ⁷') // Major 7th (alternative)
 
         // Handle extended chords with alterations
-        .replaceAll('#11', '♯¹¹') // Sharp 11
-        .replaceAll('b13', 'ᵇ¹³') // Flat 13
+        .replaceAll('♯11', '♯¹¹') // Sharp 11
+        .replaceAll('♭13', 'ᵇ¹³') // Flat 13
         .replaceAll('maj9', 'ᴹ⁹') // Major 9th with capital M
         .replaceAll('m9', '⁻⁹') // Minor 9th
         .replaceAll('add9', 'ᵃᵈᵈ⁹') // Add 9
 
         // Handle standalone alterations (must come before general numbers)
-        .replaceAll('#9', '♯⁹') // Sharp 9 (standalone)
-        .replaceAll('#5', '♯⁵') // Sharp 5 (standalone)
-        .replaceAll('b9', 'ᵇ⁹') // Flat 9 (standalone)
-        .replaceAll('b5', 'ᵇ⁵') // Flat 5 (standalone)
+        .replaceAll('♯9', '♯⁹') // Sharp 9 (standalone)
+        .replaceAll('♯5', '♯⁵') // Sharp 5 (standalone)
+        .replaceAll('♭9', 'ᵇ⁹') // Flat 9 (standalone)
+        .replaceAll('♭5', 'ᵇ⁵') // Flat 5 (standalone)
 
         // Handle suspended chords
         .replaceAll('sus4', 'ˢᵘˢ⁴') // Suspended 4th
@@ -449,8 +463,8 @@ class ChordSymbol {
       KeySignatureType.aMajor: 'A',
       KeySignatureType.eMajor: 'E',
       KeySignatureType.bMajor: 'B',
-      KeySignatureType.fSharpMajor: 'F#',
-      KeySignatureType.cSharpMajor: 'C#',
+      KeySignatureType.fSharpMajor: 'F♯',
+      KeySignatureType.cSharpMajor: 'C♯',
 
       // Flat keys
       KeySignatureType.fMajor: 'F',
@@ -465,11 +479,11 @@ class ChordSymbol {
       KeySignatureType.aMinor: 'A',
       KeySignatureType.eMinor: 'E',
       KeySignatureType.bMinor: 'B',
-      KeySignatureType.fSharpMinor: 'F#',
-      KeySignatureType.cSharpMinor: 'C#',
-      KeySignatureType.gSharpMinor: 'G#',
-      KeySignatureType.dSharpMinor: 'D#',
-      KeySignatureType.aSharpMinor: 'A#',
+      KeySignatureType.fSharpMinor: 'F♯',
+      KeySignatureType.cSharpMinor: 'C♯',
+      KeySignatureType.gSharpMinor: 'G♯',
+      KeySignatureType.dSharpMinor: 'D♯',
+      KeySignatureType.aSharpMinor: 'A♯',
       KeySignatureType.dMinor: 'D',
       KeySignatureType.gMinor: 'G',
       KeySignatureType.cMinor: 'C',
@@ -554,8 +568,8 @@ class ChordSymbol {
       KeySignatureType.aMajor: 'A',
       KeySignatureType.eMajor: 'E',
       KeySignatureType.bMajor: 'B',
-      KeySignatureType.fSharpMajor: 'F#',
-      KeySignatureType.cSharpMajor: 'C#',
+      KeySignatureType.fSharpMajor: 'F♯',
+      KeySignatureType.cSharpMajor: 'C♯',
 
       // Flat keys
       KeySignatureType.fMajor: 'F',
@@ -570,11 +584,11 @@ class ChordSymbol {
       KeySignatureType.aMinor: 'A',
       KeySignatureType.eMinor: 'E',
       KeySignatureType.bMinor: 'B',
-      KeySignatureType.fSharpMinor: 'F#',
-      KeySignatureType.cSharpMinor: 'C#',
-      KeySignatureType.gSharpMinor: 'G#',
-      KeySignatureType.dSharpMinor: 'D#',
-      KeySignatureType.aSharpMinor: 'A#',
+      KeySignatureType.fSharpMinor: 'F♯',
+      KeySignatureType.cSharpMinor: 'C♯',
+      KeySignatureType.gSharpMinor: 'G♯',
+      KeySignatureType.dSharpMinor: 'D♯',
+      KeySignatureType.aSharpMinor: 'A♯',
       KeySignatureType.dMinor: 'D',
       KeySignatureType.gMinor: 'G',
       KeySignatureType.cMinor: 'C',
@@ -589,7 +603,7 @@ class ChordSymbol {
 
   /// Normalizes a note name to remove accidentals for scale degree calculation
   String _normalizeNoteName(String noteName) {
-    return noteName.replaceAll(RegExp(r'[#b]'), '');
+    return noteName.replaceAll(RegExp(r'[♯b]'), '');
   }
 
   /// Generates the individual notes that make up this chord
@@ -652,16 +666,16 @@ class ChordSymbol {
     final noteIndex = midiValue % 12;
     final noteName = [
       'C',
-      'C#',
+      'C♯',
       'D',
-      'D#',
+      'D♯',
       'E',
       'F',
-      'F#',
+      'F♯',
       'G',
-      'G#',
+      'G♯',
       'A',
-      'A#',
+      'A♯',
       'B'
     ][noteIndex];
 
@@ -723,19 +737,19 @@ class ChordSymbol {
         return keySignature == KeySignatureType.dMajor ? 'D' : 'B';
       case KeySignatureType.aMajor:
       case KeySignatureType.fSharpMinor:
-        return keySignature == KeySignatureType.aMajor ? 'A' : 'F#';
+        return keySignature == KeySignatureType.aMajor ? 'A' : 'F♯';
       case KeySignatureType.eMajor:
       case KeySignatureType.cSharpMinor:
-        return keySignature == KeySignatureType.eMajor ? 'E' : 'C#';
+        return keySignature == KeySignatureType.eMajor ? 'E' : 'C♯';
       case KeySignatureType.bMajor:
       case KeySignatureType.gSharpMinor:
-        return keySignature == KeySignatureType.bMajor ? 'B' : 'G#';
+        return keySignature == KeySignatureType.bMajor ? 'B' : 'G♯';
       case KeySignatureType.fSharpMajor:
       case KeySignatureType.dSharpMinor:
-        return keySignature == KeySignatureType.fSharpMajor ? 'F#' : 'D#';
+        return keySignature == KeySignatureType.fSharpMajor ? 'F♯' : 'D♯';
       case KeySignatureType.cSharpMajor:
       case KeySignatureType.aSharpMinor:
-        return keySignature == KeySignatureType.cSharpMajor ? 'C#' : 'A#';
+        return keySignature == KeySignatureType.cSharpMajor ? 'C♯' : 'A♯';
       case KeySignatureType.fMajor:
       case KeySignatureType.dMinor:
         return keySignature == KeySignatureType.fMajor ? 'F' : 'D';
@@ -772,24 +786,24 @@ class ChordSymbol {
   int _getMidiValueFromNoteName(String noteName) {
     final noteValues = {
       'C': 0,
-      'C#': 1,
+      'C♯': 1,
       'Db': 1,
       'D♭': 1,
       'D': 2,
-      'D#': 3,
+      'D♯': 3,
       'Eb': 3,
       'E♭': 3,
       'E': 4,
       'F': 5,
-      'F#': 6,
+      'F♯': 6,
       'Gb': 6,
       'G♭': 6,
       'G': 7,
-      'G#': 8,
+      'G♯': 8,
       'Ab': 8,
       'A♭': 8,
       'A': 9,
-      'A#': 10,
+      'A♯': 10,
       'Bb': 10,
       'B♭': 10,
       'B': 11,
@@ -875,9 +889,9 @@ class ChordSymbol {
       case '11': // Dominant 11 (major triad)
       case '13': // Dominant 13 (major triad)
       case '7b9':
-      case '7#9':
+      case '7♯9':
       case '7b5':
-      case '7#5':
+      case '7♯5':
         // Major-type chords - use uppercase
         result = cleanNumeral.toUpperCase();
         break;
@@ -940,119 +954,118 @@ class ChordSymbol {
     final roman = modifiedKeySignature != null
         ? getRomanNumeral(original: false)
         : getRomanNumeral(original: true);
-    final qualitySuperscript = getQualitySuperscript();
-
-    // Debug logging
+    final displayQuality = _getDisplayQuality();
 
     if (roman.isEmpty) {
-      return '$effectiveRootName$effectiveQuality';
+      return '$effectiveRootName$displayQuality';
     }
 
     final romanWithQuality =
-        qualitySuperscript.isEmpty ? roman : '$roman^$qualitySuperscript';
+        displayQuality.isEmpty ? roman : '$roman^$displayQuality';
 
-    return '$effectiveRootName$effectiveQuality\n$romanWithQuality';
+    return '$effectiveRootName$displayQuality\n$romanWithQuality';
   }
 
   /// Renders the chord symbol directly on canvas above a measure
   /// Uses variables from measure.dart's paintMeasure function
 
-  void render(Canvas canvas, Size size, double measureOriginX,
-      double staffLineCenterY, double measureWidth) {
-    // Position chord symbol well above the staff for visibility - use fixed offset
-    final chordY =
-        staffLineCenterY - 150.0; // Fixed 150 pixel offset above staff
+  // void render(Canvas canvas, Size size, double measureOriginX,
+  //     double staffLineCenterY, double measureWidth) {
+  //   // Position chord symbol well above the staff for visibility - use fixed offset
+  //   final chordY =
+  //       staffLineCenterY - 150.0; // Fixed 150 pixel offset above staff
 
-    // Center the chord symbol horizontally in the measure
-    final chordX = measureOriginX + (measureWidth / 2);
+  //   // Center the chord symbol horizontally in the measure
+  //   final chordX = measureOriginX + (measureWidth / 2);
 
-    // Create the chord symbol text
-    final chordText = '$effectiveRootName$effectiveQuality';
-    // Use modifiedKeySignature if available, otherwise use originalKeySignature
-    final romanText = modifiedKeySignature != null
-        ? getRomanNumeral(original: false)
-        : getRomanNumeral(original: true);
+  //   // Create the chord symbol text
+  //   final chordText = '$effectiveRootName${_getDisplayQuality()}';
+  //   // Use modifiedKeySignature if available, otherwise use originalKeySignature
+  //   final romanText = modifiedKeySignature != null
+  //       ? getRomanNumeral(original: false)
+  //       : getRomanNumeral(original: true);
 
-    // Create text painter for chord symbol with much larger font size
-    final chordTextPainter = TextPainter(
-      text: TextSpan(
-        text: chordText,
-        style: const TextStyle(
-          fontSize: 90, // Much larger font
-          fontWeight: FontWeight.bold,
-          color: Colors.black,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    );
+  //   // Create text painter for chord symbol with much larger font size
+  //   final chordTextPainter = TextPainter(
+  //     text: TextSpan(
+  //       text: chordText,
+  //       style: const TextStyle(
+  //         fontSize: 90, // Much larger font
+  //         fontWeight: FontWeight.bold,
+  //         color: Colors.black,
+  //       ),
+  //     ),
+  //     textDirection: TextDirection.ltr,
+  //   );
 
-    chordTextPainter.layout();
+  //   chordTextPainter.layout();
 
-    // Create text painter for Roman numeral with larger font size
-    final romanTextPainter = TextPainter(
-      text: TextSpan(
-        text: romanText + getQualitySuperscript(),
-        style: const TextStyle(
-          fontSize: 85, // Much larger font
-          fontWeight: FontWeight.w600,
-          color: Colors.black,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    );
+  //   // Create text painter for Roman numeral with larger font size
+  //   final romanTextPainter = TextPainter(
+  //     text: TextSpan(
+  //       text: romanText + _getDisplayQuality(),
+  //       style: const TextStyle(
+  //         fontSize: 85, // Much larger font
+  //         fontWeight: FontWeight.w600,
+  //         color: Colors.black,
+  //         fontFeatures: [FontFeature.superscripts()],
+  //       ),
+  //     ),
+  //     textDirection: TextDirection.ltr,
+  //   );
 
-    romanTextPainter.layout();
+  //   romanTextPainter.layout();
 
-    // Calculate container size with substantial padding
-    final containerWidth =
-        math.max(chordTextPainter.width, romanTextPainter.width) +
-            20; // More padding
-    final containerHeight =
-        chordTextPainter.height + romanTextPainter.height + 10; // More padding
+  //   // Calculate container size with substantial padding
+  //   final containerWidth =
+  //       math.max(chordTextPainter.width, romanTextPainter.width) +
+  //           20; // More padding
+  //   final containerHeight =
+  //       chordTextPainter.height + romanTextPainter.height + 10; // More padding
 
-    // Draw the container background with bright color for visibility
-    final containerRect = Rect.fromCenter(
-      center: Offset(chordX, chordY),
-      width: containerWidth,
-      height: containerHeight,
-    );
+  //   // Draw the container background with bright color for visibility
+  //   final containerRect = Rect.fromCenter(
+  //     center: Offset(chordX, chordY),
+  //     width: containerWidth,
+  //     height: containerHeight,
+  //   );
 
-    final paint = Paint()
-      ..color = Colors.yellow // Bright yellow for maximum visibility
-      ..style = PaintingStyle.fill;
+  //   final paint = Paint()
+  //     ..color = Colors.yellow // Bright yellow for maximum visibility
+  //     ..style = PaintingStyle.fill;
 
-    final rrect = RRect.fromRectAndRadius(
-        containerRect, const Radius.circular(16)); // Larger border radius
-    canvas.drawRRect(rrect, paint);
+  //   final rrect = RRect.fromRectAndRadius(
+  //       containerRect, const Radius.circular(16)); // Larger border radius
+  //   canvas.drawRRect(rrect, paint);
 
-    // Draw thick border for visibility
-    final borderPaint = Paint()
-      ..color = Colors.orange.shade800
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.0; // Thicker border
+  //   // Draw thick border for visibility
+  //   final borderPaint = Paint()
+  //     ..color = Colors.orange.shade800
+  //     ..style = PaintingStyle.stroke
+  //     ..strokeWidth = 3.0; // Thicker border
 
-    canvas.drawRRect(rrect, borderPaint);
+  //   canvas.drawRRect(rrect, borderPaint);
 
-    // Draw Roman numeral text (top) with more spacing
-    final romanOffset = Offset(
-      chordX - (romanTextPainter.width / 2),
-      chordY - (containerHeight / 2) + 12,
-    );
-    romanTextPainter.paint(canvas, romanOffset);
+  //   // Draw Roman numeral text (top) with more spacing
+  //   final romanOffset = Offset(
+  //     chordX - (romanTextPainter.width / 2),
+  //     chordY - (containerHeight / 2) + 12,
+  //   );
+  //   romanTextPainter.paint(canvas, romanOffset);
 
-    // Draw chord symbol text (bottom) with more spacing
-    final chordOffset = Offset(
-      chordX - (chordTextPainter.width / 2),
-      chordY - (containerHeight / 2) + 12 + romanTextPainter.height + 8,
-    );
-    chordTextPainter.paint(canvas, chordOffset);
+  //   // Draw chord symbol text (bottom) with more spacing
+  //   final chordOffset = Offset(
+  //     chordX - (chordTextPainter.width / 2),
+  //     chordY - (containerHeight / 2) + 12 + romanTextPainter.height + 8,
+  //   );
+  //   chordTextPainter.paint(canvas, chordOffset);
 
-    // Debug: Draw a red circle to verify position
-    final debugPaint = Paint()
-      ..color = Colors.red
-      ..style = PaintingStyle.fill;
-    canvas.drawCircle(Offset(chordX, chordY), 5, debugPaint);
-  }
+  //   // Debug: Draw a red circle to verify position
+  //   final debugPaint = Paint()
+  //     ..color = Colors.red
+  //     ..style = PaintingStyle.fill;
+  //   canvas.drawCircle(Offset(chordX, chordY), 5, debugPaint);
+  // }
 
   /// Builds a styled chord symbol widget that can be used both in lists and above measures
   Widget buildWidget({
@@ -1126,19 +1139,20 @@ class ChordSymbol {
     required double canvasScale,
   }) {
     final bool isReharmonized = modifiedKeySignature != null;
-    
+
     // Container color variables
-    final Color reharmonizedColor = Colors.purple.withOpacity(0.8);
-    final Color reharmonizedTextColor = Colors.white;
-    final Color reharmonizedBorderColor = Colors.purple.withOpacity(0.8);
+    final Color reharmonizedColor = CupertinoColors.lightBackgroundGray .withOpacity(0.8);
+    final Color reharmonizedTextColor = Colors.black;
+    final Color reharmonizedBorderColor = Colors.black;
 
     final Color selectedColor = primaryColor;
     final Color selectedTextColor = Colors.white;
     final Color selectedBorderColor = Colors.white;
 
-    final Color nonDiatonicColor = Theme.of(context).colorScheme.tertiary.withOpacity(0.8);
-    final Color nonDiatonicTextColor = Colors.white;
-    final Color nonDiatonicBorderColor = Theme.of(context).colorScheme.tertiary;
+    final Color nonDiatonicColor =
+        CupertinoColors.lightBackgroundGray .withOpacity(1);
+    final Color nonDiatonicTextColor = Colors.black;
+    final Color nonDiatonicBorderColor = CupertinoColors.lightBackgroundGray;
 
     final Color diatonicColor = surfaceColor;
     final Color diatonicTextColor = onSurfaceColor;
@@ -1159,9 +1173,7 @@ class ChordSymbol {
           borderRadius: 12,
           depth: 0,
           spread: 0,
-          curveType: isSelected
-              ? CurveType.concave
-              : CurveType.none,
+          curveType: isSelected ? CurveType.concave : CurveType.none,
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
             decoration: BoxDecoration(
@@ -1172,40 +1184,41 @@ class ChordSymbol {
                       ? Border.all(color: selectedBorderColor, width: 2.0)
                       : isReharmonized
                           ? Border.all(
-                              color: reharmonizedBorderColor,
-                              width: 1.5)
+                              color: reharmonizedBorderColor, width: 1.5)
                           : isNonDiatonic
                               ? Border.all(
-                                  color: nonDiatonicBorderColor,
-                                  width: 1.5)
+                                  color: nonDiatonicBorderColor, width: 1.5)
                               : null,
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                RichText(
-                  text: TextSpan(
-                    children: [
-                      TextSpan(
-                        text: modifiedKeySignature != null
-                            ? getRomanNumeral(original: false)
-                            : getRomanNumeral(original: true),
-                        style: TextStyle(
-                            fontSize: 40 * canvasScale,
-                            fontWeight: FontWeight.w600,
-                            color: isSelected
-                                ? selectedTextColor
-                                : isReharmonized
-                                    ? reharmonizedTextColor
-                                    : isNonDiatonic
-                                        ? nonDiatonicTextColor
-                                        : diatonicTextColor),
-                      ),
-                      if (getQualitySuperscript().isNotEmpty)
-                        TextSpan(
-                          text: getQualitySuperscript(),
+                Builder(builder: (context) {
+                  final romanNumeral = modifiedKeySignature != null
+                      ? getRomanNumeral(original: false)
+                      : getRomanNumeral(original: true);
+                  final quality = _getDisplayQuality();
+                  final fullText = romanNumeral + quality;
+                  
+                  return EasyRichText(
+                    fullText,
+                    defaultStyle: TextStyle(
+                        fontSize: 40 * canvasScale,
+                        fontWeight: FontWeight.w600,
+                        color: isSelected
+                            ? selectedTextColor
+                            : isReharmonized
+                                ? reharmonizedTextColor
+                                : isNonDiatonic
+                                    ? nonDiatonicTextColor
+                                    : diatonicTextColor),
+                    patternList: [
+                      if (quality.isNotEmpty)
+                        EasyRichTextPattern(
+                          targetString: quality,
+                          superScript: true,
+                          matchWordBoundaries: false,
                           style: TextStyle(
-                              fontSize: 36 * canvasScale,
                               fontWeight: FontWeight.w600,
                               color: isSelected
                                   ? selectedTextColor
@@ -1216,29 +1229,46 @@ class ChordSymbol {
                                           : diatonicTextColor),
                         ),
                     ],
-                  ),
-                ),
+                  );
+                }),
                 const Divider(color: Colors.black, thickness: 1, height: 1),
-                RichText(
-                  text: TextSpan(
-                    children: getFormattedChordSymbol().map((span) {
-                      return TextSpan(
-                        text: span.text,
-                        style: TextStyle(
-                          fontSize: 34 * canvasScale,
-                          fontWeight: FontWeight.bold,
-                          color: isSelected
-                              ? selectedTextColor
-                              : isReharmonized
-                                  ? reharmonizedTextColor
-                                  : isNonDiatonic
-                                      ? nonDiatonicTextColor
-                                      : diatonicTextColor,
+                Builder(builder: (context) {
+                  final root = effectiveRootName;
+                  final quality = _getDisplayQuality();
+                  final fullText = root + quality;
+                  
+                  return EasyRichText(
+                    fullText,
+                    defaultStyle: TextStyle(
+                      fontSize: 34 * canvasScale,
+                      fontWeight: FontWeight.bold,
+                      color: isSelected
+                          ? selectedTextColor
+                          : isReharmonized
+                              ? reharmonizedTextColor
+                              : isNonDiatonic
+                                  ? nonDiatonicTextColor
+                                  : diatonicTextColor,
+                    ),
+                    patternList: [
+                      if (quality.isNotEmpty)
+                        EasyRichTextPattern(
+                          targetString: quality,
+                          superScript: true,
+                          matchWordBoundaries: false,
+                          style: TextStyle(
+                            color: isSelected
+                                ? selectedTextColor
+                                : isReharmonized
+                                    ? reharmonizedTextColor
+                                    : isNonDiatonic
+                                        ? nonDiatonicTextColor
+                                        : diatonicTextColor,
+                          ),
                         ),
-                      );
-                    }).toList(),
-                  ),
-                ),
+                    ],
+                  );
+                }),
               ],
             ),
           ),
@@ -1255,7 +1285,7 @@ class ChordSymbol {
                 color: reharmonizedColor.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: reharmonizedColor.withOpacity(0.6),
+                  color: reharmonizedTextColor,
                   width: 1,
                 ),
               ),
@@ -1265,7 +1295,7 @@ class ChordSymbol {
                 style: TextStyle(
                   fontSize: 30 * canvasScale,
                   fontWeight: FontWeight.bold,
-                  color: reharmonizedColor.withOpacity(0.8),
+                  color: reharmonizedTextColor,
                 ),
               ),
             ),
@@ -1290,9 +1320,9 @@ class ChordSymbol {
       case KeySignatureType.bMajor:
         return 'B';
       case KeySignatureType.fSharpMajor:
-        return 'F#';
+        return 'F♯';
       case KeySignatureType.cSharpMajor:
-        return 'C#';
+        return 'C♯';
       case KeySignatureType.fMajor:
         return 'F';
       case KeySignatureType.bFlatMajor:
@@ -1314,15 +1344,15 @@ class ChordSymbol {
       case KeySignatureType.bMinor:
         return 'Bm';
       case KeySignatureType.fSharpMinor:
-        return 'F#m';
+        return 'F♯m';
       case KeySignatureType.cSharpMinor:
-        return 'C#m';
+        return 'C♯m';
       case KeySignatureType.gSharpMinor:
-        return 'G#m';
+        return 'G♯m';
       case KeySignatureType.dSharpMinor:
-        return 'D#m';
+        return 'D♯m';
       case KeySignatureType.aSharpMinor:
-        return 'A#m';
+        return 'A♯m';
       case KeySignatureType.dMinor:
         return 'Dm';
       case KeySignatureType.gMinor:

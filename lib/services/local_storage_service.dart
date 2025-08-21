@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:practice_pad/models/practice_area.dart';
@@ -19,6 +20,38 @@ class LocalStorageService {
   static const String _chordKeysFileName = 'chord_keys.json';
   static const String _sheetMusicFileName = 'sheet_music.json';
   static const String _drawingsFileName = 'drawings.json';
+
+  // Static mutex for serializing save operations to prevent race conditions
+  static final Completer<void>? _saveMutex = null;
+  static Completer<void>? _currentSaveOperation;
+
+  /// Serialize save operations to prevent race conditions
+  static Future<T> _withSaveLock<T>(Future<T> Function() operation) async {
+    // Wait for any existing save operation to complete
+    if (_currentSaveOperation != null && !_currentSaveOperation!.isCompleted) {
+      developer.log('🔒 SAVE SERIALIZATION: Waiting for previous save to complete');
+      await _currentSaveOperation!.future;
+    }
+    
+    // Create new operation completer
+    final completer = Completer<void>();
+    _currentSaveOperation = completer;
+    
+    try {
+      developer.log('🔒 SAVE SERIALIZATION: Starting serialized save operation');
+      final result = await operation();
+      developer.log('🔒 SAVE SERIALIZATION: Save operation completed successfully');
+      return result;
+    } catch (e) {
+      developer.log('🔒 SAVE SERIALIZATION: Save operation failed: $e');
+      rethrow;
+    } finally {
+      // Mark operation as complete
+      if (!completer.isCompleted) {
+        completer.complete();
+      }
+    }
+  }
 
   /// Save practice areas to local storage
   static Future<void> savePracticeAreas(List<PracticeArea> areas) async {
@@ -503,36 +536,82 @@ class LocalStorageService {
     }
   }
 
-  /// Save drawing data for a specific song
+  /// Save drawing data for a specific song with timestamp and atomic operations
   static Future<void> saveDrawingsForSong(String songId, List<Map<String, dynamic>> drawingData) async {
-    try {
-      final allDrawings = await loadAllDrawings();
-      allDrawings[songId] = drawingData;
-      
-      final file = await _getFile(_drawingsFileName);
-      await file.writeAsString(json.encode(allDrawings));
-      developer.log('Saved ${drawingData.length} drawing elements for song: $songId');
-    } catch (e) {
-      developer.log('Error saving drawings: $e', error: e);
-      throw Exception('Failed to save drawings: $e');
-    }
+    return _withSaveLock(() async {
+      try {
+        // Create timestamped drawing entry
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        final timestampedDrawingData = {
+          'timestamp': timestamp,
+          'version': 1,
+          'drawings': drawingData,
+          'songId': songId,
+        };
+        
+        final allDrawings = await loadAllDrawings();
+        allDrawings[songId] = timestampedDrawingData;
+        
+        // Atomic save operation using temporary file
+        final file = await _getFile(_drawingsFileName);
+        final tempFile = await _getFile('$_drawingsFileName.tmp');
+        
+        // Write to temporary file first
+        await tempFile.writeAsString(json.encode(allDrawings));
+        
+        // Atomic rename to final file (OS-level atomic operation)
+        if (await file.exists()) {
+          await file.delete();
+        }
+        await tempFile.rename(file.path);
+        
+        developer.log('✅ SERIALIZED SAVE: Saved ${drawingData.length} drawing elements for song: $songId with timestamp: $timestamp');
+      } catch (e) {
+        developer.log('❌ SERIALIZED SAVE ERROR: $e', error: e);
+        throw Exception('Failed to save drawings: $e');
+      }
+    });
   }
 
-  /// Load drawing data for a specific song
+  /// Load drawing data for a specific song - always gets most recent timestamped data
   static Future<List<Map<String, dynamic>>> loadDrawingsForSong(String songId) async {
     try {
       final allDrawings = await loadAllDrawings();
-      final drawingData = allDrawings[songId] ?? [];
-      developer.log('Loaded ${drawingData.length} drawing elements for song: $songId');
-      return drawingData;
+      final songDrawingData = allDrawings[songId];
+      
+      if (songDrawingData == null) {
+        developer.log('No drawings found for song: $songId');
+        return [];
+      }
+      
+      // Handle new timestamped format
+      if (songDrawingData is Map<String, dynamic> && songDrawingData.containsKey('timestamp')) {
+        final drawingsList = songDrawingData['drawings'] as List?;
+        if (drawingsList != null) {
+          final drawings = drawingsList.cast<Map<String, dynamic>>();
+          final timestamp = songDrawingData['timestamp'] as int?;
+          developer.log('Loaded ${drawings.length} drawing elements for song: $songId with timestamp: $timestamp');
+          return drawings;
+        }
+      }
+      
+      // Handle legacy format (backward compatibility)  
+      if (songDrawingData is List) {
+        final drawings = songDrawingData.cast<Map<String, dynamic>>();
+        developer.log('Loaded ${drawings.length} drawing elements for song: $songId (legacy format)');
+        return drawings;
+      }
+      
+      developer.log('Invalid drawing data format for song: $songId');
+      return [];
     } catch (e) {
       developer.log('Error loading drawings for $songId: $e', error: e);
       return [];
     }
   }
 
-  /// Load all drawing data
-  static Future<Map<String, List<Map<String, dynamic>>>> loadAllDrawings() async {
+  /// Load all drawing data (raw format with timestamps)
+  static Future<Map<String, dynamic>> loadAllDrawings() async {
     try {
       final file = await _getFile(_drawingsFileName);
       if (!await file.exists()) {
@@ -547,12 +626,8 @@ class LocalStorageService {
       }
 
       final Map<String, dynamic> jsonData = json.decode(content);
-      final drawings = jsonData.map((songId, drawingList) => MapEntry(
-        songId,
-        List<Map<String, dynamic>>.from(drawingList as List),
-      ));
-      developer.log('Loaded drawings for ${drawings.length} songs');
-      return drawings;
+      developer.log('Loaded drawings for ${jsonData.length} songs');
+      return jsonData;
     } catch (e) {
       developer.log('Error loading all drawings: $e', error: e);
       return {};
@@ -561,45 +636,67 @@ class LocalStorageService {
 
   /// Convert drawing JSON to PaintContent objects
   static List<PaintContent> drawingJsonToPaintContents(List<Map<String, dynamic>> jsonList) {
+    print('🎨 LOCAL_STORAGE: drawingJsonToPaintContents called with ${jsonList.length} items');
     final contents = <PaintContent>[];
     
-    for (final json in jsonList) {
+    for (int i = 0; i < jsonList.length; i++) {
+      final json = jsonList[i];
       try {
+        print('🎨 LOCAL_STORAGE: Processing item $i: $json');
         final type = json['type'] as String?;
-        if (type == null || type.isEmpty) continue;
+        print('🎨 LOCAL_STORAGE: Item $i type: $type');
+        
+        if (type == null || type.isEmpty) {
+          print('🎨 LOCAL_STORAGE: Item $i skipped - null or empty type');
+          continue;
+        }
         
         PaintContent? content;
         switch (type) {
           case 'SimpleLine':
+            print('🎨 LOCAL_STORAGE: Creating SimpleLine from JSON');
             content = SimpleLine.fromJson(json);
             break;
           case 'SmoothLine':
+            print('🎨 LOCAL_STORAGE: Creating SmoothLine from JSON');
             content = SmoothLine.fromJson(json);
             break;
           case 'StraightLine':
+            print('🎨 LOCAL_STORAGE: Creating StraightLine from JSON');
             content = StraightLine.fromJson(json);
             break;
           case 'Circle':
+            print('🎨 LOCAL_STORAGE: Creating Circle from JSON');
             content = Circle.fromJson(json);
             break;
           case 'Rectangle':
+            print('🎨 LOCAL_STORAGE: Creating Rectangle from JSON');
             content = Rectangle.fromJson(json);
             break;
           case 'Eraser':
+            print('🎨 LOCAL_STORAGE: Creating Eraser from JSON');
             content = Eraser.fromJson(json);
             break;
           default:
+            print('🎨 LOCAL_STORAGE: Unsupported paint content type: $type');
             developer.log('Unsupported paint content type: $type');
             continue;
         }
         
-        contents.add(content);
+        if (content != null) {
+          print('🎨 LOCAL_STORAGE: Successfully created content $i: ${content.runtimeType}');
+          contents.add(content);
+        } else {
+          print('🎨 LOCAL_STORAGE: Failed to create content $i - content is null');
+        }
       } catch (e) {
+        print('🎨 LOCAL_STORAGE: Error deserializing item $i: $e');
         developer.log('Error deserializing paint content: $e');
         // Continue with other items even if one fails
       }
     }
     
+    print('🎨 LOCAL_STORAGE: drawingJsonToPaintContents returning ${contents.length} contents');
     return contents;
   }
 

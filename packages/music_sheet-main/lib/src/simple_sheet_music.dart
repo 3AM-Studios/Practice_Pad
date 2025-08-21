@@ -551,105 +551,120 @@ void _resetInteractionState() {
           parent: AlwaysScrollableScrollPhysics(),
         ),
         padding: const EdgeInsets.only(bottom: 200.0),
-        child: ValueListenableBuilder<bool>(
-          valueListenable: widget.isDrawingModeNotifier ?? ValueNotifier<bool>(false),
-          builder: (context, isDrawingMode, child) {
-            return GestureDetector(
-              onTapDown: isDrawingMode ? null : (details) {
-                print('Sheet music tap detected - drawing mode: $isDrawingMode');
-                _handleTapDown(details);
-              },
-              onTapUp: isDrawingMode ? null : _handleTapUp,
-              onPanUpdate: isDrawingMode ? null : _handlePanUpdate,
-              onPanEnd: isDrawingMode ? null : _handlePanEnd,
-              behavior: HitTestBehavior.deferToChild,
-              child: SizedBox(
-            width: widget.width,
-            height: (currentLayout.totalContentHeight / widget.canvasScale) + currentLayout.upperPaddingOnCanvas,
-            // The Stack is how we layer our static and dynamic painters.
-            child: Stack(
-              children: [
-                // ===== LAYER 1: The Static Background Painter =====
-                // This draws the entire score. It will only repaint when _selectedSymbol
-                // changes, NOT during a drag. The RepaintBoundary helps isolate it.
+        child: SizedBox(
+          width: widget.width,
+          height: (currentLayout.totalContentHeight / widget.canvasScale) + currentLayout.upperPaddingOnCanvas,
+          // The Stack is how we layer our static and dynamic painters.
+          child: Stack(
+            children: [
+              // ===== LAYER 1: The Static Background Painter =====
+              // This draws the entire score. It will only repaint when _selectedSymbol
+              // changes, NOT during a drag. The RepaintBoundary helps isolate it.
+              RepaintBoundary(
+                key: const ValueKey('sheet_music_canvas'),
+                child: CustomPaint(
+                  size: Size(widget.width, currentLayout.totalContentHeight),
+                  painter: staticSheetMusicRenderer,
+                ),
+              ),
+
+              // ===== LAYER 2: Sheet Music Interaction Layer =====
+              // GestureDetector for sheet music editing (disabled when drawing mode is active)
+              ValueListenableBuilder<bool>(
+                valueListenable: widget.isDrawingModeNotifier ?? ValueNotifier<bool>(false),
+                builder: (context, isDrawingMode, child) {
+                  return AbsorbPointer(
+                    absorbing: isDrawingMode, // Absorb sheet music gestures when in drawing mode
+                    child: GestureDetector(
+                      onTapDown: (details) {
+                        print('Sheet music tap detected - drawing mode: $isDrawingMode');
+                        _handleTapDown(details);
+                      },
+                      onTapUp: _handleTapUp,
+                      onPanUpdate: _handlePanUpdate,
+                      onPanEnd: _handlePanEnd,
+                      behavior: HitTestBehavior.deferToChild,
+                      child: Container(
+                        color: Colors.transparent,
+                        width: widget.width,
+                        height: (currentLayout.totalContentHeight / widget.canvasScale) + currentLayout.upperPaddingOnCanvas,
+                      ),
+                    ),
+                  );
+                },
+              ),
+
+                // ===== LAYER 3: Drawing Board =====
+                // Drawing board positioned above sheet music interaction to receive touch events
+                if (widget.drawingController != null)
+                  ValueListenableBuilder<bool>(
+                    valueListenable: widget.isDrawingModeNotifier ?? ValueNotifier<bool>(false),
+                    builder: (context, isDrawingMode, child) {
+                      return Positioned.fill(
+                        child: IgnorePointer(
+                          ignoring: !isDrawingMode, // Only accept touch events when in drawing mode
+                          child: Container(
+                            color: Colors.transparent,
+                            child: drawing_board.DrawingBoard(
+                              controller: widget.drawingController!,
+                              canvasScale: widget.canvasScale,
+                              verticalOffset: currentLayout.upperPaddingOnCanvas * widget.canvasScale,
+                              background: Container(
+                                width: widget.width / widget.canvasScale,
+                                height: (currentLayout.totalContentHeight + currentLayout.upperPaddingOnCanvas * widget.canvasScale) / widget.canvasScale,
+                                color: Colors.transparent,
+                              ),
+                              showDefaultActions: false,
+                              showDefaultTools: false,
+                              boardPanEnabled: false,
+                              boardScaleEnabled: false,
+                              onPointerUp: widget.onDrawingPointerUp,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+
+              // ===== LAYER 4: Chord Symbol Overlays =====
+              ...chordSymbolOverlays,
+
+              // ===== LAYER 5: MIDI Highlights =====
+              if (highlightedSymbolId != null)
                 RepaintBoundary(
-                  key: const ValueKey('sheet_music_canvas'),
-                  child: CustomPaint(
-                    size: Size(widget.width, currentLayout.totalContentHeight),
-                    painter: staticSheetMusicRenderer,
+                  key: const ValueKey('highlight_overlay'),
+                  child: HighlightOverlay(
+                    highlightedSymbolId: highlightedSymbolId!,
+                    symbolPosition: getSymbolPosition(highlightedSymbolId),
+                    highlightColor: currentHighlightColor,
+                    canvasScale: currentLayout.canvasScale,
                   ),
                 ),
 
-                // ===== LAYER 2: Drawing Board =====
-                // Drawing board positioned early so other overlays appear on top
-                if (widget.drawingController != null)
-                  Positioned.fill(
-                    child: IgnorePointer(
-                      ignoring: !isDrawingMode, // Only accept touch events when in drawing mode
-                      child: Container(
-                        color: Colors.transparent, // Debug: visible overlay when drawing mode is active
-                        child: drawing_board.DrawingBoard(
-                          controller: widget.drawingController!,
-                          canvasScale: widget.canvasScale,
-                          verticalOffset: 0,
+              // ===== LAYER 6: Dynamic Interaction Painter =====
+              // This is the key to our performance gain. ValueListenableBuilder listens
+              // to our notifier and ONLY rebuilds its child (the lightweight CustomPaint)
+              // when the interaction state changes.
+              ValueListenableBuilder<InteractionState?>(
+                valueListenable: _interactionNotifier,
+                builder: (context, interactionState, child) {
+                  // If there is no active interaction, we draw nothing.
+                  if (interactionState == null) {
+                    return const SizedBox.shrink();
+                  }
 
-                          background: Container(
-                            width: widget.width / widget.canvasScale,
-                            height: (currentLayout.totalContentHeight / widget.canvasScale) + currentLayout.upperPaddingOnCanvas,
-                            color: Colors.transparent,
-                          ),
-                          showDefaultActions: false,
-                          showDefaultTools: false,
-                          boardPanEnabled: false,
-                          boardScaleEnabled: false,
-                          onPointerUp: widget.onDrawingPointerUp,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                // ===== LAYER 3: Chord Symbol Overlays =====
-                ...chordSymbolOverlays,
-
-                // ===== LAYER 4: MIDI Highlights =====
-                if (highlightedSymbolId != null)
-                  RepaintBoundary(
-                    key: const ValueKey('highlight_overlay'),
-                    child: HighlightOverlay(
-                      highlightedSymbolId: highlightedSymbolId!,
-                      symbolPosition: getSymbolPosition(highlightedSymbolId),
-                      highlightColor: currentHighlightColor,
+                  // If there IS an interaction, we draw our fast overlay.
+                  return CustomPaint(
+                    size: Size(widget.width, currentLayout.totalContentHeight),
+                    painter: InteractionOverlayPainter(
+                      interactionState: interactionState,
                       canvasScale: currentLayout.canvasScale,
                     ),
-                  ),
-
-                // ===== LAYER 5: Dynamic Interaction Painter =====
-                // This is the key to our performance gain. ValueListenableBuilder listens
-                // to our notifier and ONLY rebuilds its child (the lightweight CustomPaint)
-                // when the interaction state changes.
-                ValueListenableBuilder<InteractionState?>(
-                  valueListenable: _interactionNotifier,
-                  builder: (context, interactionState, child) {
-                    // If there is no active interaction, we draw nothing.
-                    if (interactionState == null) {
-                      return const SizedBox.shrink();
-                    }
-
-                    // If there IS an interaction, we draw our fast overlay.
-                    return CustomPaint(
-                      size: Size(widget.width, currentLayout.totalContentHeight),
-                      painter: InteractionOverlayPainter(
-                        interactionState: interactionState,
-                        canvasScale: currentLayout.canvasScale,
-                      ),
-                    );
-                  },
-                ),
-              ],
-            ),
+                  );
+                },
+              ),
+            ],
           ),
-        );
-          },
         ),
       );
       },
@@ -762,7 +777,7 @@ void _resetInteractionState() {
 
                   // Position properly above the staff (much higher and more consistent)
                   final chordY = measureY -
-                      (180 *
+                      (190 *
                           layout
                               .canvasScale); // Higher and more appropriate positioning
 
