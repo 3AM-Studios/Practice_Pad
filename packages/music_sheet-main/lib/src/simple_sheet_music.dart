@@ -611,7 +611,7 @@ void _resetInteractionState() {
                               verticalOffset: currentLayout.upperPaddingOnCanvas * widget.canvasScale,
                               background: Container(
                                 width: widget.width / widget.canvasScale,
-                                height: (currentLayout.totalContentHeight + currentLayout.upperPaddingOnCanvas * widget.canvasScale) / widget.canvasScale,
+                                height: (currentLayout.totalContentHeight / widget.canvasScale) + currentLayout.upperPaddingOnCanvas,
                                 color: Colors.transparent,
                               ),
                               showDefaultActions: false,
