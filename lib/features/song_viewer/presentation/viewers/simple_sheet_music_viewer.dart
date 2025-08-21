@@ -31,12 +31,14 @@ class SimpleSheetMusicViewer extends StatefulWidget {
   final String songAssetPath;
   final int bpm;
   final PracticeArea? practiceArea;
+  final VoidCallback? onStateChanged;
 
   const SimpleSheetMusicViewer({
     super.key,
     required this.songAssetPath,
     this.bpm = 120,
     this.practiceArea,
+    this.onStateChanged,
   });
 
   @override
@@ -570,8 +572,55 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
   // Add all the stub methods for now - these will be the full implementations from the original file
   void _buildGlobalIndexMapping() {}
   Future<void> _loadChordKeys() async {}
-  KeySignatureType _getCurrentKeySignature() => KeySignatureType.cMajor;
-  music_sheet.KeySignature _createKeySignatureFromType(KeySignatureType type) => music_sheet.KeySignature.cMajor();
+  KeySignatureType _getCurrentKeySignature() => _stringToKeySignatureType(_originalKey) ?? KeySignatureType.cMajor;
+  music_sheet.KeySignature _createKeySignatureFromType(KeySignatureType keySignatureType) {
+    switch (keySignatureType) {
+      case KeySignatureType.cMajor:
+        return music_sheet.KeySignature.cMajor();
+      case KeySignatureType.gMajor:
+        return music_sheet.KeySignature.gMajor();
+      case KeySignatureType.dMajor:
+        return music_sheet.KeySignature.dMajor();
+      case KeySignatureType.aMajor:
+        return music_sheet.KeySignature.aMajor();
+      case KeySignatureType.eMajor:
+        return music_sheet.KeySignature.eMajor();
+      case KeySignatureType.bMajor:
+        return music_sheet.KeySignature.bMajor();
+      case KeySignatureType.fSharpMajor:
+        return music_sheet.KeySignature.fSharpMajor();
+      case KeySignatureType.fMajor:
+        return music_sheet.KeySignature.fMajor();
+      case KeySignatureType.bFlatMajor:
+        return music_sheet.KeySignature.bFlatMajor();
+      case KeySignatureType.eFlatMajor:
+        return music_sheet.KeySignature.eFlatMajor();
+      case KeySignatureType.aFlatMajor:
+        return music_sheet.KeySignature.aFlatMajor();
+      case KeySignatureType.dFlatMajor:
+        return music_sheet.KeySignature.dFlatMajor();
+      case KeySignatureType.aMinor:
+        return music_sheet.KeySignature.aMinor();
+      case KeySignatureType.eMinor:
+        return music_sheet.KeySignature.eMinor();
+      case KeySignatureType.bMinor:
+        return music_sheet.KeySignature.bMinor();
+      case KeySignatureType.fSharpMinor:
+        return music_sheet.KeySignature.fSharpMinor();
+      case KeySignatureType.cSharpMinor:
+        return music_sheet.KeySignature.cSharpMinor();
+      case KeySignatureType.dMinor:
+        return music_sheet.KeySignature.dMinor();
+      case KeySignatureType.gMinor:
+        return music_sheet.KeySignature.gMinor();
+      case KeySignatureType.cMinor:
+        return music_sheet.KeySignature.cMinor();
+      case KeySignatureType.fMinor:
+        return music_sheet.KeySignature.fMinor();
+      default:
+        return music_sheet.KeySignature.cMajor();
+    }
+  }
   
   // Sheet music interaction methods
   void _insertSymbolAtPosition(MusicalSymbol symbol, int measureIndex, int positionIndex) {
@@ -796,7 +845,6 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
 
   // Returns toolbar widget for main screen
   Widget buildToolbar() {
-    print('🛠️ BUILDING TOOLBAR');
     final theme = Theme.of(context);
     final surfaceColor = theme.colorScheme.surface;
 
@@ -815,9 +863,11 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
               builder: (context, constraints) {
                 // Check if we have enough width for single row layout
                 final isWideScreen = constraints.maxWidth > 600;
+                print('🛠️ LAYOUT: maxWidth=${constraints.maxWidth}, isWideScreen=$isWideScreen');
 
                 if (isWideScreen) {
                   // Wide screen: single row layout
+                  print('🛠️ USING WIDE SCREEN LAYOUT');
                   return Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     crossAxisAlignment: CrossAxisAlignment.center,
@@ -829,6 +879,7 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
                   );
                 } else {
                   // Narrow screen: wrapped layout
+                  print('🛠️ USING NARROW SCREEN LAYOUT');
                   return Column(
                     children: [
                       // Top row: Key controls and extension controls
@@ -932,6 +983,9 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
       _cachedSheetMusicWidget = null;
       _lastRenderedMeasures = null;
     });
+    
+    // Notify parent widget to rebuild toolbar
+    widget.onStateChanged?.call();
   }
   
   /// Updates the key signature display based on the original key
@@ -969,10 +1023,136 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
     return majorToMinor[majorKey] ?? 'Am';
   }
   
-  /// Placeholder for transposing all chord symbols
+  /// Transposes all chord symbols from one key to another
   void _transposeAllChordSymbols(String fromKey, String toKey) {
-    // This would need the full transposition logic from the original
-    print('Transposing from $fromKey to $toKey');
+    print('🔧 TRANSPOSING ALL CHORDS FROM $fromKey TO $toKey');
+    
+    // Calculate the transposition interval
+    final interval = _getTranspositionInterval(fromKey, toKey);
+    if (interval == 0) return; // No transposition needed
+    
+    print('🔧 TRANSPOSITION INTERVAL: $interval semitones');
+    
+    // Transpose each chord symbol in the main list
+    for (int i = 0; i < _chordSymbols.length; i++) {
+      final chord = _chordSymbols[i];
+      final newRoot = _transposeNote(chord.effectiveRootName, interval);
+      
+      // Capture the current Roman numeral before transposing
+      String originalRomanNumeral = '';
+      final currentKeySignature = _stringToKeySignatureType(fromKey);
+      if (currentKeySignature != null) {
+        originalRomanNumeral = chord.getRomanNumeralWithKey(currentKeySignature);
+        final qualitySuperscript = chord.getQualitySuperscript();
+        if (qualitySuperscript.isNotEmpty) {
+          originalRomanNumeral += qualitySuperscript;
+        }
+      }
+      
+      print('🔧 TRANSPOSING CHORD $i: ${chord.effectiveRootName} (${chord.effectiveQuality}) -> $newRoot');
+      
+      // Create new chord symbol with transposed root
+      final newChord = ChordSymbol(
+        newRoot,
+        chord.effectiveQuality,
+        position: chord.position,
+        originalKeySignature: _stringToKeySignatureType(toKey),
+        modifiedKeySignature: null,
+        preservedRomanNumeral: originalRomanNumeral,
+      );
+      
+      _chordSymbols[i] = newChord;
+    }
+    
+    // Also update chord symbols in all measures
+    for (int measureIndex = 0; measureIndex < _chordMeasures.length; measureIndex++) {
+      final measure = _chordMeasures[measureIndex];
+      final updatedChordSymbols = <ChordSymbol>[];
+      
+      for (final chord in measure.chordSymbols) {
+        final newRoot = _transposeNote(chord.effectiveRootName, interval);
+        
+        // Capture the current Roman numeral before transposing
+        String originalRomanNumeral = '';
+        final currentKeySignature = _stringToKeySignatureType(fromKey);
+        if (currentKeySignature != null) {
+          originalRomanNumeral = chord.getRomanNumeralWithKey(currentKeySignature);
+          final qualitySuperscript = chord.getQualitySuperscript();
+          if (qualitySuperscript.isNotEmpty) {
+            originalRomanNumeral += qualitySuperscript;
+          }
+        }
+        
+        // Create new chord symbol with transposed root
+        final newChord = ChordSymbol(
+          newRoot,
+          chord.effectiveQuality,
+          position: chord.position,
+          originalKeySignature: _stringToKeySignatureType(toKey),
+          modifiedKeySignature: null,
+          preservedRomanNumeral: originalRomanNumeral,
+        );
+        
+        updatedChordSymbols.add(newChord);
+      }
+      
+      _chordMeasures[measureIndex] = ChordMeasure(
+        measure.musicalSymbols,
+        isNewLine: measure.isNewLine,
+        chordSymbols: updatedChordSymbols,
+      );
+    }
+  }
+  
+  /// Calculates the transposition interval between two keys in semitones
+  int _getTranspositionInterval(String fromKey, String toKey) {
+    const keyToSemitone = {
+      'C': 0, 'C#': 1, 'Db': 1, 'D♭': 1, 'D': 2, 'D#': 3, 'Eb': 3, 'E♭': 3,
+      'E': 4, 'F': 5, 'F#': 6, 'Gb': 6, 'G♭': 6, 'G': 7, 'G#': 8, 'Ab': 8, 'A♭': 8,
+      'A': 9, 'A#': 10, 'Bb': 10, 'B♭': 10, 'B': 11,
+      // Minor keys
+      'Am': 0, 'A#m': 1, 'Bbm': 1, 'B♭m': 1, 'Bm': 2, 'Cm': 3, 'C#m': 4,
+      'Dm': 5, 'D#m': 6, 'Ebm': 6, 'E♭m': 6, 'Em': 7, 'Fm': 8, 'F#m': 9, 'Gm': 10, 'G#m': 11
+    };
+    
+    final fromSemitone = keyToSemitone[fromKey] ?? 0;
+    final toSemitone = keyToSemitone[toKey] ?? 0;
+    return (toSemitone - fromSemitone + 12) % 12;
+  }
+  
+  /// Transposes a single note by the given interval (in semitones)
+  String _transposeNote(String note, int interval) {
+    const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const noteToIndex = {
+      'C': 0, 'C#': 1, 'Db': 1, 'D♭': 1, 'D': 2, 'D#': 3, 'Eb': 3, 'E♭': 3,
+      'E': 4, 'F': 5, 'F#': 6, 'Gb': 6, 'G♭': 6, 'G': 7, 'G#': 8, 'Ab': 8, 'A♭': 8,
+      'A': 9, 'A#': 10, 'Bb': 10, 'B♭': 10, 'B': 11
+    };
+    
+    final currentIndex = noteToIndex[note] ?? 0;
+    final newIndex = (currentIndex + interval) % 12;
+    return notes[newIndex];
+  }
+  
+  /// Converts string key to KeySignatureType
+  KeySignatureType? _stringToKeySignatureType(String key) {
+    const keyMap = {
+      'C': KeySignatureType.cMajor, 'Am': KeySignatureType.aMinor,
+      'G': KeySignatureType.gMajor, 'Em': KeySignatureType.eMinor,
+      'D': KeySignatureType.dMajor, 'Bm': KeySignatureType.bMinor,
+      'A': KeySignatureType.aMajor, 'F#m': KeySignatureType.fSharpMinor,
+      'E': KeySignatureType.eMajor, 'C#m': KeySignatureType.cSharpMinor,
+      'B': KeySignatureType.bMajor, 'G#m': KeySignatureType.gSharpMinor,
+      'F#': KeySignatureType.fSharpMajor, 'D#m': KeySignatureType.dSharpMinor,
+      'F': KeySignatureType.fMajor, 'Dm': KeySignatureType.dMinor,
+      'Bb': KeySignatureType.bFlatMajor, 'Gm': KeySignatureType.gMinor,
+      'Eb': KeySignatureType.eFlatMajor, 'Cm': KeySignatureType.cMinor,
+      'Ab': KeySignatureType.aFlatMajor, 'Fm': KeySignatureType.fMinor,
+      'Db': KeySignatureType.dFlatMajor, 'Bbm': KeySignatureType.bFlatMinor,
+      'Gb': KeySignatureType.gFlatMajor, 'Ebm': KeySignatureType.eFlatMinor,
+    };
+    
+    return keyMap[key];
   }
   Widget _buildCachedSheetMusic() {
     if (_chordMeasures.isEmpty) {
@@ -1178,32 +1358,32 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                ClayContainer(
-                  color: surfaceColor,
-                  borderRadius: 20,
-                  child: Container(
-                    decoration: () {
-                      print('🎵 CHORD BUTTON: _extensionNumbersRelativeToChords = $_extensionNumbersRelativeToChords, showing wood: $_extensionNumbersRelativeToChords');
-                      return _extensionNumbersRelativeToChords;
-                    }()
-                        ? BoxDecoration(
-                            image: const DecorationImage(
-                              image: AssetImage(
-                                  'assets/images/wood_texture_rotated.jpg'),
-                              fit: BoxFit.cover,
-                            ),
-                            border: Border.all(
-                                color: Theme.of(context).colorScheme.surface,
-                                width: 4),
-                            borderRadius: BorderRadius.circular(20),
-                          )
-                        : null,
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: () {
-                        print('🎵🎵🎵 CHORD BUTTON TAPPED - SETTING TO TRUE');
-                        _toggleExtensionNumbering(true);
-                      },
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {
+                    print('🎵🎵🎵 CHORD BUTTON TAPPED - SETTING TO TRUE');
+                    _toggleExtensionNumbering(true);
+                  },
+                  child: ClayContainer(
+                    color: surfaceColor,
+                    borderRadius: 20,
+                    child: Container(
+                      decoration: () {
+                        print('🎵 CHORD BUTTON: _extensionNumbersRelativeToChords = $_extensionNumbersRelativeToChords, showing wood: $_extensionNumbersRelativeToChords');
+                        return _extensionNumbersRelativeToChords;
+                      }()
+                          ? BoxDecoration(
+                              image: const DecorationImage(
+                                image: AssetImage(
+                                    'assets/images/wood_texture_rotated.jpg'),
+                                fit: BoxFit.cover,
+                              ),
+                              border: Border.all(
+                                  color: Theme.of(context).colorScheme.surface,
+                                  width: 4),
+                              borderRadius: BorderRadius.circular(20),
+                            )
+                          : null,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 4),
@@ -1222,32 +1402,32 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
                   ),
                 ),
                 const SizedBox(width: 2),
-                ClayContainer(
-                  color: surfaceColor,
-                  borderRadius: 20,
-                  child: Container(
-                    decoration: () {
-                      print('🎵 KEY BUTTON: _extensionNumbersRelativeToChords = $_extensionNumbersRelativeToChords, showing wood: ${!_extensionNumbersRelativeToChords}');
-                      return !_extensionNumbersRelativeToChords;
-                    }()
-                        ? BoxDecoration(
-                            image: const DecorationImage(
-                              image: AssetImage(
-                                  'assets/images/wood_texture_rotated.jpg'),
-                              fit: BoxFit.cover,
-                            ),
-                            border: Border.all(
-                                color: Theme.of(context).colorScheme.surface,
-                                width: 4),
-                            borderRadius: BorderRadius.circular(20),
-                          )
-                        : null,
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: () {
-                        print('🎵🎵🎵 KEY BUTTON TAPPED - SETTING TO FALSE');
-                        _toggleExtensionNumbering(false);
-                      },
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {
+                    print('🎵🎵🎵 KEY BUTTON TAPPED - SETTING TO FALSE');
+                    _toggleExtensionNumbering(false);
+                  },
+                  child: ClayContainer(
+                    color: surfaceColor,
+                    borderRadius: 20,
+                    child: Container(
+                      decoration: () {
+                        print('🎵 KEY BUTTON: _extensionNumbersRelativeToChords = $_extensionNumbersRelativeToChords, showing wood: ${!_extensionNumbersRelativeToChords}');
+                        return !_extensionNumbersRelativeToChords;
+                      }()
+                          ? BoxDecoration(
+                              image: const DecorationImage(
+                                image: AssetImage(
+                                    'assets/images/wood_texture_rotated.jpg'),
+                                fit: BoxFit.cover,
+                              ),
+                              border: Border.all(
+                                  color: Theme.of(context).colorScheme.surface,
+                                  width: 4),
+                              borderRadius: BorderRadius.circular(20),
+                            )
+                          : null,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 4),
@@ -1354,6 +1534,9 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
       _cachedSheetMusicWidget = null;
       _lastRenderedMeasures = null;
     });
+    
+    // Notify parent widget to rebuild toolbar
+    widget.onStateChanged?.call();
   }
 
   @override

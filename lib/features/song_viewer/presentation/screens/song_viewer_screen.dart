@@ -40,6 +40,11 @@ class _SongViewerScreenState extends State<SongViewerScreen> {
       songAssetPath: widget.songAssetPath,
       bpm: widget.bpm,
       practiceArea: widget.practiceArea,
+      onStateChanged: () {
+        setState(() {
+          // Rebuild the parent to update toolbar
+        });
+      },
     );
     
     _pdfViewer = PDFViewer(
