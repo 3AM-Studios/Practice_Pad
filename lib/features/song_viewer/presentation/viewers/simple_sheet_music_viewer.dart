@@ -18,7 +18,6 @@ import 'package:practice_pad/features/song_viewer/presentation/widgets/concentri
 import 'package:practice_pad/models/practice_area.dart';
 import 'package:practice_pad/models/practice_item.dart';
 import 'package:practice_pad/models/chord_progression.dart';
-import 'package:practice_pad/widgets/active_session_banner.dart';
 import 'package:practice_pad/features/practice/presentation/pages/practice_session_screen.dart';
 import 'package:practice_pad/features/edit_items/presentation/viewmodels/edit_items_viewmodel.dart';
 import 'package:provider/provider.dart';
@@ -134,25 +133,25 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
     _isDrawingModeNotifier = ValueNotifier<bool>(false);
     
     // Reuse or create a stable GlobalKey for this song
-    print('🔑 GLOBALKEY DEBUG: Starting GlobalKey lookup for: ${widget.songAssetPath}_sheet');
-    print('🔑 GLOBALKEY DEBUG: Static map size: ${_drawingGlobalKeys.length}');
-    print('🔑 GLOBALKEY DEBUG: Static map keys: ${_drawingGlobalKeys.keys.toList()}');
+    
+    
+    
     
     final drawingKeyPath = '${widget.songAssetPath}_sheet';
     final existingKey = _drawingGlobalKeys[drawingKeyPath];
-    print('🔑 GLOBALKEY DEBUG: Existing key for $drawingKeyPath: ${existingKey?.toString() ?? 'null'}');
+    
     
     _drawingKey = _drawingGlobalKeys.putIfAbsent(
       drawingKeyPath,
       () {
         final newKey = GlobalKey(debugLabel: 'drawing_$drawingKeyPath');
-        print('🔑 GLOBALKEY DEBUG: Creating NEW GlobalKey: ${newKey.toString()}');
+        
         return newKey;
       },
     );
     
-    print('🔑 GLOBALKEY DEBUG: Final selected key: ${_drawingKey.toString()}');
-    print('🔑 GLOBALKEY DEBUG: Static map size after: ${_drawingGlobalKeys.length}');
+    
+    
     // Initialize controller after waiting for any pending disposal
     _initializeControllerSafely();
 
@@ -168,9 +167,9 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
     
     // Wait for any pending disposal of previous controller for this song
     if (_controllerDisposalLocks.containsKey(drawingKeyPath)) {
-      print('🎨 CONTROLLER SYNC: Waiting for previous disposal to complete for $drawingKeyPath');
+      
       await _controllerDisposalLocks[drawingKeyPath]!.future;
-      print('🎨 CONTROLLER SYNC: Previous disposal completed for $drawingKeyPath');
+      
     }
     
     // Now safe to create new controller with stable GlobalKey
@@ -180,9 +179,9 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
     );
 
     // Debug: Log controller creation and validate clean state
-    print('🎨 CONTROLLER LIFECYCLE: Created new DrawingController for $drawingKeyPath');
-    print('🎨 CONTROLLER INITIAL STATE: currentIndex=${_drawingController.currentIndex}, historyLength=${_drawingController.getHistory.length}');
-    print('🎨 CONTROLLER PAINTER KEY: ${_drawingController.painterKey.toString()}');
+    
+    
+    
 
     // Validate that we start with a completely clean state
     assert(_drawingController.currentIndex == 0, 'DrawingController should start with currentIndex = 0');
@@ -215,7 +214,7 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
             .log('Loaded song viewer settings for ${widget.songAssetPath}');
       }
     } catch (e) {
-      print('Error loading song viewer settings: $e');
+      
     }
   }
 
@@ -228,9 +227,9 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
         'lastModified': DateTime.now().toIso8601String(),
       };
       await LocalStorageService.saveSongChanges(widget.songAssetPath, settings);
-      print('Saved song viewer settings for ${widget.songAssetPath}');
+      
     } catch (e) {
-      print('Error saving song viewer settings: $e');
+      
     }
   }
 
@@ -240,43 +239,43 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
       if (!mounted) return;
       
       final drawingKeyPath = '${widget.songAssetPath}_sheet';
-      print('🎨 LOADING DRAWINGS: Starting load for $drawingKeyPath');
-      print('🎨 CONTROLLER STATE BEFORE LOAD: currentIndex=${_drawingController.currentIndex}, historyLength=${_drawingController.getHistory.length}');
+      
+      
       
       // Load saved drawings from LocalStorageService
       final drawingData = await LocalStorageService.loadDrawingsForSong(drawingKeyPath);
-      print('🎨 LOADING DRAWINGS: Retrieved ${drawingData.length} drawing elements from storage');
-      print('🎨 LOADING DRAWINGS: Raw JSON data: $drawingData');
+      
+      
       
       if (drawingData.isNotEmpty && mounted) {
         // Convert JSON data back to PaintContent objects
-        print('🎨 LOADING DRAWINGS: Converting JSON to PaintContent objects...');
+        
         final paintContents = LocalStorageService.drawingJsonToPaintContents(drawingData);
-        print('🎨 LOADING DRAWINGS: Converted to ${paintContents.length} PaintContent objects');
+        
         
         // Debug each paint content
         for (int i = 0; i < paintContents.length; i++) {
           final content = paintContents[i];
-          print('🎨 LOADING DRAWINGS: Content $i - type: ${content.runtimeType}, toString: ${content.toString()}');
+          
         }
         
         if (paintContents.isNotEmpty) {
           // Clear existing drawings first, then load new ones
           _drawingController.clear();
-          print('🎨 CONTROLLER STATE AFTER CLEAR: currentIndex=${_drawingController.currentIndex}, historyLength=${_drawingController.getHistory.length}');
+          
           
           _drawingController.addContents(paintContents);
-          print('🎨 LOADING DRAWINGS: Added ${paintContents.length} painting contents to controller');
-          print('🎨 CONTROLLER STATE AFTER LOAD: currentIndex=${_drawingController.currentIndex}, historyLength=${_drawingController.getHistory.length}');
+          
+          
         }
       } else {
-        print('🎨 LOADING DRAWINGS: No saved drawings found for $drawingKeyPath');
+        
         // Ensure controller is cleared when no drawings exist
         _drawingController.clear();
-        print('🎨 CONTROLLER STATE AFTER CLEAR (no drawings): currentIndex=${_drawingController.currentIndex}, historyLength=${_drawingController.getHistory.length}');
+        
       }
     } catch (e) {
-      print('🎨 LOADING DRAWINGS ERROR: $e');
+      
     }
   }
 
@@ -286,18 +285,18 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
       if (!mounted) return;
       
       final drawingKeyPath = '${widget.songAssetPath}_sheet';
-      print('🎨 CONTROLLER STATE BEFORE SAVE: currentIndex=${_drawingController.currentIndex}, historyLength=${_drawingController.getHistory.length}');
+      
       
       // Save the JSON data using LocalStorageService
       final jsonData = _drawingController.getJsonList();
-      print('🎨 SAVING DRAWINGS: Retrieved ${jsonData.length} drawing elements from controller for $drawingKeyPath');
-      print('🎨 SAVING DRAWINGS: JSON data being saved: $jsonData');
+      
+      
       
       // Always save, even if empty (to clear old data)
       await LocalStorageService.saveDrawingsForSong(drawingKeyPath, jsonData);
-      print('🎨 SAVING DRAWINGS: Saved ${jsonData.length} drawing elements for $drawingKeyPath');
+      
     } catch (e) {
-      print('🎨 SAVING DRAWINGS ERROR: $e');
+      
     }
   }
 
@@ -417,13 +416,12 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
                 );
                 if (chordSymbol != null) {
                   measureChords.add(chordSymbol);
-                  print(
-                      'Added chord symbol: ${chordSymbol.effectiveRootName}${chordSymbol.effectiveQuality} to measure $measureNumber');
+                  
                 }
                 break;
 
               case 'note':
-                print('Processing note in measure $measureNumber');
+                
                 // Process note elements for duration calculations if needed
                 final durationNode =
                     element.findElements('duration').firstOrNull;
@@ -431,14 +429,11 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
                 if (durationNode != null) {
                   final durationValue = int.parse(durationNode.innerText);
                   final durationInBeats = durationValue / divisions;
-                  print('  Note duration: $durationInBeats beats');
+                  
                 }
                 break;
             }
           }
-
-          print(
-              'Measure $measureNumber: Found ${musicalSymbols.length} musical symbols and ${measureChords.length} chord symbols');
 
           // Create measure with musical symbols and chord symbols
           final chordMeasure = ChordMeasure(
@@ -463,12 +458,7 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
         throw 'No valid musical content was parsed from the MusicXML file.';
       }
 
-      print(
-          '📊 Parsed ${chordMeasures.length} measures with ${allChords.length} chords');
-      for (int i = 0; i < chordMeasures.length; i++) {
-        print(
-            '  Measure ${i + 1}: ${chordMeasures[i].musicalSymbols.length} symbols, ${chordMeasures[i].chordSymbols.length} chords');
-      }
+
 
       // --- 3. Initialize State ---
       setState(() {
@@ -512,11 +502,11 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
 
         _tickSubscription = _metronome.tickStream.listen(_onTick);
       } catch (e) {
-        print('Warning: Could not initialize metronome audio: $e');
+        
         // Continue without metronome audio for now
       }
       */
-      print('Metronome disabled - add proper audio assets to enable');
+      
       await _loadDrawingData();
 
       setState(() {
@@ -526,7 +516,7 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
       // Load drawings after song is fully loaded
       
     } catch (e) {
-      print('Error loading song: $e');
+      
       setState(() {
         _isLoading = false;
       });
@@ -564,7 +554,7 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
         originalKeySignature: originalKeySignature,
       );
     } catch (e) {
-      print('Error creating chord from harmony: $e');
+      
       return null;
     }
   }
@@ -649,7 +639,7 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
         _cachedSheetMusicWidget = null;
         _lastRenderedMeasures = null;
         
-        print('🎵 Inserted symbol ${symbol.runtimeType} at measure $measureIndex, position $positionIndex');
+        
       }
     });
   }
@@ -680,7 +670,7 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
         _cachedSheetMusicWidget = null;
         _lastRenderedMeasures = null;
         
-        print('🎵 Updated symbol at measure $measureIndex, position $positionIndex');
+        
       }
     });
   }
@@ -711,24 +701,24 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
         _cachedSheetMusicWidget = null;
         _lastRenderedMeasures = null;
         
-        print('🎵 Deleted symbol at measure $measureIndex, position $positionIndex');
+        
       }
     });
   }
   
   void _onChordSymbolTap(dynamic chordSymbol, int globalChordIndex) {
     // Handle chord symbol tap - could be used for selection, etc.
-    print('🎵 Chord symbol tapped: $chordSymbol at index $globalChordIndex');
+    
   }
   
   void _onChordSymbolLongPress(dynamic chordSymbol, int globalChordIndex) {
     // Handle chord symbol long press - could show context menu
-    print('🎵 Chord symbol long pressed: $chordSymbol at index $globalChordIndex');
+    
   }
   
   void _onChordSymbolLongPressEnd(dynamic chordSymbol, int globalChordIndex, LongPressEndDetails? details) {
     // Handle end of long press
-    print('🎵 Chord symbol long press ended: $chordSymbol at index $globalChordIndex');
+    
   }
   
   void _onChordSymbolHover(dynamic chordSymbol, int globalChordIndex) {
@@ -831,14 +821,6 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
         const SizedBox(height: 20),
         // Chord progression creation button (appears when chords are selected)
         _buildChordProgressionButton(),
-
-        const ActiveSessionBanner(),
-        // Practice items widget
-        _buildPracticeItemsWidget(),
-        // General practice item button (always shown)
-        _buildGeneralPracticeItemButton(),
-
-        const SizedBox(height: 20), // Bottom padding for scroll
       ],
     );
   }
@@ -863,11 +845,11 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
               builder: (context, constraints) {
                 // Check if we have enough width for single row layout
                 final isWideScreen = constraints.maxWidth > 600;
-                print('🛠️ LAYOUT: maxWidth=${constraints.maxWidth}, isWideScreen=$isWideScreen');
+                
 
                 if (isWideScreen) {
                   // Wide screen: single row layout
-                  print('🛠️ USING WIDE SCREEN LAYOUT');
+                  
                   return Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     crossAxisAlignment: CrossAxisAlignment.center,
@@ -879,7 +861,7 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
                   );
                 } else {
                   // Narrow screen: wrapped layout
-                  print('🛠️ USING NARROW SCREEN LAYOUT');
+                  
                   return Column(
                     children: [
                       // Top row: Key controls and extension controls
@@ -1025,13 +1007,13 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
   
   /// Transposes all chord symbols from one key to another
   void _transposeAllChordSymbols(String fromKey, String toKey) {
-    print('🔧 TRANSPOSING ALL CHORDS FROM $fromKey TO $toKey');
+    
     
     // Calculate the transposition interval
     final interval = _getTranspositionInterval(fromKey, toKey);
     if (interval == 0) return; // No transposition needed
     
-    print('🔧 TRANSPOSITION INTERVAL: $interval semitones');
+    
     
     // Transpose each chord symbol in the main list
     for (int i = 0; i < _chordSymbols.length; i++) {
@@ -1049,7 +1031,7 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
         }
       }
       
-      print('🔧 TRANSPOSING CHORD $i: ${chord.effectiveRootName} (${chord.effectiveQuality}) -> $newRoot');
+      
       
       // Create new chord symbol with transposed root
       final newChord = ChordSymbol(
@@ -1200,44 +1182,6 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
     );
   }
   Widget _buildChordProgressionButton() => const SizedBox.shrink();
-  Widget _buildPracticeItemsWidget() => const SizedBox.shrink();
-  
-  Widget _buildGeneralPracticeItemButton() {
-    if (widget.practiceArea == null) {
-      return const SizedBox.shrink();
-    }
-
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.all(16),
-      child: ClayContainer(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: 20,
-        depth: 5,
-        curveType: CurveType.convex,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.add,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Add Practice Item',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.primary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
   /// Builds the key controls section (key button and indicator)
   Widget _buildKeyControls() {
@@ -1328,7 +1272,7 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
 
   /// Builds the extension numbering controls section
   Widget _buildExtensionControls(Color surfaceColor) {
-    print('🎵🎵🎵 BUILDING EXTENSION CONTROLS: _extensionNumbersRelativeToChords = $_extensionNumbersRelativeToChords');
+    
     return ClayContainer(
       color: surfaceColor,
       borderRadius: 12,
@@ -1361,7 +1305,7 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
                 GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTap: () {
-                    print('🎵🎵🎵 CHORD BUTTON TAPPED - SETTING TO TRUE');
+                    
                     _toggleExtensionNumbering(true);
                   },
                   child: ClayContainer(
@@ -1369,7 +1313,7 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
                     borderRadius: 20,
                     child: Container(
                       decoration: () {
-                        print('🎵 CHORD BUTTON: _extensionNumbersRelativeToChords = $_extensionNumbersRelativeToChords, showing wood: $_extensionNumbersRelativeToChords');
+                        
                         return _extensionNumbersRelativeToChords;
                       }()
                           ? BoxDecoration(
@@ -1405,7 +1349,7 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
                 GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTap: () {
-                    print('🎵🎵🎵 KEY BUTTON TAPPED - SETTING TO FALSE');
+                    
                     _toggleExtensionNumbering(false);
                   },
                   child: ClayContainer(
@@ -1413,7 +1357,7 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
                     borderRadius: 20,
                     child: Container(
                       decoration: () {
-                        print('🎵 KEY BUTTON: _extensionNumbersRelativeToChords = $_extensionNumbersRelativeToChords, showing wood: ${!_extensionNumbersRelativeToChords}');
+                        
                         return !_extensionNumbersRelativeToChords;
                       }()
                           ? BoxDecoration(
@@ -1525,10 +1469,10 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
     });
   }
   void _toggleExtensionNumbering(bool relativeToChords) {
-    print('🎵🎵🎵 EXTENSION TOGGLE: Setting to $relativeToChords (was $_extensionNumbersRelativeToChords)');
+    
     setState(() {
       _extensionNumbersRelativeToChords = relativeToChords;
-      print('🎵🎵🎵 EXTENSION UPDATE: _extensionNumbersRelativeToChords is now $_extensionNumbersRelativeToChords');
+      
       _saveSongViewerSettings();
       // Invalidate sheet music cache since extension numbering changed
       _cachedSheetMusicWidget = null;
@@ -1555,15 +1499,15 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
     final completer = Completer<void>();
     _controllerDisposalLocks[drawingKeyPath] = completer;
     
-    print('🎨 DISPOSE: Starting synchronous disposal for $drawingKeyPath');
+    
     
     // Schedule the disposal work but don't block the dispose method
     () async {
       try {
         // Save drawings synchronously
-        print('🎨 DISPOSE: Starting save of drawing data');
+        
         await _saveDrawingData();
-        print('🎨 DISPOSE: Drawing data save completed successfully');
+        
         
         // Remove app lifecycle observer
         WidgetsBinding.instance.removeObserver(this);
@@ -1574,14 +1518,14 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
         _isDrawingModeNotifier.dispose();
 
         // CRITICAL: Dispose the drawing controller to prevent memory leaks and state conflicts
-        print('🎨 CONTROLLER LIFECYCLE: Disposing DrawingController for $drawingKeyPath');
-        print('🎨 CONTROLLER FINAL STATE: currentIndex=${_drawingController.currentIndex}, historyLength=${_drawingController.getHistory.length}');
-        print('🎨 CONTROLLER PAINTER KEY BEFORE DISPOSE: ${_drawingController.painterKey.toString()}');
+        
+        
+        
         _drawingController.dispose();
-        print('🎨 CONTROLLER LIFECYCLE: DrawingController disposed successfully');
+        
         
       } catch (error) {
-        print('🎨 DISPOSE: Error during disposal: $error');
+        
       } finally {
         // Always complete the disposal lock
         completer.complete();
@@ -1589,7 +1533,7 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
         Future.delayed(const Duration(milliseconds: 100), () {
           _controllerDisposalLocks.remove(drawingKeyPath);
         });
-        print('🎨 DISPOSE: Disposal completed for $drawingKeyPath');
+        
       }
     }();
   }

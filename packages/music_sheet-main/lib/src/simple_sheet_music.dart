@@ -208,7 +208,12 @@ class SimpleSheetMusicState extends State<SimpleSheetMusic>
         widget.width != oldWidget.width ||
         widget.height != oldWidget.height ||
         widget.canvasScale != oldWidget.canvasScale) {
-      _updateLayout();
+      // Only update layout if font assets have been loaded
+      _fontFuture.then((_) {
+        if (mounted) {
+          _updateLayout();
+        }
+      });
     }
   }
 

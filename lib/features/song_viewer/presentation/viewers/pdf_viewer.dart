@@ -1,12 +1,17 @@
 import 'dart:async';
+import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:clay_containers/clay_containers.dart';
-import 'package:flutter_drawing_board/flutter_drawing_board.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:practice_pad/models/practice_area.dart';
 import 'package:practice_pad/services/local_storage_service.dart';
+import 'package:pdf_to_image_converter/pdf_to_image_converter.dart';
+import 'package:image_painter/image_painter.dart';
 
-/// PDF viewer widget with separate drawing persistence using _pdf suffix
+/// PDF viewer widget with drawing functionality using PDF-to-image conversion
 class PDFViewer extends StatefulWidget {
   final String songAssetPath;
   final int bpm;
@@ -26,72 +31,252 @@ class PDFViewer extends StatefulWidget {
 class _PDFViewerState extends State<PDFViewer>
     with TickerProviderStateMixin, WidgetsBindingObserver {
   
-  // Static controller disposal locks to prevent race conditions
-  static final Map<String, Completer<void>> _controllerDisposalLocks = {};
-  
-  // Static map to store stable GlobalKeys per song
-  static final Map<String, GlobalKey> _drawingGlobalKeys = {};
-  
   bool _isLoading = true;
   
-  // Drawing functionality
-  late ValueNotifier<bool> _isDrawingModeNotifier;
-  late DrawingController _drawingController;
-  late GlobalKey _drawingKey;
-  Color _currentDrawingColor = Colors.black;
-  double _currentStrokeWidth = 2.0;
-
+  // PDF to Image converter
+  final PdfImageConverter _converter = PdfImageConverter();
+  Uint8List? _currentPageImage;
+  
+  // Image Painter controller
+  late ImagePainterController _imagePainterController;
+  
   // PDF viewer specific controls
-  double _pdfScale = 1.0;
-  int _currentPage = 1;
-  int _totalPages = 1;
+  int _currentPage = 0; // 0-based indexing for pdf_to_image_converter
+  int _totalPages = 0;
+  String? _pdfPath;
+  bool _isReady = false;
+  
 
   @override
   void initState() {
     super.initState();
-    
-    // Register for app lifecycle changes
     WidgetsBinding.instance.addObserver(this);
-
-    // Initialize drawing functionality
-    _isDrawingModeNotifier = ValueNotifier<bool>(false);
+    _imagePainterController = ImagePainterController();
     
-    // Use PDF suffix for separate drawing persistence
-    final drawingKeyPath = '${widget.songAssetPath}_pdf';
+    // Listen for drawing changes to auto-save
+    _imagePainterController.addListener(_onDrawingChanged);
     
-    _drawingKey = _drawingGlobalKeys.putIfAbsent(
-      drawingKeyPath,
-      () => GlobalKey(debugLabel: 'drawing_$drawingKeyPath'),
-    );
-    
-    // Initialize controller after waiting for any pending disposal
-    _initializeControllerSafely();
-    _isLoading = false; // Placeholder - no actual loading for now
+    _loadSavedPDF();
   }
 
-  /// Safely initialize the drawing controller, waiting for any pending disposal
-  Future<void> _initializeControllerSafely() async {
-    final drawingKeyPath = '${widget.songAssetPath}_pdf';
-    
-    // Wait for any pending disposal of previous controller for this song
-    if (_controllerDisposalLocks.containsKey(drawingKeyPath)) {
-      await _controllerDisposalLocks[drawingKeyPath]!.future;
+  /// Load previously saved PDF path
+  Future<void> _loadSavedPDF() async {
+    try {
+      // Use a simple file-based approach for PDF paths
+      final file = await _getPDFPathFile();
+      String? savedPath;
+      if (await file.exists()) {
+        savedPath = await file.readAsString();
+      }
+      if (savedPath != null && savedPath.isNotEmpty && File(savedPath).existsSync()) {
+        await _loadPDF(savedPath);
+      } else {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading saved PDF: $e');
+      setState(() {
+        _isLoading = false;
+      });
     }
-    
-    // Now safe to create new controller with stable GlobalKey
-    _drawingController = DrawingController(
-      uniqueId: drawingKeyPath,
-      globalKey: _drawingKey,
-    );
+  }
 
-    // Set default drawing style
-    _drawingController.setStyle(
-      color: _currentDrawingColor,
-      strokeWidth: _currentStrokeWidth,
-    );
+  /// Save PDF path to storage
+  Future<void> _savePDFPath(String path) async {
+    try {
+      final file = await _getPDFPathFile();
+      await file.writeAsString(path);
+    } catch (e) {
+      debugPrint('Error saving PDF path: $e');
+    }
+  }
+
+  /// Load PDF file and convert first page to image
+  Future<void> _loadPDF(String path) async {
+    try {
+      setState(() {
+        _isLoading = true;
+        _isReady = false;
+      });
+
+      // Open PDF with converter
+      await _converter.openPdf(path);
+      
+      // Get page count
+      _totalPages = _converter.pageCount;
+      _currentPage = 0;
+      
+      // Convert current page to image
+      await _loadCurrentPageImage();
+      
+      // Save PDF path
+      await _savePDFPath(path);
+      
+      setState(() {
+        _pdfPath = path;
+        _isReady = true;
+        _isLoading = false;
+      });
+      
+      // Load drawings for current page
+      await _loadDrawingDataForCurrentPage();
+      
+    } catch (e) {
+      debugPrint('Error loading PDF: $e');
+      setState(() {
+        _isLoading = false;
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading PDF: $e')),
+        );
+      }
+    }
+  }
+
+  /// Load current page as image
+  Future<void> _loadCurrentPageImage() async {
+    try {
+      final pageImage = await _converter.renderPage(_currentPage);
+      if (pageImage != null) {
+        setState(() {
+          _currentPageImage = pageImage;
+        });
+        debugPrint('Loaded page $_currentPage image (${pageImage.length} bytes)');
+      }
+    } catch (e) {
+      debugPrint('Error loading page image: $e');
+    }
+  }
+
+  /// Upload PDF file
+  Future<void> _uploadPDF() async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf'],
+        allowMultiple: false,
+      );
+
+      if (result != null && result.files.single.path != null) {
+        await _loadPDF(result.files.single.path!);
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('PDF loaded successfully!')),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error uploading PDF: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error uploading PDF: $e')),
+        );
+      }
+    }
+  }
+
+  /// Remove current PDF
+  Future<void> _removePDF() async {
+    try {
+      // Close PDF in converter
+      if (_converter.isOpen) {
+        await _converter.closePdf();
+      }
+      
+      // Clear saved path
+      await _savePDFPath('');
+      
+      setState(() {
+        _pdfPath = null;
+        _currentPage = 0;
+        _totalPages = 0;
+        _isReady = false;
+        _currentPageImage = null;
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('PDF removed successfully!')),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error removing PDF: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error removing PDF: $e')),
+        );
+      }
+    }
+  }
+
+  /// Navigate to next page
+  Future<void> _nextPage() async {
+    if (_currentPage < _totalPages - 1) {
+      await _saveDrawingData(); // Save current page drawings
+      _currentPage++;
+      await _loadCurrentPageImage();
+      await _loadDrawingDataForCurrentPage();
+      setState(() {});
+    }
+  }
+
+  /// Navigate to previous page
+  Future<void> _previousPage() async {
+    if (_currentPage > 0) {
+      await _saveDrawingData(); // Save current page drawings
+      _currentPage--;
+      await _loadCurrentPageImage();
+      await _loadDrawingDataForCurrentPage();
+      setState(() {});
+    }
+  }
+
+  /// Save drawing data for current page
+  Future<void> _saveDrawingData() async {
+    if (_pdfPath == null || !_isReady || _currentPageImage == null) return;
     
-    // Load any existing drawings
-    await _loadDrawingData();
+    try {
+      // Save PaintInfo data using LocalStorageService
+      final safeFilename = _getSafeFilename(widget.songAssetPath);
+      await LocalStorageService.savePDFDrawingsForSongPage(
+        safeFilename,
+        _currentPage,
+        _imagePainterController.paintHistory,
+      );
+      debugPrint('PDF Drawing: Saved paint history for page $_currentPage');
+    } catch (e) {
+      debugPrint('Error saving drawing data: $e');
+    }
+  }
+
+  /// Load drawing data for current page
+  Future<void> _loadDrawingDataForCurrentPage() async {
+    if (_pdfPath == null || !_isReady) return;
+    
+    try {
+      // Load PaintInfo data using LocalStorageService
+      final safeFilename = _getSafeFilename(widget.songAssetPath);
+      final paintHistory = await LocalStorageService.loadPDFDrawingsForSongPage(
+        safeFilename,
+        _currentPage,
+      );
+      
+      if (paintHistory.isNotEmpty) {
+        // Clear existing history and add loaded drawings
+        _imagePainterController.clear();
+        for (final paintInfo in paintHistory) {
+          _imagePainterController.addPaintInfo(paintInfo);
+        }
+        debugPrint('PDF Drawing: Loaded ${paintHistory.length} drawings for page $_currentPage');
+      }
+    } catch (e) {
+      debugPrint('Error loading drawing data: $e');
+    }
   }
 
   @override
@@ -107,18 +292,7 @@ class _PDFViewerState extends State<PDFViewer>
       children: [
         const SizedBox(height: 20),
 
-        // Drawing controls (shown when in drawing mode)
-        ValueListenableBuilder<bool>(
-          valueListenable: _isDrawingModeNotifier,
-          builder: (context, isDrawingMode, child) {
-            if (isDrawingMode) {
-              return Center(child: _buildDrawingControls());
-            }
-            return const SizedBox.shrink();
-          },
-        ),
-
-        // PDF Display placeholder
+        // PDF Display with Drawing
         Container(
           height: 600,
           margin: const EdgeInsets.symmetric(vertical: 8),
@@ -127,77 +301,9 @@ class _PDFViewerState extends State<PDFViewer>
             borderRadius: 20,
             depth: 10,
             spread: 3,
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.picture_as_pdf,
-                    size: 64,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'PDF Viewer',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Coming Soon',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    margin: const EdgeInsets.symmetric(horizontal: 32),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surface,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
-                      ),
-                    ),
-                    child: Column(
-                      children: [
-                        Text(
-                          'This will display PDF sheet music with:',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            color: Theme.of(context).colorScheme.onSurface,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '• PDF rendering & navigation\n'
-                          '• Independent annotation system\n'
-                          '• Zoom & page controls\n'
-                          '• Separate drawing persistence',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Path: ${widget.songAssetPath.split('/').last}',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            child: _pdfPath == null
+                ? _buildPDFUploadPrompt()
+                : _buildPDFWithDrawing(),
           ),
         ),
 
@@ -206,64 +312,166 @@ class _PDFViewerState extends State<PDFViewer>
     );
   }
 
+  /// Build PDF upload prompt
+  Widget _buildPDFUploadPrompt() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.upload_file,
+            size: 64,
+            color: Theme.of(context).colorScheme.primary.withOpacity(0.6),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Upload PDF',
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Tap to select a PDF file to view and annotate',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+          ElevatedButton.icon(
+            onPressed: _uploadPDF,
+            icon: const Icon(Icons.upload_file),
+            label: const Text('Choose PDF'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Build PDF with drawing capability
+  Widget _buildPDFWithDrawing() {
+    return Stack(
+      children: [
+        // Main PDF + Drawing Area
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: _currentPageImage == null
+                ? const Center(child: CircularProgressIndicator())
+                : ImagePainter.memory(
+                    _currentPageImage!,
+                    controller: _imagePainterController,
+                    scalable: true,
+                    textDelegate: TextDelegate(),
+                    controlsAtTop: false, // Controls at bottom
+                    showControls: true,
+                    controlsBackgroundColor: Colors.transparent,
+                    selectedColor: Theme.of(context).colorScheme.primary,
+                    unselectedColor: Theme.of(context).colorScheme.onSurface,
+                    optionColor: Theme.of(context).colorScheme.onSurface,
+                  ),
+          ),
+        ),
+
+        // Page navigation controls
+        _buildPageControls(),
+      ],
+    );
+  }
+
+  /// Build page navigation controls
+  Widget _buildPageControls() {
+    return Positioned(
+      bottom: 16,
+      left: 16,
+      right: 16,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            IconButton(
+              onPressed: _currentPage > 0 ? _previousPage : null,
+              icon: const Icon(Icons.chevron_left),
+            ),
+            Text('${_currentPage + 1} / $_totalPages'),
+            IconButton(
+              onPressed: _currentPage < _totalPages - 1 ? _nextPage : null,
+              icon: const Icon(Icons.chevron_right),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+
+
+
   /// Returns toolbar widget for main screen
   Widget buildToolbar() {
     final theme = Theme.of(context);
     final surfaceColor = theme.colorScheme.surface;
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       child: ClayContainer(
         color: surfaceColor,
         borderRadius: 20,
-        depth: 10,
-        spread: 3,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(children: [
-            // Main controls with responsive layout
-            LayoutBuilder(
-              builder: (context, constraints) {
-                // Check if we have enough width for single row layout
-                final isWideScreen = constraints.maxWidth > 600;
-
-                if (isWideScreen) {
-                  // Wide screen: single row layout
-                  return Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      _buildPDFControls(),
-                      _buildZoomAndDrawControls(surfaceColor),
-                      _buildPageControls(surfaceColor),
-                    ],
-                  );
-                } else {
-                  // Narrow screen: wrapped layout
-                  return Column(
-                    children: [
-                      // Top row: PDF controls and page controls
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          _buildPDFControls(),
-                          _buildPageControls(surfaceColor),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      // Bottom row: Zoom/draw controls centered
-                      Center(child: _buildZoomAndDrawControls(surfaceColor)),
-                    ],
-                  );
-                }
-              },
-            ),
-          ]),
+        depth: 8,
+        spread: 2,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              if (constraints.maxWidth > 600) {
+                // Wide screen: horizontal layout
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildPDFControls(),
+                    _buildToolbarPageControls(),
+                    _buildZoomAndDrawControls(surfaceColor),
+                  ],
+                );
+              } else {
+                // Narrow screen: wrapped layout
+                return Column(
+                  children: [
+                    // Top row: PDF controls and page controls
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _buildPDFControls(),
+                        _buildToolbarPageControls(),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    // Bottom row: Zoom/draw controls centered
+                    Center(child: _buildZoomAndDrawControls(surfaceColor)),
+                  ],
+                );
+              }
+            },
+          ),
         ),
       ),
     );
   }
-
 
   Widget _buildPDFControls() {
     return Container(
@@ -287,196 +495,44 @@ class _PDFViewerState extends State<PDFViewer>
               fontWeight: FontWeight.w600,
             ),
           ),
+          if (_pdfPath != null) ...[
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: _removePDF,
+              child: Icon(
+                Icons.close,
+                color: Theme.of(context).colorScheme.error,
+                size: 20,
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 
   Widget _buildZoomAndDrawControls(Color surfaceColor) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // Zoom controls
-        ClayContainer(
-          color: surfaceColor,
-          borderRadius: 8,
-          child: IconButton(
-            icon: const Icon(Icons.zoom_in, size: 20),
-            onPressed: _zoomIn,
-            tooltip: 'Zoom In',
-            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-            padding: const EdgeInsets.all(4),
-          ),
-        ),
-        const SizedBox(width: 4),
-        ClayContainer(
-          color: surfaceColor,
-          borderRadius: 8,
-          child: IconButton(
-            icon: const Icon(Icons.zoom_out, size: 20),
-            onPressed: _zoomOut,
-            tooltip: 'Zoom Out',
-            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-            padding: const EdgeInsets.all(4),
-          ),
-        ),
-        const SizedBox(width: 8),
-        // Drawing mode toggle button
-        ValueListenableBuilder<bool>(
-          valueListenable: _isDrawingModeNotifier,
-          builder: (context, isDrawingMode, child) {
-            return ClayContainer(
-              color: isDrawingMode
-                  ? Colors.blue.withOpacity(0.8)
-                  : surfaceColor,
-              borderRadius: 8,
-              child: IconButton(
-                icon: Icon(
-                  isDrawingMode ? Icons.edit_off : Icons.draw,
-                  size: 20,
-                  color: isDrawingMode ? Colors.white : null,
-                ),
-                onPressed: () {
-                  _isDrawingModeNotifier.value = !_isDrawingModeNotifier.value;
-                  
-                  // Save drawing state when exiting drawing mode
-                  if (!_isDrawingModeNotifier.value) {
-                    _saveDrawingData();
-                  }
-                },
-                tooltip: isDrawingMode ? 'Exit Drawing Mode' : 'Enter Drawing Mode',
-                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                padding: const EdgeInsets.all(4),
-              ),
-            );
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPageControls(Color surfaceColor) {
-    return ClayContainer(
-      color: surfaceColor,
-      borderRadius: 12,
-      child: Padding(
-        padding: const EdgeInsets.all(8),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.keyboard_arrow_left),
-              onPressed: _previousPage,
-              tooltip: 'Previous Page',
-            ),
-            Text('$_currentPage / $_totalPages'),
-            IconButton(
-              icon: const Icon(Icons.keyboard_arrow_right),
-              onPressed: _nextPage,
-              tooltip: 'Next Page',
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDrawingControls() {
-    return Container(
-      padding: const EdgeInsets.all(8),
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: const Text('PDF Drawing Controls (Coming Soon)'),
-    );
-  }
-
-  // Control methods
-  void _zoomIn() {
-    setState(() {
-      _pdfScale = (_pdfScale + 0.1).clamp(0.5, 3.0);
-    });
-  }
-
-  void _zoomOut() {
-    setState(() {
-      _pdfScale = (_pdfScale - 0.1).clamp(0.5, 3.0);
-    });
-  }
-
-  void _previousPage() {
-    setState(() {
-      _currentPage = (_currentPage - 1).clamp(1, _totalPages);
-    });
-  }
-
-  void _nextPage() {
-    setState(() {
-      _currentPage = (_currentPage + 1).clamp(1, _totalPages);
-    });
-  }
-
-  /// Load saved drawing data from local storage with PDF suffix
-  Future<void> _loadDrawingData() async {
-    try {
-      if (!mounted) return;
-      
-      final drawingKeyPath = '${widget.songAssetPath}_pdf';
-      final drawingData = await LocalStorageService.loadDrawingsForSong(drawingKeyPath);
-      
-      if (drawingData.isNotEmpty && mounted) {
-        final paintContents = LocalStorageService.drawingJsonToPaintContents(drawingData);
-        if (paintContents.isNotEmpty) {
-          _drawingController.clear();
-          _drawingController.addContents(paintContents);
-        }
-      }
-    } catch (e) {
-      print('Error loading PDF drawings: $e');
-    }
-  }
-
-  /// Save drawing data to local storage with PDF suffix
-  Future<void> _saveDrawingData() async {
-    try {
-      if (!mounted) return;
-      
-      final drawingKeyPath = '${widget.songAssetPath}_pdf';
-      final jsonData = _drawingController.getJsonList();
-      await LocalStorageService.saveDrawingsForSong(drawingKeyPath, jsonData);
-    } catch (e) {
-      print('Error saving PDF drawings: $e');
-    }
+    return const SizedBox.shrink(); // Removed drawing controls from toolbar
   }
 
   @override
   void dispose() {
     _disposeControllerSafely();
-    _isDrawingModeNotifier.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
   void _disposeControllerSafely() {
-    final drawingKeyPath = '${widget.songAssetPath}_pdf';
-    
-    // Create a completer to track disposal completion
-    final completer = Completer<void>();
-    _controllerDisposalLocks[drawingKeyPath] = completer;
-    
     () async {
       try {
         await _saveDrawingData();
-        _drawingController.dispose();
+        if (_converter.isOpen) {
+          await _converter.closePdf();
+        }
+        _imagePainterController.removeListener(_onDrawingChanged);
+        _imagePainterController.dispose();
       } catch (error) {
-        print('Error during PDF viewer disposal: $error');
-      } finally {
-        completer.complete();
-        Future.delayed(const Duration(milliseconds: 100), () {
-          _controllerDisposalLocks.remove(drawingKeyPath);
-        });
+        debugPrint('Error during PDF viewer disposal: $error');
       }
     }();
   }
@@ -487,5 +543,105 @@ class _PDFViewerState extends State<PDFViewer>
     if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
       _saveDrawingData();
     }
+  }
+
+  /// Get file for storing PDF path
+  Future<File> _getPDFPathFile() async {
+    final directory = await getApplicationDocumentsDirectory();
+    final safeFilename = _getSafeFilename(widget.songAssetPath);
+    return File('${directory.path}/${safeFilename}_pdf_path.txt');
+  }
+
+
+  /// Convert asset path to safe filename by replacing invalid characters
+  String _getSafeFilename(String path) {
+    return path
+        .replaceAll('/', '_')
+        .replaceAll('\\', '_')
+        .replaceAll(':', '_')
+        .replaceAll('*', '_')
+        .replaceAll('?', '_')
+        .replaceAll('"', '_')
+        .replaceAll('<', '_')
+        .replaceAll('>', '_')
+        .replaceAll('|', '_');
+  }
+
+  /// Called when drawing changes to auto-save
+  void _onDrawingChanged() {
+    // Debounce auto-save to avoid excessive saves
+    if (_isReady && _pdfPath != null) {
+      // Use a small delay to batch rapid changes
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted && _isReady && _pdfPath != null) {
+          _saveDrawingData();
+        }
+      });
+    }
+  }
+
+  /// Build page controls for toolbar
+  Widget _buildToolbarPageControls() {
+    if (_pdfPath == null) {
+      return ClayContainer(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: 12,
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: GestureDetector(
+            onTap: _uploadPDF,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.upload_file,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Upload PDF',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return ClayContainer(
+      color: Theme.of(context).colorScheme.surface,
+      borderRadius: 12,
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              onPressed: _currentPage > 0 ? _previousPage : null,
+              icon: const Icon(Icons.chevron_left),
+              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+              padding: const EdgeInsets.all(4),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Text(
+                '${_currentPage + 1} / $_totalPages',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ),
+            IconButton(
+              onPressed: _currentPage < _totalPages - 1 ? _nextPage : null,
+              icon: const Icon(Icons.chevron_right),
+              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+              padding: const EdgeInsets.all(4),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

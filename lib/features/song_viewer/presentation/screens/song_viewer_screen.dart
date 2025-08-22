@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:clay_containers/clay_containers.dart';
 import 'package:practice_pad/models/practice_area.dart';
+import 'package:practice_pad/widgets/active_session_banner.dart';
 import 'package:practice_pad/features/song_viewer/presentation/viewers/simple_sheet_music_viewer.dart';
 import 'package:practice_pad/features/song_viewer/presentation/viewers/pdf_viewer.dart';
 
@@ -181,8 +183,55 @@ class _SongViewerScreenState extends State<SongViewerScreen> {
                 // Content section
                 _buildContent(),
                 const SizedBox(height: 20),
+                
+                // Practice-related widgets (shared between modes)
+                const ActiveSessionBanner(),
+                _buildPracticeItemsWidget(),
+                _buildGeneralPracticeItemButton(),
+                
+                const SizedBox(height: 20), // Bottom padding for scroll
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Practice-related widgets (shared between modes)
+  Widget _buildPracticeItemsWidget() => const SizedBox.shrink();
+  
+  Widget _buildGeneralPracticeItemButton() {
+    if (widget.practiceArea == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.all(16),
+      child: ClayContainer(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: 20,
+        depth: 5,
+        curveType: CurveType.convex,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.add,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Add Practice Item',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ),
         ),
       ),

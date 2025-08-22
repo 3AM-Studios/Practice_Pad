@@ -65,6 +65,12 @@ dependencies:
   device_info_plus: ^11.3.0
   home_widget: ^0.8.0
   easy_rich_text: ^2.2.0
+  flutter_pdfview:
+    path: packages/flutter_pdfview
+  file_picker: ^8.1.4
+  pdf_to_image_converter: ^0.0.3
+  image_painter:
+    path: packages/image_painter
 
 dev_dependencies:
   flutter_test:

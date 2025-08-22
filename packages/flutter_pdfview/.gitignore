@@ -1,0 +1,11 @@
+.DS_Store
+.dart_tool/
+
+.packages
+.pub/
+.idea/
+
+ios/.symlinks
+
+build/
+example/android/app/.cxx

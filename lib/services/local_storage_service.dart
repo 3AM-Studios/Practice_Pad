@@ -10,6 +10,7 @@ import 'package:practice_pad/features/song_viewer/data/models/song.dart';
 import 'package:music_sheet/index.dart';
 import 'package:flutter_drawing_board/paint_contents.dart';
 import 'dart:developer' as developer;
+import 'package:image_painter/image_painter.dart';
 
 /// Local storage service for persisting app data
 class LocalStorageService {
@@ -20,6 +21,7 @@ class LocalStorageService {
   static const String _chordKeysFileName = 'chord_keys.json';
   static const String _sheetMusicFileName = 'sheet_music.json';
   static const String _drawingsFileName = 'drawings.json';
+  static const String _pdfDrawingsFileName = 'pdf_drawings.json';
 
   // Static mutex for serializing save operations to prevent race conditions
   static final Completer<void>? _saveMutex = null;
@@ -700,6 +702,151 @@ class LocalStorageService {
     return contents;
   }
 
+  /// Save PDF drawing data for a specific song and page with timestamp and atomic operations
+  static Future<void> savePDFDrawingsForSongPage(String songId, int pageNumber, List<PaintInfo> paintHistory) async {
+    return _withSaveLock(() async {
+      try {
+        // Convert PaintInfo objects to JSON
+        final drawingData = paintHistory.map((paintInfo) => _paintInfoToJson(paintInfo)).toList();
+        
+        // Create timestamped drawing entry
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        final timestampedDrawingData = {
+          'timestamp': timestamp,
+          'version': 1,
+          'drawings': drawingData,
+          'songId': songId,
+          'pageNumber': pageNumber,
+        };
+        
+        final allPDFDrawings = await loadAllPDFDrawings();
+        final songPageKey = '${songId}_page_$pageNumber';
+        allPDFDrawings[songPageKey] = timestampedDrawingData;
+        
+        // Atomic save operation using temporary file
+        final file = await _getFile(_pdfDrawingsFileName);
+        final tempFile = await _getFile('$_pdfDrawingsFileName.tmp');
+        
+        // Write to temporary file first
+        await tempFile.writeAsString(json.encode(allPDFDrawings));
+        
+        // Atomic rename to final file (OS-level atomic operation)
+        if (await file.exists()) {
+          await file.delete();
+        }
+        await tempFile.rename(file.path);
+        
+        developer.log('✅ SERIALIZED SAVE: Saved ${drawingData.length} PDF drawing elements for song: $songId page: $pageNumber with timestamp: $timestamp');
+      } catch (e) {
+        developer.log('❌ SERIALIZED PDF SAVE ERROR: $e', error: e);
+        throw Exception('Failed to save PDF drawings: $e');
+      }
+    });
+  }
+
+  /// Load PDF drawing data for a specific song and page
+  static Future<List<PaintInfo>> loadPDFDrawingsForSongPage(String songId, int pageNumber) async {
+    try {
+      final allPDFDrawings = await loadAllPDFDrawings();
+      final songPageKey = '${songId}_page_$pageNumber';
+      final songPageDrawingData = allPDFDrawings[songPageKey];
+      
+      if (songPageDrawingData == null) {
+        developer.log('No PDF drawings found for song: $songId page: $pageNumber');
+        return [];
+      }
+      
+      // Handle timestamped format
+      if (songPageDrawingData is Map<String, dynamic> && songPageDrawingData.containsKey('timestamp')) {
+        final drawingsList = songPageDrawingData['drawings'] as List?;
+        if (drawingsList != null) {
+          final paintInfoList = drawingsList
+              .cast<Map<String, dynamic>>()
+              .map((json) => _paintInfoFromJson(json))
+              .toList();
+          final timestamp = songPageDrawingData['timestamp'] as int?;
+          developer.log('Loaded ${paintInfoList.length} PDF drawing elements for song: $songId page: $pageNumber with timestamp: $timestamp');
+          return paintInfoList;
+        }
+      }
+      
+      developer.log('Invalid PDF drawing data format for song: $songId page: $pageNumber');
+      return [];
+    } catch (e) {
+      developer.log('Error loading PDF drawings for $songId page $pageNumber: $e', error: e);
+      return [];
+    }
+  }
+
+  /// Load all PDF drawing data (raw format with timestamps)
+  static Future<Map<String, dynamic>> loadAllPDFDrawings() async {
+    try {
+      final file = await _getFile(_pdfDrawingsFileName);
+      if (!await file.exists()) {
+        developer.log('PDF drawings file does not exist, returning empty map');
+        return {};
+      }
+
+      final content = await file.readAsString();
+      if (content.trim().isEmpty) {
+        developer.log('PDF drawings file is empty, returning empty map');
+        return {};
+      }
+
+      final Map<String, dynamic> jsonData = json.decode(content);
+      developer.log('Loaded PDF drawings for ${jsonData.length} song pages');
+      return jsonData;
+    } catch (e) {
+      developer.log('Error loading all PDF drawings: $e', error: e);
+      return {};
+    }
+  }
+
+  /// Convert PaintInfo to JSON
+  static Map<String, dynamic> _paintInfoToJson(PaintInfo paintInfo) {
+    return {
+      'mode': paintInfo.mode.toString(),
+      'color': paintInfo.color.value,
+      'strokeWidth': paintInfo.strokeWidth,
+      'offsets': paintInfo.offsets.map((offset) => 
+        offset != null ? {'dx': offset.dx, 'dy': offset.dy} : null
+      ).toList(),
+      'text': paintInfo.text,
+      'fill': paintInfo.fill,
+    };
+  }
+
+  /// Convert JSON to PaintInfo
+  static PaintInfo _paintInfoFromJson(Map<String, dynamic> json) {
+    // Parse mode
+    final modeString = json['mode'] as String;
+    final mode = PaintMode.values.firstWhere(
+      (e) => e.toString() == modeString,
+      orElse: () => PaintMode.freeStyle,
+    );
+
+    // Parse color
+    final colorValue = json['color'] as int;
+    final color = Color(colorValue);
+
+    // Parse offsets
+    final offsetsData = json['offsets'] as List;
+    final offsets = offsetsData.map((offsetJson) {
+      if (offsetJson == null) return null;
+      final offsetMap = offsetJson as Map<String, dynamic>;
+      return Offset(offsetMap['dx'] as double, offsetMap['dy'] as double);
+    }).toList();
+
+    return PaintInfo(
+      mode: mode,
+      color: color,
+      strokeWidth: (json['strokeWidth'] as num).toDouble(),
+      offsets: offsets,
+      text: json['text'] as String? ?? '',
+      fill: json['fill'] as bool? ?? false,
+    );
+  }
+
   /// Clear all local storage
   static Future<void> clearAll() async {
     try {
@@ -711,6 +858,7 @@ class LocalStorageService {
         _chordKeysFileName,
         _sheetMusicFileName,
         _drawingsFileName,
+        _pdfDrawingsFileName,
       ];
 
       for (final fileName in files) {
