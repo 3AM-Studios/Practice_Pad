@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+import 'package:easy_rich_text/easy_rich_text.dart';
 import 'package:practice_pad/features/song_viewer/presentation/widgets/measure/chord_symbol/chord_symbol.dart';
 
 /// Parses text input into ChordSymbol objects
@@ -7,7 +9,7 @@ import 'package:practice_pad/features/song_viewer/presentation/widgets/measure/c
 class ChordSymbolParser {
   
   /// Roman numeral patterns (I-VII in both cases)
-  static final RegExp _romanNumeralPattern = RegExp(r'^(i{1,3}v?|iv|v|vi{0,2}|VII?)', caseSensitive: false);
+  static final RegExp _romanNumeralPattern = RegExp(r'^(vii|vi|v|iv|iii|ii|i)', caseSensitive: false);
   
   /// Chord root note patterns (A-G with optional accidentals)
   static final RegExp _chordNamePattern = RegExp(r'^[A-G][#b♯♭]?');
@@ -180,6 +182,66 @@ class ChordSymbolParser {
         .replaceAll('min7b5', 'm7b5');
     
     return quality;
+  }
+  
+  /// Creates a text widget with superscript quality formatting
+  /// 
+  /// [chordText] - The full chord text (e.g., "Imaj7", "ii°", "V7")
+  /// [textStyle] - Base text style for the chord symbol
+  /// 
+  /// Returns an EasyRichText widget with quality in superscript
+  static Widget buildChordTextWithSuperscriptQuality(String chordText, {TextStyle? textStyle}) {
+    if (chordText.trim().isEmpty) {
+      return Text(chordText, style: textStyle);
+    }
+    
+    try {
+      // Parse the chord to separate base and quality
+      final cleanInput = chordText.trim();
+      String baseNumeral = '';
+      String quality = '';
+      
+      // Try parsing as Roman numeral first
+      final romanMatch = _romanNumeralPattern.firstMatch(cleanInput);
+      if (romanMatch != null) {
+        baseNumeral = romanMatch.group(0)!;
+        quality = cleanInput.substring(romanMatch.end).trim();
+      } else {
+        // Try parsing as chord name
+        final chordNameMatch = _chordNamePattern.firstMatch(cleanInput);
+        if (chordNameMatch != null) {
+          baseNumeral = chordNameMatch.group(0)!;
+          quality = cleanInput.substring(chordNameMatch.end).trim();
+        } else {
+          // Fallback: treat entire string as base
+          baseNumeral = cleanInput;
+          quality = '';
+        }
+      }
+      
+      // If no quality, just return plain text
+      if (quality.isEmpty) {
+        return Text(chordText, style: textStyle);
+      }
+      
+      // Create EasyRichText with superscript quality
+      return EasyRichText(
+        '$baseNumeral$quality',
+        defaultStyle: textStyle ?? const TextStyle(),
+        patternList: [
+          EasyRichTextPattern(
+            targetString: quality,
+            superScript: true,
+            matchWordBoundaries: false,
+            style: textStyle?.copyWith(fontSize: (textStyle.fontSize ?? 14) * 0.75) ?? 
+                   const TextStyle(fontSize: 10.5),
+          ),
+        ],
+      );
+    } catch (e) {
+      // Fallback to plain text if parsing fails
+      return Text(chordText, style: textStyle);
+    }
   }
   
 }

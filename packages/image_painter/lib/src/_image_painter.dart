@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart' hide Image;
+import 'package:flutter/rendering.dart';
 
 import 'controller.dart';
 
@@ -146,9 +147,9 @@ class DrawImage extends CustomPainter {
       }
     }
 
-    ///Draws extension labels on the canvas.
-    for (final label in _controller.extensionLabels) {
-      _drawExtensionLabel(canvas, label);
+    ///Draws all labels on the canvas.
+    for (final label in _controller.labels) {
+      _drawLabel(canvas, label);
     }
 
     ///Draws all the completed actions of painting on the canvas.
@@ -174,14 +175,15 @@ class DrawImage extends CustomPainter {
     canvas.restore();
   }
 
-  ///Draws extension label on the canvas.
-  void _drawExtensionLabel(Canvas canvas, ExtensionLabel label) {
+  ///Draws any label on the canvas.
+  void _drawLabel(Canvas canvas, Label label) {
     final size = label.size;
     
-    // Create square rectangle centered on label position
+    // Create rectangle centered on label position with extra width for roman numerals
+    final width = label is RomanNumeralLabel ? size * 1.4 : size;
     final labelRect = Rect.fromCenter(
       center: label.position,
-      width: size,
+      width: width,
       height: size,
     );
     
@@ -212,13 +214,14 @@ class DrawImage extends CustomPainter {
     );
     
     // Draw label border
+    final borderWidth = label.isSelected ? (size * 0.08).clamp(0.3, 2.0) : (size * 0.06).clamp(0.3, 1.5);
     final borderPaint = Paint()
       ..color = label.isSelected 
           ? const Color(0xFF000000) // Black border when selected for visibility
           : (label.color.opacity == 0 
               ? const Color(0xFF757575) // Grey border for transparent labels
               : label.color) // Use label color border when not selected
-      ..strokeWidth = label.isSelected ? 3.0 : 2.0
+      ..strokeWidth = borderWidth
       ..style = PaintingStyle.stroke;
     
     canvas.drawRRect(
@@ -226,35 +229,127 @@ class DrawImage extends CustomPainter {
       borderPaint,
     );
     
-    // Draw label text
+    // Draw label text with superscript support for roman numerals
     final isTransparent = label.color.opacity == 0;
-    final textSpan = TextSpan(
-      text: label.number,
-      style: TextStyle(
-        color: label.isSelected 
-            ? const Color(0xFFFFFFFF) // White text when selected
-            : (isTransparent 
-                ? const Color(0xFF212121) // Dark text for transparent labels
-                : const Color(0xFFFFFFFF)), // White text for colored labels
-        fontSize: (size * 0.6).clamp(10.0, 20.0), // Scale font with label size
-        fontWeight: FontWeight.bold,
-      ),
-    );
+    final textColor = label.isSelected 
+        ? const Color(0xFFFFFFFF) // White text when selected
+        : (isTransparent 
+            ? const Color(0xFF212121) // Dark text for transparent labels
+            : const Color(0xFFFFFFFF)); // White text for colored labels
     
-    final textPainter = TextPainter(
-      text: textSpan,
+    final fontSize = (size * 0.45).clamp(2.0, 16.0); // Scale font with label size, smaller overall
+    
+    // Check if this is a roman numeral that needs superscript formatting
+    if (label is RomanNumeralLabel) {
+      _drawRomanNumeralWithSuperscript(canvas, label, textColor, fontSize, size);
+    } else {
+      // Regular text rendering for extension labels
+      final textSpan = TextSpan(
+        text: label.displayValue,
+        style: TextStyle(
+          color: textColor,
+          fontSize: fontSize,
+          fontWeight: FontWeight.bold,
+        ),
+      );
+      
+      final textPainter = TextPainter(
+        text: textSpan,
+        textAlign: TextAlign.center,
+        textDirection: TextDirection.ltr,
+      );
+      
+      textPainter.layout(minWidth: 1, maxWidth: size);
+      
+      final textOffset = Offset(
+        label.position.dx - textPainter.width / 2,
+        label.position.dy - textPainter.height / 2,
+      );
+      
+      textPainter.paint(canvas, textOffset);
+    }
+  }
+
+  ///Draws roman numeral text with superscript quality
+  void _drawRomanNumeralWithSuperscript(Canvas canvas, RomanNumeralLabel label, Color textColor, double fontSize, double labelSize) {
+    final chordText = label.displayValue;
+    
+    // Parse roman numeral and quality
+    String baseNumeral = '';
+    String quality = '';
+    
+    // Roman numeral patterns (I-VII in both cases)
+    final romanNumeralPattern = RegExp(r'^[#♯b♭]?(i{1,3}v?|iv|v|vi{0,2}|VII?)', caseSensitive: false);
+    final romanMatch = romanNumeralPattern.firstMatch(chordText);
+    
+    if (romanMatch != null) {
+      baseNumeral = romanMatch.group(0)!;
+      quality = chordText.substring(romanMatch.end).trim();
+    } else {
+      // Fallback: treat entire string as base
+      baseNumeral = chordText;
+      quality = '';
+    }
+    
+    // Create text painters
+    final baseTextPainter = TextPainter(
+      text: TextSpan(
+        text: baseNumeral,
+        style: TextStyle(
+          color: textColor,
+          fontSize: fontSize,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
       textAlign: TextAlign.center,
       textDirection: TextDirection.ltr,
     );
     
-    textPainter.layout(minWidth: 0, maxWidth: size);
+    baseTextPainter.layout(minWidth: 0, maxWidth: labelSize);
     
-    final textOffset = Offset(
-      label.position.dx - textPainter.width / 2,
-      label.position.dy - textPainter.height / 2,
-    );
-    
-    textPainter.paint(canvas, textOffset);
+    if (quality.isEmpty) {
+      // No quality, just draw the base
+      final textOffset = Offset(
+        label.position.dx - baseTextPainter.width / 2,
+        label.position.dy - baseTextPainter.height / 2,
+      );
+      baseTextPainter.paint(canvas, textOffset);
+    } else {
+      // Draw base and superscript quality
+      final superscriptFontSize = fontSize * 0.65;
+      final qualityTextPainter = TextPainter(
+        text: TextSpan(
+          text: quality,
+          style: TextStyle(
+            color: textColor,
+            fontSize: superscriptFontSize,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        textAlign: TextAlign.center,
+        textDirection: TextDirection.ltr,
+      );
+      
+      qualityTextPainter.layout(minWidth: 0, maxWidth: labelSize);
+      
+      // Calculate total width and positioning
+      final totalWidth = baseTextPainter.width + qualityTextPainter.width;
+      final startX = label.position.dx - totalWidth / 2;
+      
+      // Draw base numeral
+      final baseOffset = Offset(
+        startX,
+        label.position.dy - baseTextPainter.height / 2,
+      );
+      baseTextPainter.paint(canvas, baseOffset);
+      
+      // Draw superscript quality (offset up and to the right)
+      final qualityOffset = Offset(
+        startX + baseTextPainter.width,
+        label.position.dy - baseTextPainter.height / 2 - superscriptFontSize * 0.3,
+      );
+      qualityTextPainter.paint(canvas, qualityOffset);
+    }
   }
 
   ///Draws dashed path.

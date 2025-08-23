@@ -7,20 +7,14 @@ class ExtensionLabel extends Label {
   String number;     // '1'-'9'
   
   ExtensionLabel({
-    required String id,
-    required Offset position,
+    required super.id,
+    required super.position,
     required this.accidental,
     required this.number,
-    bool isSelected = false,
-    double size = 25.0,
-    Color color = const Color(0xFF2196F3),
-  }) : super(
-    id: id,
-    position: position,
-    isSelected: isSelected,
-    size: size,
-    color: color,
-  );
+    super.isSelected,
+    super.size,
+    super.color,
+  });
   
   @override
   String get displayValue => accidental == '♮' ? number : '$accidental$number';

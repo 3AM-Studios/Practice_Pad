@@ -22,6 +22,11 @@ class _ChordProgressionInputScreenState extends State<ChordProgressionInputScree
   final List<String> _chords = [];
   int? _selectedChordIndex; // Index of currently highlighted chord
   String? _parseError;
+  
+  // Roman numeral mode state
+  bool _isRomanNumeralMode = false;
+  String _currentQuality = 'Maj'; // 'Maj', 'Min', 'o/', 'o', '7th'
+  String _currentRomanNumeral = 'I';
 
   @override
   void initState() {
@@ -125,6 +130,150 @@ class _ChordProgressionInputScreenState extends State<ChordProgressionInputScree
 
   bool _isValid() {
     return _chords.isNotEmpty;
+  }
+
+  // Roman numeral methods
+  void _toggleRomanNumeralMode() {
+    setState(() {
+      _isRomanNumeralMode = !_isRomanNumeralMode;
+      if (_isRomanNumeralMode) {
+        _updateTextFromRomanNumeral();
+      }
+    });
+  }
+
+  void _setQuality(String quality) {
+    setState(() {
+      _currentQuality = quality;
+      _updateTextFromRomanNumeral();
+    });
+  }
+
+  void _setRomanNumeral(String numeral) {
+    setState(() {
+      _currentRomanNumeral = numeral;
+      _updateTextFromRomanNumeral();
+    });
+  }
+
+  void _updateTextFromRomanNumeral() {
+    if (!_isRomanNumeralMode) return;
+
+    String result = _currentRomanNumeral;
+    
+    // Apply case based on quality
+    if (_currentQuality == 'Min' || _currentQuality == 'o/' || _currentQuality == 'o') {
+      result = result.toLowerCase();
+    } else {
+      result = result.toUpperCase();
+    }
+    
+    // Apply quality suffix
+    switch (_currentQuality) {
+      case '7th':
+        result += '7';
+        break;
+      case 'Maj':
+        // No suffix for major
+        break;
+      case 'Min':
+        // Lowercase already applied
+        break;
+      case 'o/':
+        result += 'ø7';
+        break;
+      case 'o':
+        result += '°7';
+        break;
+    }
+
+    _chordInputController.text = result;
+  }
+
+  List<String> _getRomanNumerals() {
+    return ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
+  }
+
+  Widget _buildQualityButton(String quality, String displayText) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isSelected = _currentQuality == quality;
+    
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => _setQuality(quality),
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 4),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: isSelected 
+                ? colorScheme.primary 
+                : colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected 
+                  ? colorScheme.primary 
+                  : colorScheme.outline.withOpacity(0.3),
+              width: 1,
+            ),
+          ),
+          child: Text(
+            displayText,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: isSelected 
+                  ? colorScheme.onPrimary 
+                  : colorScheme.onSurface,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRomanNumeralButton(String numeral) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isSelected = _currentRomanNumeral == numeral;
+    
+    // Display case based on quality
+    String displayText = numeral;
+    if (_currentQuality == 'Min' || _currentQuality == 'o/' || _currentQuality == 'o') {
+      displayText = displayText.toLowerCase();
+    }
+    
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => _setRomanNumeral(numeral),
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 4),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: isSelected 
+                ? colorScheme.primary 
+                : colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected 
+                  ? colorScheme.primary 
+                  : colorScheme.outline.withOpacity(0.3),
+              width: 1,
+            ),
+          ),
+          child: Text(
+            displayText,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: isSelected 
+                  ? colorScheme.onPrimary 
+                  : colorScheme.onSurface,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   String _getDisplayText(String chord) {
@@ -468,12 +617,53 @@ class _ChordProgressionInputScreenState extends State<ChordProgressionInputScree
                         
                         const SizedBox(height: 16),
                         
+                        // Mode toggle
+                        Row(
+                          children: [
+                            Text(
+                              'Input Mode:',
+                              style: textTheme.bodyMedium?.copyWith(
+                                color: colorScheme.onSurface,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            SegmentedButton<bool>(
+                              segments: [
+                                ButtonSegment(
+                                  value: false,
+                                  label: Text('Text'),
+                                  icon: Icon(Icons.keyboard, size: 16),
+                                ),
+                                ButtonSegment(
+                                  value: true,
+                                  label: Text('Roman'),
+                                  icon: Icon(Icons.format_list_numbered, size: 16),
+                                ),
+                              ],
+                              selected: {_isRomanNumeralMode},
+                              onSelectionChanged: (Set<bool> newSelection) {
+                                _toggleRomanNumeralMode();
+                              },
+                              style: SegmentedButton.styleFrom(
+                                backgroundColor: colorScheme.surfaceContainerHighest,
+                                foregroundColor: colorScheme.onSurface,
+                                selectedBackgroundColor: colorScheme.primary,
+                                selectedForegroundColor: colorScheme.onPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        
+                        const SizedBox(height: 16),
+                        
                         Row(
                           children: [
                             Expanded(
                               child: TextFormField(
                                 controller: _chordInputController,
                                 focusNode: _chordInputFocusNode,
+                                readOnly: _isRomanNumeralMode,
                                 style: textTheme.bodyLarge?.copyWith(
                                   fontSize: 18,
                                   fontWeight: FontWeight.w500,
@@ -481,7 +671,9 @@ class _ChordProgressionInputScreenState extends State<ChordProgressionInputScree
                                 decoration: InputDecoration(
                                   hintText: _selectedChordIndex != null 
                                       ? 'Edit chord...'
-                                      : 'Enter chord (e.g., Imaj7, ii7, V7)',
+                                      : _isRomanNumeralMode 
+                                          ? 'Use buttons below to build Roman numeral'
+                                          : 'Enter chord (e.g., Imaj7, ii7, V7)',
                                   hintStyle: textTheme.bodyLarge?.copyWith(
                                     color: colorScheme.onSurface.withOpacity(0.5),
                                   ),
@@ -603,6 +795,47 @@ class _ChordProgressionInputScreenState extends State<ChordProgressionInputScree
             ),
           ),
           
+          // Roman numeral buttons (when in Roman numeral mode)
+          if (_isRomanNumeralMode)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: colorScheme.surface,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 4,
+                    offset: const Offset(0, -2),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  // Row 1: Quality buttons
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _buildQualityButton('7th', '7th'),
+                      _buildQualityButton('Maj', 'Maj'),
+                      _buildQualityButton('Min', 'min'),
+                      _buildQualityButton('o/', 'ø7'),
+                      _buildQualityButton('o', '°7'),
+                    ],
+                  ),
+                  
+                  const SizedBox(height: 12),
+                  
+                  // Row 2: Roman numeral buttons
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: _getRomanNumerals().map((numeral) {
+                      return _buildRomanNumeralButton(numeral);
+                    }).toList(),
+                  ),
+                ],
+              ),
+            ),
+
           // Help section at bottom
           Container(
             margin: const EdgeInsets.all(16),
@@ -632,26 +865,48 @@ class _ChordProgressionInputScreenState extends State<ChordProgressionInputScree
                   ],
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  'Roman numerals: Iᵐᵃʲ⁷, ii⁷, V⁷, vi, I, iiø⁷',
-                  style: textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onPrimaryContainer.withOpacity(0.8),
-                    fontWeight: FontWeight.w500,
+                if (_isRomanNumeralMode) ...[
+                  Text(
+                    'Select quality (7th, Maj, min, ø7, °7) then Roman numeral (I-VII)',
+                    style: textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onPrimaryContainer.withOpacity(0.8),
+                      fontWeight: FontWeight.w500,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Chord names: Cᵐᵃʲ⁷, Dm⁷, G⁷, Am, F',
-                  style: textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onPrimaryContainer.withOpacity(0.8),
-                    fontWeight: FontWeight.w500,
+                  const SizedBox(height: 4),
+                  Text(
+                    'Examples: I, ii, V7, viø7, vii°7',
+                    style: textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onPrimaryContainer.withOpacity(0.8),
+                      fontWeight: FontWeight.w500,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
-                  textAlign: TextAlign.center,
-                ),
+                ] else ...[
+                  Text(
+                    'Roman numerals: Iᵐᵃʲ⁷, ii⁷, V⁷, vi, I, iiø⁷',
+                    style: textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onPrimaryContainer.withOpacity(0.8),
+                      fontWeight: FontWeight.w500,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Chord names: Cᵐᵃʲ⁷, Dm⁷, G⁷, Am, F',
+                    style: textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onPrimaryContainer.withOpacity(0.8),
+                      fontWeight: FontWeight.w500,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
                 const SizedBox(height: 8),
                 Text(
-                  'Tap any chord to edit • Both Roman numerals and chord names supported',
+                  _isRomanNumeralMode 
+                    ? 'Tap buttons to build chord • Switch to Text mode for manual entry'
+                    : 'Tap any chord to edit • Switch to Roman mode for guided entry',
                   style: textTheme.bodySmall?.copyWith(
                     color: colorScheme.onPrimaryContainer.withOpacity(0.7),
                   ),

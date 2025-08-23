@@ -6,31 +6,66 @@ import 'package:flutter/material.dart';
 import '../image_painter.dart';
 import '_signature_painter.dart';
 
-/// Extension label model for PDF annotations
-class ExtensionLabel {
+/// Base label class for PDF annotations
+abstract class Label {
   final String id;
   Offset position;
-  String number;
   bool isSelected;
   double size;
   Color color;
   
-  ExtensionLabel({
+  Label({
     required this.id,
     required this.position,
-    required this.number,
     this.isSelected = false,
-    this.size = 25.0,
+    this.size = 10.0,
     this.color = const Color(0xFF2196F3),
   });
+  
+  String get displayValue;
+  String get labelType;
   
   Map<String, dynamic> toJson() => {
     'id': id,
     'position': {'dx': position.dx, 'dy': position.dy},
-    'number': number,
     'size': size,
     'color': color.value,
+    'isSelected': isSelected,
+    'labelType': labelType,
   };
+}
+
+/// Extension label model for PDF annotations
+class ExtensionLabel extends Label {
+  String number;
+  
+  ExtensionLabel({
+    required String id,
+    required Offset position,
+    required this.number,
+    bool isSelected = false,
+    double size = 10.0,
+    Color color = const Color(0xFF2196F3),
+  }) : super(
+    id: id,
+    position: position,
+    isSelected: isSelected,
+    size: size,
+    color: color,
+  );
+  
+  @override
+  String get displayValue => number;
+  
+  @override
+  String get labelType => 'extension';
+  
+  @override
+  Map<String, dynamic> toJson() {
+    final json = super.toJson();
+    json['number'] = number;
+    return json;
+  }
   
   factory ExtensionLabel.fromJson(Map<String, dynamic> json) => ExtensionLabel(
     id: json['id'] as String,
@@ -39,8 +74,54 @@ class ExtensionLabel {
       (json['position']['dy'] as num).toDouble(),
     ),
     number: json['number'] as String,
-    size: (json['size'] as num?)?.toDouble() ?? 25.0,
+    size: (json['size'] as num?)?.toDouble() ?? 10.0,
     color: Color((json['color'] as int?) ?? 0xFF2196F3),
+    isSelected: json['isSelected'] as bool? ?? false,
+  );
+}
+
+/// Roman numeral label model for PDF annotations
+class RomanNumeralLabel extends Label {
+  String romanNumeral;
+  
+  RomanNumeralLabel({
+    required String id,
+    required Offset position,
+    required this.romanNumeral,
+    bool isSelected = false,
+    double size = 10.0,
+    Color color = const Color(0xFF2196F3),
+  }) : super(
+    id: id,
+    position: position,
+    isSelected: isSelected,
+    size: size,
+    color: color,
+  );
+  
+  @override
+  String get displayValue => romanNumeral;
+  
+  @override
+  String get labelType => 'romanNumeral';
+  
+  @override
+  Map<String, dynamic> toJson() {
+    final json = super.toJson();
+    json['romanNumeral'] = romanNumeral;
+    return json;
+  }
+  
+  factory RomanNumeralLabel.fromJson(Map<String, dynamic> json) => RomanNumeralLabel(
+    id: json['id'] as String,
+    position: Offset(
+      (json['position']['dx'] as num).toDouble(),
+      (json['position']['dy'] as num).toDouble(),
+    ),
+    romanNumeral: json['romanNumeral'] as String? ?? 'I',
+    size: (json['size'] as num?)?.toDouble() ?? 10.0,
+    color: Color((json['color'] as int?) ?? 0xFF2196F3),
+    isSelected: json['isSelected'] as bool? ?? false,
   );
 }
 
@@ -56,7 +137,7 @@ class ImagePainterController extends ChangeNotifier {
   final List<Offset?> _offsets = [];
 
   final List<PaintInfo> _paintHistory = [];
-  final List<ExtensionLabel> _extensionLabels = [];
+  final List<Label> _labels = []; // Generic labels list (extension + roman)
 
   Offset? _start, _end;
 
@@ -64,12 +145,21 @@ class ImagePainterController extends ChangeNotifier {
   bool _paintInProgress = false;
   bool _isSignature = false;
   
-  // Extension label state
-  ExtensionLabel? _selectedLabel;
+  // Label state
+  Label? _selectedLabel;
   bool _isLabelMode = false;
+  String _currentLabelType = 'extension'; // 'extension' or 'romanNumeral'
+  
+  // Extension label state
   String _currentAccidental = '♮'; // Default to natural symbol
   String _currentNumber = '1';
-  double _labelSize = 25.0; // Default label size
+  
+  // Roman numeral state
+  String _currentRomanNumeral = 'I';
+  String _currentChordText = 'I';
+  
+  // Shared label state
+  double _labelSize = 10.0; // Default label size
   Color _labelColor = const Color(0xFF2196F3); // Default blue color
 
   ui.Image? get image => _image;
@@ -105,13 +195,24 @@ class ImagePainterController extends ChangeNotifier {
           .where((element) => element.mode == PaintMode.text)
           .isNotEmpty;
 
-  // Extension label getters
-  List<ExtensionLabel> get extensionLabels => _extensionLabels;
-  ExtensionLabel? get selectedLabel => _selectedLabel;
+  // Label getters
+  List<Label> get labels => _labels;
+  List<ExtensionLabel> get extensionLabels => _labels.whereType<ExtensionLabel>().toList();
+  List<RomanNumeralLabel> get romanNumeralLabels => _labels.whereType<RomanNumeralLabel>().toList();
+  Label? get selectedLabel => _selectedLabel;
   bool get isLabelMode => _isLabelMode;
+  String get currentLabelType => _currentLabelType;
+  
+  // Extension label specific getters
   String get currentAccidental => _currentAccidental;
   String get currentNumber => _currentNumber;
   String get currentLabelNumber => _currentAccidental == '♮' ? _currentNumber : '$_currentAccidental$_currentNumber';
+  
+  // Roman numeral specific getters
+  String get currentRomanNumeral => _currentRomanNumeral;
+  String get currentChordText => _currentChordText;
+  
+  // Shared getters
   double get labelSize => _labelSize;
   Color get labelColor => _labelColor;
 
@@ -268,7 +369,7 @@ class ImagePainterController extends ChangeNotifier {
     _isLabelMode = isLabelMode;
     if (!isLabelMode) {
       _selectedLabel = null;
-      for (final label in _extensionLabels) {
+      for (final label in _labels) {
         label.isSelected = false;
       }
     }
@@ -278,7 +379,9 @@ class ImagePainterController extends ChangeNotifier {
   void setCurrentAccidental(String accidental) {
     _currentAccidental = accidental;
     if (_selectedLabel != null) {
-      _selectedLabel!.number = currentLabelNumber;
+      if (_selectedLabel is ExtensionLabel) {
+        (_selectedLabel as ExtensionLabel).number = currentLabelNumber;
+      }
     }
     notifyListeners();
   }
@@ -286,7 +389,9 @@ class ImagePainterController extends ChangeNotifier {
   void setCurrentNumber(String number) {
     _currentNumber = number;
     if (_selectedLabel != null) {
-      _selectedLabel!.number = currentLabelNumber;
+      if (_selectedLabel is ExtensionLabel) {
+        (_selectedLabel as ExtensionLabel).number = currentLabelNumber;
+      }
     }
     notifyListeners();
   }
@@ -302,13 +407,15 @@ class ImagePainterController extends ChangeNotifier {
       _currentNumber = number;
     }
     if (_selectedLabel != null) {
-      _selectedLabel!.number = currentLabelNumber;
+      if (_selectedLabel is ExtensionLabel) {
+        (_selectedLabel as ExtensionLabel).number = currentLabelNumber;
+      }
     }
     notifyListeners();
   }
 
   void setLabelSize(double size) {
-    _labelSize = size.clamp(10.0, 50.0); // Clamp between 10 and 50 pixels
+    _labelSize = size.clamp(7.0, 25.0); // Clamp between 7 and 25 pixels
     if (_selectedLabel != null) {
       _selectedLabel!.size = _labelSize;
     }
@@ -316,11 +423,11 @@ class ImagePainterController extends ChangeNotifier {
   }
 
   void increaseLabelSize() {
-    setLabelSize(_labelSize + 2.0);
+    setLabelSize(_labelSize + 1.0);
   }
 
   void decreaseLabelSize() {
-    setLabelSize(_labelSize - 2.0);
+    setLabelSize(_labelSize - 1.0);
   }
 
   void setLabelColor(Color color) {
@@ -343,11 +450,11 @@ class ImagePainterController extends ChangeNotifier {
     );
     
     // Deselect all labels
-    for (final l in _extensionLabels) {
+    for (final l in _labels) {
       l.isSelected = false;
     }
     
-    _extensionLabels.add(label);
+    _labels.add(label);
     _selectedLabel = label;
     label.isSelected = true;
     notifyListeners();
@@ -355,7 +462,7 @@ class ImagePainterController extends ChangeNotifier {
 
   void selectLabel(ExtensionLabel label) {
     // Deselect all labels
-    for (final l in _extensionLabels) {
+    for (final l in _labels) {
       l.isSelected = false;
     }
     // Select the tapped label
@@ -371,22 +478,84 @@ class ImagePainterController extends ChangeNotifier {
 
   void deleteSelectedLabel() {
     if (_selectedLabel != null) {
-      _extensionLabels.remove(_selectedLabel);
+      _labels.remove(_selectedLabel);
       _selectedLabel = null;
       notifyListeners();
     }
   }
 
   void clearExtensionLabels() {
-    _extensionLabels.clear();
+    _labels.clear();
     _selectedLabel = null;
     notifyListeners();
   }
 
   void setExtensionLabels(List<ExtensionLabel> labels) {
-    _extensionLabels.clear();
-    _extensionLabels.addAll(labels);
+    _labels.clear();
+    _labels.addAll(labels);
     _selectedLabel = null;
+    notifyListeners();
+  }
+
+  // Roman numeral methods
+  void setCurrentRomanNumeral(String roman) {
+    _currentRomanNumeral = roman;
+    if (_selectedLabel != null && _selectedLabel is RomanNumeralLabel) {
+      (_selectedLabel as RomanNumeralLabel).romanNumeral = roman;
+    }
+    notifyListeners();
+  }
+
+  void setCurrentChordText(String chordText) {
+    _currentChordText = chordText;
+    _currentRomanNumeral = chordText; // Keep backward compatibility
+    if (_selectedLabel != null && _selectedLabel is RomanNumeralLabel) {
+      (_selectedLabel as RomanNumeralLabel).romanNumeral = chordText;
+    }
+    notifyListeners();
+  }
+
+  void addRomanNumeralLabel(Offset position) {
+    if (!_isLabelMode) return;
+    
+    final label = RomanNumeralLabel(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      position: position,
+      romanNumeral: _currentChordText,
+      size: _labelSize,
+      color: _labelColor,
+    );
+    
+    // Deselect all labels
+    for (final l in _labels) {
+      l.isSelected = false;
+    }
+    
+    _labels.add(label);
+    _selectedLabel = label;
+    label.isSelected = true;
+    notifyListeners();
+  }
+
+  // Generic label methods
+  void setLabelType(String type) {
+    _currentLabelType = type;
+    notifyListeners();
+  }
+
+  void selectGenericLabel(Label label) {
+    // Deselect all labels
+    for (final l in _labels) {
+      l.isSelected = false;
+    }
+    // Select the tapped label
+    _selectedLabel = label;
+    label.isSelected = true;
+    notifyListeners();
+  }
+
+  void moveGenericLabel(Label label, Offset newPosition) {
+    label.position = newPosition;
     notifyListeners();
   }
 

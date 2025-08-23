@@ -74,6 +74,8 @@ class ImagePainter extends StatefulWidget {
     this.onUndo,
     this.onClear,
     this.customMenuButtons,
+    this.romanNumeralControlsWidget,
+    this.extensionLabelControlsWidget,
   }) : super(key: key);
 
   ///Constructor for loading image from network url.
@@ -103,6 +105,8 @@ class ImagePainter extends StatefulWidget {
     VoidCallback? onUndo,
     VoidCallback? onClear,
     List<MenuButton>? customMenuButtons,
+    Widget? romanNumeralControlsWidget,
+    Widget? extensionLabelControlsWidget,
   }) {
     return ImagePainter._(
       key: key,
@@ -130,6 +134,8 @@ class ImagePainter extends StatefulWidget {
       onUndo: onUndo,
       onClear: onClear,
       customMenuButtons: customMenuButtons,
+      romanNumeralControlsWidget: romanNumeralControlsWidget,
+      extensionLabelControlsWidget: extensionLabelControlsWidget,
     );
   }
 
@@ -160,6 +166,8 @@ class ImagePainter extends StatefulWidget {
     VoidCallback? onUndo,
     VoidCallback? onClear,
     List<MenuButton>? customMenuButtons,
+    Widget? romanNumeralControlsWidget,
+    Widget? extensionLabelControlsWidget,
   }) {
     return ImagePainter._(
       controller: controller,
@@ -187,6 +195,8 @@ class ImagePainter extends StatefulWidget {
       onUndo: onUndo,
       onClear: onClear,
       customMenuButtons: customMenuButtons,
+      romanNumeralControlsWidget: romanNumeralControlsWidget,
+      extensionLabelControlsWidget: extensionLabelControlsWidget,
     );
   }
 
@@ -217,6 +227,8 @@ class ImagePainter extends StatefulWidget {
     VoidCallback? onUndo,
     VoidCallback? onClear,
     List<MenuButton>? customMenuButtons,
+    Widget? romanNumeralControlsWidget,
+    Widget? extensionLabelControlsWidget,
   }) {
     return ImagePainter._(
       controller: controller,
@@ -244,6 +256,8 @@ class ImagePainter extends StatefulWidget {
       onUndo: onUndo,
       onClear: onClear,
       customMenuButtons: customMenuButtons,
+      romanNumeralControlsWidget: romanNumeralControlsWidget,
+      extensionLabelControlsWidget: extensionLabelControlsWidget,
     );
   }
 
@@ -274,6 +288,8 @@ class ImagePainter extends StatefulWidget {
     VoidCallback? onUndo,
     VoidCallback? onClear,
     List<MenuButton>? customMenuButtons,
+    Widget? romanNumeralControlsWidget,
+    Widget? extensionLabelControlsWidget,
   }) {
     return ImagePainter._(
       controller: controller,
@@ -301,6 +317,8 @@ class ImagePainter extends StatefulWidget {
       onUndo: onUndo,
       onClear: onClear,
       customMenuButtons: customMenuButtons,
+      romanNumeralControlsWidget: romanNumeralControlsWidget,
+      extensionLabelControlsWidget: extensionLabelControlsWidget,
     );
   }
 
@@ -329,6 +347,8 @@ class ImagePainter extends StatefulWidget {
     VoidCallback? onUndo,
     VoidCallback? onClear,
     List<MenuButton>? customMenuButtons,
+    Widget? romanNumeralControlsWidget,
+    Widget? extensionLabelControlsWidget,
   }) {
     return ImagePainter._(
       controller: controller,
@@ -356,6 +376,8 @@ class ImagePainter extends StatefulWidget {
       onUndo: onUndo,
       onClear: onClear,
       customMenuButtons: customMenuButtons,
+      romanNumeralControlsWidget: romanNumeralControlsWidget,
+      extensionLabelControlsWidget: extensionLabelControlsWidget,
     );
   }
 
@@ -438,6 +460,12 @@ class ImagePainter extends StatefulWidget {
 
   final List<MenuButton>? customMenuButtons;
 
+  ///Custom widget for roman numeral label controls
+  final Widget? romanNumeralControlsWidget;
+
+  ///Custom widget for extension label controls  
+  final Widget? extensionLabelControlsWidget;
+
   @override
   ImagePainterState createState() => ImagePainterState();
 }
@@ -456,7 +484,7 @@ class ImagePainterState extends State<ImagePainter> {
   
   // Label interaction state
   bool _isDraggingLabel = false;
-  ExtensionLabel? _draggedLabel;
+  Label? _draggedLabel;
   bool _showAllColors = false;
   int _currentPointerCount = 0;
   @override
@@ -597,8 +625,8 @@ class ImagePainterState extends State<ImagePainter> {
             children: [
               if (widget.controlsAtTop && widget.showControls) _buildTopControlsRow(),
               Expanded(
-                child: Center(
-                  child: AnimatedBuilder(
+                child:
+                AnimatedBuilder(
                     animation: _controller,
                     builder: (context, child) {
                       return InteractiveViewer(
@@ -611,14 +639,17 @@ class ImagePainterState extends State<ImagePainter> {
                         onInteractionStart: _scaleStartGesture,
                         onInteractionUpdate: _scaleUpdateGesture,
                         onInteractionEnd: _scaleEndGesture,
-                        child: AspectRatio(
-                          aspectRatio: imageSize.width / imageSize.height,
-                          child: CustomPaint(
-                            size: imageSize,
-                            willChange: true,
-                            isComplex: true,
-                            painter: DrawImage(
-                              controller: _controller,
+                        child: Container(
+                          width: double.infinity,
+                          child: AspectRatio(
+                            aspectRatio: imageSize.width / imageSize.height,
+                            child: CustomPaint(
+                              size: imageSize,
+                              willChange: true,
+                              isComplex: true,
+                              painter: DrawImage(
+                                controller: _controller,
+                              ),
                             ),
                           ),
                         ),
@@ -626,7 +657,6 @@ class ImagePainterState extends State<ImagePainter> {
                     },
                   ),
                 ),
-              ),
               SizedBox(height: MediaQuery.of(context).padding.bottom)
             ],
           ),
@@ -702,7 +732,7 @@ class ImagePainterState extends State<ImagePainter> {
     });
     
     // Don't handle gestures if multi-touch (panning/zooming) or not in active drawing/label modes
-    if (onStart.pointerCount > 1 || (_currentMenuLevel.value != 'drawing' && _currentMenuLevel.value != 'labels')) {
+    if (onStart.pointerCount > 1 || (_currentMenuLevel.value != 'drawing' && _currentMenuLevel.value != 'extension_labels' && _currentMenuLevel.value != 'roman_labels')) {
       return;
     }
     
@@ -714,9 +744,9 @@ class ImagePainterState extends State<ImagePainter> {
     _draggedLabel = null;
     
     if (!widget.isSignature) {
-      // Handle label mode
-      if (_controller.isLabelMode && _currentMenuLevel.value == 'labels') {
-        // Check if tapping on existing label first
+      // Handle extension label mode
+      if (_controller.isLabelMode && _currentMenuLevel.value == 'extension_labels') {
+        // Check if tapping on existing extension label first
         ExtensionLabel? tappedLabel;
         for (final label in _controller.extensionLabels) {
           // Check if tap is within square label bounds
@@ -733,11 +763,34 @@ class ImagePainterState extends State<ImagePainter> {
         
         if (tappedLabel != null) {
           // Select the tapped label and prepare for potential drag
-          _controller.selectLabel(tappedLabel);
+          _controller.selectGenericLabel(tappedLabel);
           _draggedLabel = tappedLabel;
         } else {
-          // Add new label at tap position
+          // Add new extension label at tap position
           _controller.addExtensionLabel(_imageOffset);
+        }
+      } else if (_controller.isLabelMode && _currentMenuLevel.value == 'roman_labels') {
+        // Handle Roman numeral label tapping/creation
+        Label? tappedLabel;
+        for (final label in _controller.labels) {
+          final labelBounds = Rect.fromCenter(
+            center: label.position,
+            width: label.size,
+            height: label.size,
+          );
+          if (labelBounds.contains(_imageOffset)) {
+            tappedLabel = label;
+            break;
+          }
+        }
+        
+        if (tappedLabel != null) {
+          // Select the tapped label and prepare for potential drag
+          _controller.selectGenericLabel(tappedLabel);
+          _draggedLabel = tappedLabel;
+        } else {
+          // Add new Roman numeral label at tap position
+          _controller.addRomanNumeralLabel(_imageOffset);
         }
       } else if (_currentMenuLevel.value == 'drawing') {
         // Check if tapping on label in drawing mode (to prevent drawing on labels)
@@ -761,14 +814,14 @@ class ImagePainterState extends State<ImagePainter> {
   ///Fires while user is interacting with the screen to record painting.
   void _scaleUpdateGesture(ScaleUpdateDetails onUpdate) {
     // Don't handle update if multi-touch or not in active drawing/label modes
-    if (_currentPointerCount > 1 || (_currentMenuLevel.value != 'drawing' && _currentMenuLevel.value != 'labels')) {
+    if (_currentPointerCount > 1 || (_currentMenuLevel.value != 'drawing' && _currentMenuLevel.value != 'extension_labels' && _currentMenuLevel.value != 'roman_labels')) {
       return;
     }
     final _zoomAdjustedOffset =
         _transformationController.toScene(onUpdate.localFocalPoint);
     final _imageOffset = _convertToImageCoordinates(_zoomAdjustedOffset);
     
-    if (_controller.isLabelMode && _currentMenuLevel.value == 'labels' && _draggedLabel != null) {
+    if (_controller.isLabelMode && (_currentMenuLevel.value == 'extension_labels' || _currentMenuLevel.value == 'roman_labels') && _draggedLabel != null) {
       // Only start dragging if we've moved enough to indicate intent to drag
       if (!_isDraggingLabel) {
         final startOffset = _draggedLabel!.position;
@@ -782,7 +835,7 @@ class ImagePainterState extends State<ImagePainter> {
       
       if (_isDraggingLabel) {
         // Move the dragged label
-        _controller.moveLabel(_draggedLabel!, _imageOffset);
+        _controller.moveGenericLabel(_draggedLabel!, _imageOffset);
       }
     } else if (_currentMenuLevel.value == 'drawing') {
       // Check if dragging on any label (to prevent drawing on labels)
@@ -1110,11 +1163,17 @@ class ImagePainterState extends State<ImagePainter> {
               // Label type selection level
               ..._buildLabelTypeButtons(),
             ] else if (menuLevel == 'extension_labels') ...[
-              // Extension label controls level
-              ..._buildLabelControlButtons(),
+              // Extension label controls level - use custom widget if provided
+              if (widget.extensionLabelControlsWidget != null) 
+                widget.extensionLabelControlsWidget!
+              else 
+                ..._buildLabelControlButtons(),
             ] else if (menuLevel == 'roman_labels') ...[
-              // Roman numeral label controls level
-              ..._buildRomanNumeralControlButtons(),
+              // Roman numeral label controls level - use custom widget if provided
+              if (widget.romanNumeralControlsWidget != null) 
+                widget.romanNumeralControlsWidget!
+              else 
+                ..._buildRomanNumeralControlButtons(),
             ] else if (menuLevel.startsWith('custom_')) ...[
               // Custom button sub-menu
               ..._buildCustomButtonSubMenu(menuLevel),
@@ -1590,18 +1649,84 @@ class ImagePainterState extends State<ImagePainter> {
     ];
   }
 
-  /// Build Roman numeral label control buttons (placeholder for now)
+  /// Build Roman numeral label control buttons
   List<Widget> _buildRomanNumeralControlButtons() {
     return [
+      // Text input for chord text
       Container(
-        padding: const EdgeInsets.all(16),
-        child: const Text(
-          'Roman Numeral Labels\n(Coming Soon)',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey,
+        margin: const EdgeInsets.only(bottom: 12),
+        height: 40,
+        child: TextField(
+          controller: TextEditingController(text: _controller.currentChordText),
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
           ),
+          decoration: InputDecoration(
+            hintText: 'Chord (e.g., I, ii, V7, viø7)',
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey.shade400),
+            ),
+            filled: true,
+            fillColor: Colors.grey[100],
+          ),
+          onChanged: (value) => _controller.setCurrentChordText(value),
+        ),
+      ),
+
+      // Row 1: Quality modifiers and Delete button
+      Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              _buildModifierButton('7th', () => _controller.setCurrentChordText(_addSeventh(_controller.currentChordText))),
+              const SizedBox(width: 6),
+              _buildModifierButton('Maj', () => _controller.setCurrentChordText(_applyQuality(_getBaseNumeral(_controller.currentChordText), 'Maj'))),
+              const SizedBox(width: 6),
+              _buildModifierButton('Min', () => _controller.setCurrentChordText(_applyQuality(_getBaseNumeral(_controller.currentChordText), 'Min'))),
+              const SizedBox(width: 6),
+              _buildModifierButton('ø', () => _controller.setCurrentChordText(_applyQuality(_getBaseNumeral(_controller.currentChordText), 'ø'))),
+              const SizedBox(width: 6),
+              _buildModifierButton('°', () => _controller.setCurrentChordText(_applyQuality(_getBaseNumeral(_controller.currentChordText), 'o'))),
+              const SizedBox(width: 12),
+              // Delete button
+              if (_controller.selectedLabel != null && _controller.selectedLabel is RomanNumeralLabel)
+                _buildClayButton(
+                  icon: const Icon(Icons.delete, color: Colors.red, size: 18),
+                  onPressed: () => _controller.deleteSelectedLabel(),
+                  tooltip: 'Delete Label',
+                ),
+            ],
+          ),
+        ),
+      ),
+
+      // Row 2: Roman numeral buttons
+      Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        child: Column(
+          children: [
+            // First row: I-VI
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                for (final numeral in ['I', 'II', 'III', 'IV', 'V', 'VI'])
+                  _buildRomanNumeralButton(numeral),
+              ],
+            ),
+            const SizedBox(height: 6),
+            // Second row: VII (centered)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildRomanNumeralButton('VII'),
+              ],
+            ),
+          ],
         ),
       ),
     ];
@@ -1855,5 +1980,97 @@ class ImagePainterState extends State<ImagePainter> {
         ),
       ),
     );
+  }
+
+  /// Helper methods for Roman numeral chord editing
+  String _getBaseNumeral(String chord) {
+    String text = chord;
+    // Remove quality indicators and seventh
+    text = text.replaceAll('7', '');
+    text = text.replaceAll('ø', '');
+    text = text.replaceAll('°', '');
+    
+    // Convert to uppercase to get base
+    String base = text.toUpperCase();
+    return base.isNotEmpty ? base : 'I';
+  }
+
+  String _applyQuality(String base, String quality) {
+    switch (quality) {
+      case 'Maj':
+        return base.toUpperCase();
+      case 'Min':
+        return base.toLowerCase();
+      case 'ø':
+        return '${base.toLowerCase()}ø';
+      case 'o':
+        return '${base.toLowerCase()}°';
+      default:
+        return base.toUpperCase();
+    }
+  }
+
+  String _addSeventh(String chord) {
+    if (chord.contains('7')) {
+      return chord.replaceAll('7', ''); // Remove if already has 7th
+    } else {
+      return '${chord}7'; // Add 7th
+    }
+  }
+
+  Widget _buildModifierButton(String label, VoidCallback onPressed) {
+    return Container(
+      height: 32,
+      child: FloatingActionButton(
+        mini: true,
+        onPressed: onPressed,
+        backgroundColor: Colors.grey[200],
+        foregroundColor: Colors.grey[700],
+        elevation: 4,
+        child: Text(
+          label,
+          style: const TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRomanNumeralButton(String numeral) {
+    final isCurrentBase = _getBaseNumeral(_controller.currentChordText).toUpperCase() == numeral;
+    
+    return Container(
+      width: 40,
+      height: 32,
+      child: FloatingActionButton(
+        mini: true,
+        onPressed: () {
+          final currentQuality = _getCurrentQuality(_controller.currentChordText);
+          final hasSeventh = _controller.currentChordText.contains('7');
+          String newChord = _applyQuality(numeral, currentQuality);
+          if (hasSeventh) newChord += '7';
+          _controller.setCurrentChordText(newChord);
+        },
+        backgroundColor: isCurrentBase ? Colors.blue[100] : Colors.grey[200],
+        foregroundColor: isCurrentBase ? Colors.blue[800] : Colors.grey[700],
+        elevation: isCurrentBase ? 2 : 4,
+        child: Text(
+          numeral,
+          style: const TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _getCurrentQuality(String chord) {
+    if (chord.contains('ø')) return 'ø';
+    if (chord.contains('°')) return 'o';
+    if (chord == chord.toLowerCase() && chord.isNotEmpty) return 'Min';
+    return 'Maj';
   }
 }

@@ -13,9 +13,13 @@ import 'package:pdf_to_image_converter/pdf_to_image_converter.dart';
 import 'package:image_painter/image_painter.dart';
 
 // Import new label system
-import 'models/label_base.dart';
+import 'models/label_base.dart' as base_models;
 import 'models/extension_label.dart' as models;
-import 'services/label_persistence_service.dart';
+import 'models/roman_numeral_label.dart' as roman_models;
+
+// Import control widgets
+import 'widgets/label_controls/roman_numeral_label_controls.dart';
+import 'widgets/label_controls/extension_label_controls.dart';
 
 /// PDF viewer widget with drawing functionality using PDF-to-image conversion
 class PDFViewer extends StatefulWidget {
@@ -62,8 +66,8 @@ class _PDFViewerState extends State<PDFViewer>
     // Listen for drawing changes to auto-save
     _imagePainterController.addListener(_onDrawingChanged);
     
-    // Listen for extension label changes to auto-save
-    _imagePainterController.addListener(_onExtensionLabelChanged);
+    // Listen for label changes to auto-save
+    _imagePainterController.addListener(_onLabelChanged);
     
     _loadSavedPDF();
   }
@@ -131,7 +135,7 @@ class _PDFViewerState extends State<PDFViewer>
       
       // Load drawings for current page
       await _loadDrawingDataForCurrentPage();
-      await _loadExtensionLabels();
+      await _loadLabels();
       
     } catch (e) {
       debugPrint('Error loading PDF: $e');
@@ -232,7 +236,7 @@ class _PDFViewerState extends State<PDFViewer>
       _currentPage++;
       await _loadCurrentPageImage();
       await _loadDrawingDataForCurrentPage();
-      await _loadExtensionLabels();
+      await _loadLabels();
       setState(() {});
     }
   }
@@ -245,7 +249,7 @@ class _PDFViewerState extends State<PDFViewer>
       _currentPage--;
       await _loadCurrentPageImage();
       await _loadDrawingDataForCurrentPage();
-      await _loadExtensionLabels();
+      await _loadLabels();
       setState(() {});
     }
   }
@@ -299,37 +303,54 @@ class _PDFViewerState extends State<PDFViewer>
     if (_pdfPath == null || !_isReady) return;
     
     try {
-      final labelsData = _imagePainterController.extensionLabels.map((label) => label.toJson()).toList();
-      final file = await _getExtensionLabelsFile(_currentPage);
+      final labelsData = _imagePainterController.labels.map((label) => label.toJson()).toList();
+      final file = await _getLabelsFile(_currentPage);
       await file.writeAsString(jsonEncode(labelsData));
-      debugPrint('Extension Labels: Saved ${_imagePainterController.extensionLabels.length} labels for page $_currentPage');
+      debugPrint('Labels: Saved ${_imagePainterController.labels.length} labels for page $_currentPage');
     } catch (e) {
-      debugPrint('Error saving extension labels: $e');
+      debugPrint('Error saving labels: $e');
     }
   }
 
-  /// Load extension labels for current page
-  Future<void> _loadExtensionLabels() async {
+  /// Load labels for current page
+  Future<void> _loadLabels() async {
     if (_pdfPath == null || !_isReady) return;
     
     try {
-      final file = await _getExtensionLabelsFile(_currentPage);
+      final file = await _getLabelsFile(_currentPage);
       if (await file.exists()) {
         final jsonString = await file.readAsString();
         final labelsData = jsonDecode(jsonString) as List<dynamic>;
         
-        final labels = <ExtensionLabel>[];
+        final extensionLabels = <ExtensionLabel>[];
+        final romanLabels = <RomanNumeralLabel>[];
         for (final labelData in labelsData) {
-          labels.add(ExtensionLabel.fromJson(labelData as Map<String, dynamic>));
+          final Map<String, dynamic> data = labelData as Map<String, dynamic>;
+          final labelType = data['labelType'] as String;
+          
+          if (labelType == 'extension') {
+            extensionLabels.add(ExtensionLabel.fromJson(data));
+          } else if (labelType == 'romanNumeral') {
+            romanLabels.add(RomanNumeralLabel.fromJson(data));
+          }
         }
         
-        _imagePainterController.setExtensionLabels(labels);
-        debugPrint('Extension Labels: Loaded ${labels.length} labels for page $_currentPage');
+        // Clear existing labels
+        _imagePainterController.clearExtensionLabels();
+        
+        // Add loaded labels
+        final allLabels = <Label>[];
+        allLabels.addAll(extensionLabels);
+        allLabels.addAll(romanLabels);
+        for (final label in allLabels) {
+          _imagePainterController.labels.add(label);
+        }
+        debugPrint('Labels: Loaded ${allLabels.length} labels for page $_currentPage');
       } else {
         _imagePainterController.clearExtensionLabels();
       }
     } catch (e) {
-      debugPrint('Error loading extension labels: $e');
+      debugPrint('Error loading labels: $e');
       _imagePainterController.clearExtensionLabels();
     }
   }
@@ -427,6 +448,12 @@ class _PDFViewerState extends State<PDFViewer>
                     selectedColor: Theme.of(context).colorScheme.primary,
                     unselectedColor: Theme.of(context).colorScheme.onSurface,
                     optionColor: Theme.of(context).colorScheme.onSurface,
+                    romanNumeralControlsWidget: RomanNumeralLabelControls(
+                      controller: _imagePainterController,
+                    ),
+                    extensionLabelControlsWidget: ExtensionLabelControls(
+                      controller: _imagePainterController,
+                    ),
                   ),
           ),
         ),
@@ -586,7 +613,7 @@ class _PDFViewerState extends State<PDFViewer>
           await _converter.closePdf();
         }
         _imagePainterController.removeListener(_onDrawingChanged);
-        _imagePainterController.removeListener(_onExtensionLabelChanged);
+        _imagePainterController.removeListener(_onLabelChanged);
         _imagePainterController.dispose();
       } catch (error) {
         debugPrint('Error during PDF viewer disposal: $error');
@@ -609,8 +636,8 @@ class _PDFViewerState extends State<PDFViewer>
     return File('${directory.path}/${safeFilename}_pdf_path.txt');
   }
 
-  /// Get file for storing extension labels for a page
-  Future<File> _getExtensionLabelsFile(int page) async {
+  /// Get file for storing labels for a page
+  Future<File> _getLabelsFile(int page) async {
     final directory = await getApplicationDocumentsDirectory();
     final safeFilename = _getSafeFilename(widget.songAssetPath);
     return File('${directory.path}/${safeFilename}_pdf_page_${page}_labels.json');
@@ -644,8 +671,8 @@ class _PDFViewerState extends State<PDFViewer>
     }
   }
 
-  /// Called when extension labels change to auto-save
-  void _onExtensionLabelChanged() {
+  /// Called when labels change to auto-save
+  void _onLabelChanged() {
     // Debounce auto-save to avoid excessive saves
     if (_isReady && _pdfPath != null) {
       // Use a small delay to batch rapid changes
