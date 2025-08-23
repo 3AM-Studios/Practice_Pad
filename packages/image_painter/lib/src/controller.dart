@@ -6,6 +6,44 @@ import 'package:flutter/material.dart';
 import '../image_painter.dart';
 import '_signature_painter.dart';
 
+/// Extension label model for PDF annotations
+class ExtensionLabel {
+  final String id;
+  Offset position;
+  String number;
+  bool isSelected;
+  double size;
+  Color color;
+  
+  ExtensionLabel({
+    required this.id,
+    required this.position,
+    required this.number,
+    this.isSelected = false,
+    this.size = 25.0,
+    this.color = const Color(0xFF2196F3),
+  });
+  
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'position': {'dx': position.dx, 'dy': position.dy},
+    'number': number,
+    'size': size,
+    'color': color.value,
+  };
+  
+  factory ExtensionLabel.fromJson(Map<String, dynamic> json) => ExtensionLabel(
+    id: json['id'] as String,
+    position: Offset(
+      (json['position']['dx'] as num).toDouble(),
+      (json['position']['dy'] as num).toDouble(),
+    ),
+    number: json['number'] as String,
+    size: (json['size'] as num?)?.toDouble() ?? 25.0,
+    color: Color((json['color'] as int?) ?? 0xFF2196F3),
+  );
+}
+
 class ImagePainterController extends ChangeNotifier {
   late double _strokeWidth;
   late Color _color;
@@ -18,12 +56,21 @@ class ImagePainterController extends ChangeNotifier {
   final List<Offset?> _offsets = [];
 
   final List<PaintInfo> _paintHistory = [];
+  final List<ExtensionLabel> _extensionLabels = [];
 
   Offset? _start, _end;
 
   int _strokeMultiplier = 1;
   bool _paintInProgress = false;
   bool _isSignature = false;
+  
+  // Extension label state
+  ExtensionLabel? _selectedLabel;
+  bool _isLabelMode = false;
+  String _currentAccidental = '♮'; // Default to natural symbol
+  String _currentNumber = '1';
+  double _labelSize = 25.0; // Default label size
+  Color _labelColor = const Color(0xFF2196F3); // Default blue color
 
   ui.Image? get image => _image;
 
@@ -57,6 +104,16 @@ class ImagePainterController extends ChangeNotifier {
       _paintHistory
           .where((element) => element.mode == PaintMode.text)
           .isNotEmpty;
+
+  // Extension label getters
+  List<ExtensionLabel> get extensionLabels => _extensionLabels;
+  ExtensionLabel? get selectedLabel => _selectedLabel;
+  bool get isLabelMode => _isLabelMode;
+  String get currentAccidental => _currentAccidental;
+  String get currentNumber => _currentNumber;
+  String get currentLabelNumber => _currentAccidental == '♮' ? _currentNumber : '$_currentAccidental$_currentNumber';
+  double get labelSize => _labelSize;
+  Color get labelColor => _labelColor;
 
   ImagePainterController({
     double strokeWidth = 4.0,
@@ -204,6 +261,133 @@ class ImagePainterController extends ChangeNotifier {
     final byteData =
         await _convertedImage.toByteData(format: ui.ImageByteFormat.png);
     return byteData?.buffer.asUint8List();
+  }
+
+  // Extension label methods
+  void setLabelMode(bool isLabelMode) {
+    _isLabelMode = isLabelMode;
+    if (!isLabelMode) {
+      _selectedLabel = null;
+      for (final label in _extensionLabels) {
+        label.isSelected = false;
+      }
+    }
+    notifyListeners();
+  }
+
+  void setCurrentAccidental(String accidental) {
+    _currentAccidental = accidental;
+    if (_selectedLabel != null) {
+      _selectedLabel!.number = currentLabelNumber;
+    }
+    notifyListeners();
+  }
+
+  void setCurrentNumber(String number) {
+    _currentNumber = number;
+    if (_selectedLabel != null) {
+      _selectedLabel!.number = currentLabelNumber;
+    }
+    notifyListeners();
+  }
+
+  void setCurrentLabelNumber(String number) {
+    // This is for backward compatibility - try to parse accidental + number
+    if (number.startsWith('#') || number.startsWith('b')) {
+      _currentAccidental = number.substring(0, 1);
+      _currentNumber = number.substring(1);
+    } else if (number == '♮' || number == 'b' || number == '#') {
+      _currentAccidental = number;
+    } else {
+      _currentNumber = number;
+    }
+    if (_selectedLabel != null) {
+      _selectedLabel!.number = currentLabelNumber;
+    }
+    notifyListeners();
+  }
+
+  void setLabelSize(double size) {
+    _labelSize = size.clamp(10.0, 50.0); // Clamp between 10 and 50 pixels
+    if (_selectedLabel != null) {
+      _selectedLabel!.size = _labelSize;
+    }
+    notifyListeners();
+  }
+
+  void increaseLabelSize() {
+    setLabelSize(_labelSize + 2.0);
+  }
+
+  void decreaseLabelSize() {
+    setLabelSize(_labelSize - 2.0);
+  }
+
+  void setLabelColor(Color color) {
+    _labelColor = color;
+    if (_selectedLabel != null) {
+      _selectedLabel!.color = _labelColor;
+    }
+    notifyListeners();
+  }
+
+  void addExtensionLabel(Offset position) {
+    if (!_isLabelMode) return;
+    
+    final label = ExtensionLabel(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      position: position,
+      number: currentLabelNumber,
+      size: _labelSize,
+      color: _labelColor,
+    );
+    
+    // Deselect all labels
+    for (final l in _extensionLabels) {
+      l.isSelected = false;
+    }
+    
+    _extensionLabels.add(label);
+    _selectedLabel = label;
+    label.isSelected = true;
+    notifyListeners();
+  }
+
+  void selectLabel(ExtensionLabel label) {
+    // Deselect all labels
+    for (final l in _extensionLabels) {
+      l.isSelected = false;
+    }
+    // Select the tapped label
+    _selectedLabel = label;
+    label.isSelected = true;
+    notifyListeners();
+  }
+
+  void moveLabel(ExtensionLabel label, Offset newPosition) {
+    label.position = newPosition;
+    notifyListeners();
+  }
+
+  void deleteSelectedLabel() {
+    if (_selectedLabel != null) {
+      _extensionLabels.remove(_selectedLabel);
+      _selectedLabel = null;
+      notifyListeners();
+    }
+  }
+
+  void clearExtensionLabels() {
+    _extensionLabels.clear();
+    _selectedLabel = null;
+    notifyListeners();
+  }
+
+  void setExtensionLabels(List<ExtensionLabel> labels) {
+    _extensionLabels.clear();
+    _extensionLabels.addAll(labels);
+    _selectedLabel = null;
+    notifyListeners();
   }
 
   Future<Uint8List?> exportImage() {

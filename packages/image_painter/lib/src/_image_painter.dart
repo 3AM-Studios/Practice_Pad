@@ -146,6 +146,11 @@ class DrawImage extends CustomPainter {
       }
     }
 
+    ///Draws extension labels on the canvas.
+    for (final label in _controller.extensionLabels) {
+      _drawExtensionLabel(canvas, label);
+    }
+
     ///Draws all the completed actions of painting on the canvas.
   }
 
@@ -167,6 +172,89 @@ class DrawImage extends CustomPainter {
     canvas.rotate((end - start).direction);
     canvas.drawPath(path, arrowPainter);
     canvas.restore();
+  }
+
+  ///Draws extension label on the canvas.
+  void _drawExtensionLabel(Canvas canvas, ExtensionLabel label) {
+    final size = label.size;
+    
+    // Create square rectangle centered on label position
+    final labelRect = Rect.fromCenter(
+      center: label.position,
+      width: size,
+      height: size,
+    );
+    
+    // Draw shadow first (behind the square)
+    if (!label.isSelected) {
+      final shadowRect = Rect.fromCenter(
+        center: Offset(label.position.dx + 2, label.position.dy + 2),
+        width: size,
+        height: size,
+      );
+      final shadowPaint = Paint()
+        ..color = const Color(0xFF000000).withOpacity(0.2)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(shadowRect, const Radius.circular(4.0)),
+        shadowPaint,
+      );
+    }
+    
+    // Draw label background square
+    final backgroundPaint = Paint()
+      ..color = label.color.withOpacity(label.color.opacity == 0 ? 0.0 : 0.9) // Use label color always, respect transparency
+      ..style = PaintingStyle.fill;
+    
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(labelRect, const Radius.circular(4.0)),
+      backgroundPaint,
+    );
+    
+    // Draw label border
+    final borderPaint = Paint()
+      ..color = label.isSelected 
+          ? const Color(0xFF000000) // Black border when selected for visibility
+          : (label.color.opacity == 0 
+              ? const Color(0xFF757575) // Grey border for transparent labels
+              : label.color) // Use label color border when not selected
+      ..strokeWidth = label.isSelected ? 3.0 : 2.0
+      ..style = PaintingStyle.stroke;
+    
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(labelRect, const Radius.circular(4.0)),
+      borderPaint,
+    );
+    
+    // Draw label text
+    final isTransparent = label.color.opacity == 0;
+    final textSpan = TextSpan(
+      text: label.number,
+      style: TextStyle(
+        color: label.isSelected 
+            ? const Color(0xFFFFFFFF) // White text when selected
+            : (isTransparent 
+                ? const Color(0xFF212121) // Dark text for transparent labels
+                : const Color(0xFFFFFFFF)), // White text for colored labels
+        fontSize: (size * 0.6).clamp(10.0, 20.0), // Scale font with label size
+        fontWeight: FontWeight.bold,
+      ),
+    );
+    
+    final textPainter = TextPainter(
+      text: textSpan,
+      textAlign: TextAlign.center,
+      textDirection: TextDirection.ltr,
+    );
+    
+    textPainter.layout(minWidth: 0, maxWidth: size);
+    
+    final textOffset = Offset(
+      label.position.dx - textPainter.width / 2,
+      label.position.dy - textPainter.height / 2,
+    );
+    
+    textPainter.paint(canvas, textOffset);
   }
 
   ///Draws dashed path.

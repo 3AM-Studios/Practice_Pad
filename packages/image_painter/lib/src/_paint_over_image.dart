@@ -453,6 +453,10 @@ class ImagePainterState extends State<ImagePainter> {
 
   int _strokeMultiplier = 1;
   late TextDelegate textDelegate;
+  
+  // Label interaction state
+  bool _isDraggingLabel = false;
+  ExtensionLabel? _draggedLabel;
   @override
   void initState() {
     super.initState();
@@ -599,7 +603,7 @@ class ImagePainterState extends State<ImagePainter> {
                         transformationController: _transformationController,
                         maxScale: 5.0,
                         minScale: 0.8,
-                        panEnabled: _controller.mode == PaintMode.none,
+                        panEnabled: (_currentMenuLevel.value == 'closed' || _currentMenuLevel.value == 'main') && !_isDraggingLabel,
                         scaleEnabled: widget.isScalable!,
                         boundaryMargin: const EdgeInsets.all(20),
                         onInteractionStart: _scaleStartGesture,
@@ -690,12 +694,60 @@ class ImagePainterState extends State<ImagePainter> {
   }
 
   _scaleStartGesture(ScaleStartDetails onStart) {
+    // Don't handle gestures if multi-touch (panning/zooming) or not in active drawing/label modes
+    if (onStart.pointerCount > 1 || (_currentMenuLevel.value != 'drawing' && _currentMenuLevel.value != 'labels')) {
+      return;
+    }
+    
     final _zoomAdjustedOffset =
         _transformationController.toScene(onStart.localFocalPoint);
     final _imageOffset = _convertToImageCoordinates(_zoomAdjustedOffset);
+    
+    _isDraggingLabel = false;
+    _draggedLabel = null;
+    
     if (!widget.isSignature) {
-      _controller.setStart(_imageOffset);
-      _controller.addOffsets(_imageOffset);
+      // Handle label mode
+      if (_controller.isLabelMode && _currentMenuLevel.value == 'labels') {
+        // Check if tapping on existing label first
+        ExtensionLabel? tappedLabel;
+        for (final label in _controller.extensionLabels) {
+          // Check if tap is within square label bounds
+          final labelBounds = Rect.fromCenter(
+            center: label.position,
+            width: label.size,
+            height: label.size,
+          );
+          if (labelBounds.contains(_imageOffset)) {
+            tappedLabel = label;
+            break;
+          }
+        }
+        
+        if (tappedLabel != null) {
+          // Select the tapped label and prepare for potential drag
+          _controller.selectLabel(tappedLabel);
+          _draggedLabel = tappedLabel;
+        } else {
+          // Add new label at tap position
+          _controller.addExtensionLabel(_imageOffset);
+        }
+      } else if (_currentMenuLevel.value == 'drawing') {
+        // Check if tapping on label in drawing mode (to prevent drawing on labels)
+        for (final label in _controller.extensionLabels) {
+          final labelBounds = Rect.fromCenter(
+            center: label.position,
+            width: label.size,
+            height: label.size,
+          );
+          if (labelBounds.contains(_imageOffset)) {
+            return; // Don't start drawing if tapping on a label
+          }
+        }
+        // Normal drawing mode - only when drawing menu is open
+        _controller.setStart(_imageOffset);
+        _controller.addOffsets(_imageOffset);
+      }
     }
   }
 
@@ -704,23 +756,65 @@ class ImagePainterState extends State<ImagePainter> {
     final _zoomAdjustedOffset =
         _transformationController.toScene(onUpdate.localFocalPoint);
     final _imageOffset = _convertToImageCoordinates(_zoomAdjustedOffset);
-    _controller.setInProgress(true);
-    if (_controller.start == null) {
-      _controller.setStart(_imageOffset);
-    }
-    _controller.setEnd(_imageOffset);
-    if (_controller.mode == PaintMode.freeStyle) {
-      _controller.addOffsets(_imageOffset);
-    }
-    if (_controller.onTextUpdateMode) {
-      _controller.paintHistory
-          .lastWhere((element) => element.mode == PaintMode.text)
-          .offsets = [_imageOffset];
+    
+    if (_controller.isLabelMode && _currentMenuLevel.value == 'labels' && _draggedLabel != null) {
+      // Only start dragging if we've moved enough to indicate intent to drag
+      if (!_isDraggingLabel) {
+        final startOffset = _draggedLabel!.position;
+        final distance = (_imageOffset - startOffset).distance;
+        if (distance > 5.0) { // Threshold to distinguish tap from drag
+          setState(() {
+            _isDraggingLabel = true;
+          });
+        }
+      }
+      
+      if (_isDraggingLabel) {
+        // Move the dragged label
+        _controller.moveLabel(_draggedLabel!, _imageOffset);
+      }
+    } else if (_currentMenuLevel.value == 'drawing') {
+      // Check if dragging on any label (to prevent drawing on labels)
+      bool isDraggingOnLabel = false;
+      for (final label in _controller.extensionLabels) {
+        final labelBounds = Rect.fromCenter(
+          center: label.position,
+          width: label.size,
+          height: label.size,
+        );
+        if (labelBounds.contains(_imageOffset)) {
+          isDraggingOnLabel = true;
+          break;
+        }
+      }
+      
+      if (!isDraggingOnLabel) {
+        // Normal drawing mode - only when drawing menu is open
+        _controller.setInProgress(true);
+        if (_controller.start == null) {
+          _controller.setStart(_imageOffset);
+        }
+        _controller.setEnd(_imageOffset);
+        if (_controller.mode == PaintMode.freeStyle) {
+          _controller.addOffsets(_imageOffset);
+        }
+        if (_controller.onTextUpdateMode) {
+          _controller.paintHistory
+              .lastWhere((element) => element.mode == PaintMode.text)
+              .offsets = [_imageOffset];
+        }
+      }
     }
   }
 
   ///Fires when user stops interacting with the screen.
   void _scaleEndGesture(ScaleEndDetails onEnd) {
+    // Reset label dragging state
+    setState(() {
+      _isDraggingLabel = false;
+      _draggedLabel = null;
+    });
+    
     _controller.setInProgress(false);
     if (_controller.start != null &&
         _controller.end != null &&
@@ -1000,6 +1094,9 @@ class ImagePainterState extends State<ImagePainter> {
             ] else if (menuLevel == 'drawing') ...[
               // Drawing controls level
               ..._buildDrawingControlButtons(),
+            ] else if (menuLevel == 'labels') ...[
+              // Label controls level
+              ..._buildLabelControlButtons(),
             ] else if (menuLevel.startsWith('custom_')) ...[
               // Custom button sub-menu
               ..._buildCustomButtonSubMenu(menuLevel),
@@ -1030,6 +1127,19 @@ class ImagePainterState extends State<ImagePainter> {
             _controller.setMode(PaintMode.freeStyle);
           },
           tooltip: 'Drawing Tools',
+        ),
+      ),
+      // Labels button
+      Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        child: _buildClayButton(
+          icon: const Icon(Icons.label),
+          onPressed: () {
+            _currentMenuLevel.value = 'labels';
+            // Enter label mode
+            _controller.setLabelMode(true);
+          },
+          tooltip: 'Extension Labels',
         ),
       ),
     ];
@@ -1174,6 +1284,292 @@ class ImagePainterState extends State<ImagePainter> {
     ];
   }
 
+  List<Widget> _buildLabelControlButtons() {
+    return [
+      // Accidental buttons row (♮, b, #)
+      Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        child: Column(
+          children: [
+            // Title for accidentals
+            Text(
+              'Accidentals',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[600],
+              ),
+            ),
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildAccidentalButton('♮'),
+                _buildAccidentalButton('b'),
+                _buildAccidentalButton('#'),
+              ],
+            ),
+          ],
+        ),
+      ),
+      
+      // Number pad (3x3 grid)
+      Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        child: Column(
+          children: [
+            // Title for numbers
+            Text(
+              'Numbers',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[600],
+              ),
+            ),
+            const SizedBox(height: 4),
+            // Numbers 1-9 in 3x3 grid
+            for (int row = 0; row < 3; row++)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    for (int col = 0; col < 3; col++)
+                      _buildNumberButton('${row * 3 + col + 1}'),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+      
+      // Size controls
+      Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        child: Column(
+          children: [
+            // Title for size
+            Text(
+              'Size',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[600],
+              ),
+            ),
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildClayButton(
+                  icon: const Icon(Icons.remove, size: 16),
+                  onPressed: () {
+                    _controller.decreaseLabelSize();
+                  },
+                  tooltip: 'Decrease Size',
+                ),
+                AnimatedBuilder(
+                  animation: _controller,
+                  builder: (_, __) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[200],
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        '${_controller.labelSize.round()}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                _buildClayButton(
+                  icon: const Icon(Icons.add, size: 16),
+                  onPressed: () {
+                    _controller.increaseLabelSize();
+                  },
+                  tooltip: 'Increase Size',
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+      
+      // Color picker
+      Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        child: Column(
+          children: [
+            // Title for color
+            Text(
+              'Color',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[600],
+              ),
+            ),
+            const SizedBox(height: 4),
+            // Color buttons row
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildColorButton(const Color(0xFF2196F3)), // Blue
+                _buildColorButton(const Color(0xFF4CAF50)), // Green
+                _buildColorButton(const Color(0xFFFF9800)), // Orange
+              ],
+            ),
+            const SizedBox(height: 4),
+            // Second row of colors
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildColorButton(const Color(0xFFF44336)), // Red
+                _buildColorButton(const Color(0xFF9C27B0)), // Purple
+                _buildColorButton(const Color(0xFFFFFFFF)), // White
+              ],
+            ),
+          ],
+        ),
+      ),
+      
+      // Delete button (if label selected)
+      AnimatedBuilder(
+        animation: _controller,
+        builder: (_, __) {
+          if (_controller.selectedLabel != null) {
+            return Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              child: _buildClayButton(
+                icon: const Icon(Icons.delete, color: Colors.red),
+                onPressed: () {
+                  _controller.deleteSelectedLabel();
+                },
+                tooltip: 'Delete Label',
+              ),
+            );
+          } else {
+            return const SizedBox.shrink();
+          }
+        },
+      ),
+    ];
+  }
+
+  Widget _buildAccidentalButton(String accidental) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (_, __) {
+        final isSelected = _controller.currentAccidental == accidental;
+        return Container(
+          width: 40,
+          height: 40,
+          margin: const EdgeInsets.all(2),
+          child: _buildClayButton(
+            icon: Text(
+              accidental,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: isSelected 
+                    ? Colors.blue
+                    : Colors.grey[700],
+              ),
+            ),
+            onPressed: () {
+              _controller.setCurrentAccidental(accidental);
+            },
+            tooltip: 'Accidental $accidental',
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildNumberButton(String number) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (_, __) {
+        final isSelected = _controller.currentNumber == number;
+        return Container(
+          width: 40,
+          height: 40,
+          margin: const EdgeInsets.all(2),
+          child: _buildClayButton(
+            icon: Text(
+              number,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: isSelected 
+                    ? Colors.blue
+                    : Colors.grey[700],
+              ),
+            ),
+            onPressed: () {
+              _controller.setCurrentNumber(number);
+            },
+            tooltip: 'Number $number',
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildColorButton(Color color) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (_, __) {
+        final isSelected = _controller.labelColor == color;
+        final isTransparent = color.opacity == 0;
+        
+        return Container(
+          width: 40,
+          height: 40,
+          margin: const EdgeInsets.all(2),
+          child: _buildClayButton(
+            icon: Container(
+              width: 24,
+              height: 24,
+              decoration: BoxDecoration(
+                color: isTransparent ? Colors.white : color,
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(
+                  color: isSelected ? Colors.white : Colors.grey,
+                  width: isSelected ? 3 : 1,
+                ),
+                boxShadow: isSelected ? [
+                  const BoxShadow(
+                    color: Colors.black26,
+                    blurRadius: 4,
+                    offset: Offset(0, 2),
+                  ),
+                ] : null,
+              ),
+              child: isTransparent ? const Center(
+                child: Icon(
+                  Icons.clear,
+                  size: 16,
+                  color: Colors.grey,
+                ),
+              ) : null,
+            ),
+            onPressed: () {
+              _controller.setLabelColor(color);
+            },
+            tooltip: isTransparent ? 'Clear' : 'Color',
+          ),
+        );
+      },
+    );
+  }
+
   IconData _getMainButtonIcon(String menuLevel) {
     if (menuLevel.startsWith('custom_')) {
       return Icons.arrow_back;
@@ -1182,6 +1578,8 @@ class ImagePainterState extends State<ImagePainter> {
       case 'main':
         return Icons.close;
       case 'drawing':
+        return Icons.arrow_back;
+      case 'labels':
         return Icons.arrow_back;
       case 'closed':
       default:
@@ -1197,6 +1595,8 @@ class ImagePainterState extends State<ImagePainter> {
       case 'main':
         return 'Close Menu';
       case 'drawing':
+        return 'Back to Main Menu';
+      case 'labels':
         return 'Back to Main Menu';
       case 'closed':
       default:
@@ -1221,6 +1621,11 @@ class ImagePainterState extends State<ImagePainter> {
         _currentMenuLevel.value = 'main';
         // Disable drawing mode when leaving drawing controls
         _controller.setMode(PaintMode.none);
+        break;
+      case 'labels':
+        _currentMenuLevel.value = 'main';
+        // Disable label mode when leaving label controls
+        _controller.setLabelMode(false);
         break;
     }
   }
