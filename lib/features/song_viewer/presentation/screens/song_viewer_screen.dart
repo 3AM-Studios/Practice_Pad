@@ -3,7 +3,7 @@ import 'package:clay_containers/clay_containers.dart';
 import 'package:practice_pad/models/practice_area.dart';
 import 'package:practice_pad/widgets/active_session_banner.dart';
 import 'package:practice_pad/features/song_viewer/presentation/viewers/simple_sheet_music_viewer.dart';
-import 'package:practice_pad/features/song_viewer/presentation/viewers/pdf_viewer.dart';
+import 'package:practice_pad/features/song_viewer/presentation/viewers/pdf_viewer/pdf_viewer_screen.dart';
 
 enum ViewerMode { simpleSheetMusic, pdf }
 

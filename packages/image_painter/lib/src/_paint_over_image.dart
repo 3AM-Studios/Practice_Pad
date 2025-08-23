@@ -1106,9 +1106,15 @@ class ImagePainterState extends State<ImagePainter> {
             ] else if (menuLevel == 'drawing') ...[
               // Drawing controls level
               ..._buildDrawingControlButtons(),
-            ] else if (menuLevel == 'labels') ...[
-              // Label controls level
+            ] else if (menuLevel == 'label_types') ...[
+              // Label type selection level
+              ..._buildLabelTypeButtons(),
+            ] else if (menuLevel == 'extension_labels') ...[
+              // Extension label controls level
               ..._buildLabelControlButtons(),
+            ] else if (menuLevel == 'roman_labels') ...[
+              // Roman numeral label controls level
+              ..._buildRomanNumeralControlButtons(),
             ] else if (menuLevel.startsWith('custom_')) ...[
               // Custom button sub-menu
               ..._buildCustomButtonSubMenu(menuLevel),
@@ -1147,11 +1153,10 @@ class ImagePainterState extends State<ImagePainter> {
         child: _buildClayButton(
           icon: const Icon(Icons.label),
           onPressed: () {
-            _currentMenuLevel.value = 'labels';
-            // Enter label mode
-            _controller.setLabelMode(true);
+            _currentMenuLevel.value = 'label_types';
+            // Don't enter label mode yet - let user select type first
           },
-          tooltip: 'Extension Labels',
+          tooltip: 'Labels',
         ),
       ),
     ];
@@ -1555,6 +1560,53 @@ class ImagePainterState extends State<ImagePainter> {
     );
   }
 
+  /// Build label type selection buttons
+  List<Widget> _buildLabelTypeButtons() {
+    return [
+      // Extension Labels button
+      Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        child: _buildClayButton(
+          icon: const Icon(Icons.numbers),
+          onPressed: () {
+            _currentMenuLevel.value = 'extension_labels';
+            _controller.setLabelMode(true);
+          },
+          tooltip: 'Extension Labels (♮,b,#)',
+        ),
+      ),
+      // Roman Numeral Labels button
+      Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        child: _buildClayButton(
+          icon: const Icon(Icons.format_list_numbered_rtl),
+          onPressed: () {
+            _currentMenuLevel.value = 'roman_labels';
+            _controller.setLabelMode(true);
+          },
+          tooltip: 'Roman Numerals (I,II,III...)',
+        ),
+      ),
+    ];
+  }
+
+  /// Build Roman numeral label control buttons (placeholder for now)
+  List<Widget> _buildRomanNumeralControlButtons() {
+    return [
+      Container(
+        padding: const EdgeInsets.all(16),
+        child: const Text(
+          'Roman Numeral Labels\n(Coming Soon)',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 14,
+            color: Colors.grey,
+          ),
+        ),
+      ),
+    ];
+  }
+
   IconData _getMainButtonIcon(String menuLevel) {
     if (menuLevel.startsWith('custom_')) {
       return Icons.arrow_back;
@@ -1564,7 +1616,9 @@ class ImagePainterState extends State<ImagePainter> {
         return Icons.close;
       case 'drawing':
         return Icons.arrow_back;
-      case 'labels':
+      case 'label_types':
+      case 'extension_labels':
+      case 'roman_labels':
         return Icons.arrow_back;
       case 'closed':
       default:
@@ -1581,7 +1635,9 @@ class ImagePainterState extends State<ImagePainter> {
         return 'Close Menu';
       case 'drawing':
         return 'Back to Main Menu';
-      case 'labels':
+      case 'label_types':
+      case 'extension_labels':
+      case 'roman_labels':
         return 'Back to Main Menu';
       case 'closed':
       default:
@@ -1607,10 +1663,18 @@ class ImagePainterState extends State<ImagePainter> {
         // Disable drawing mode when leaving drawing controls
         _controller.setMode(PaintMode.none);
         break;
-      case 'labels':
+      case 'label_types':
+      case 'extension_labels':
+      case 'roman_labels':
         _currentMenuLevel.value = 'main';
-        // Disable label mode when leaving label controls
-        _controller.setLabelMode(false);
+        // Handle different back navigation for different label menu levels
+        if (menuLevel == 'label_types') {
+          _currentMenuLevel.value = 'main';
+        } else {
+          // extension_labels or roman_labels go back to label_types
+          _currentMenuLevel.value = 'label_types';
+          _controller.setLabelMode(false);
+        }
         break;
     }
   }

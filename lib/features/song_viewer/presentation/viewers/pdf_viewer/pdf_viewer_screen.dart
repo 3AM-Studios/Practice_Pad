@@ -12,6 +12,11 @@ import 'package:practice_pad/services/local_storage_service.dart';
 import 'package:pdf_to_image_converter/pdf_to_image_converter.dart';
 import 'package:image_painter/image_painter.dart';
 
+// Import new label system
+import 'models/label_base.dart';
+import 'models/extension_label.dart' as models;
+import 'services/label_persistence_service.dart';
+
 /// PDF viewer widget with drawing functionality using PDF-to-image conversion
 class PDFViewer extends StatefulWidget {
   final String songAssetPath;
@@ -223,7 +228,7 @@ class _PDFViewerState extends State<PDFViewer>
   Future<void> _nextPage() async {
     if (_currentPage < _totalPages - 1) {
       await _saveDrawingData(); // Save current page drawings
-      await _saveExtensionLabels(); // Save current page labels
+      await _saveLabels(); // Save current page labels
       _currentPage++;
       await _loadCurrentPageImage();
       await _loadDrawingDataForCurrentPage();
@@ -236,7 +241,7 @@ class _PDFViewerState extends State<PDFViewer>
   Future<void> _previousPage() async {
     if (_currentPage > 0) {
       await _saveDrawingData(); // Save current page drawings
-      await _saveExtensionLabels(); // Save current page labels
+      await _saveLabels(); // Save current page labels
       _currentPage--;
       await _loadCurrentPageImage();
       await _loadDrawingDataForCurrentPage();
@@ -289,8 +294,8 @@ class _PDFViewerState extends State<PDFViewer>
     }
   }
 
-  /// Save extension labels for current page
-  Future<void> _saveExtensionLabels() async {
+  /// Save labels for current page
+  Future<void> _saveLabels() async {
     if (_pdfPath == null || !_isReady) return;
     
     try {
@@ -646,7 +651,7 @@ class _PDFViewerState extends State<PDFViewer>
       // Use a small delay to batch rapid changes
       Future.delayed(const Duration(milliseconds: 500), () {
         if (mounted && _isReady && _pdfPath != null) {
-          _saveExtensionLabels();
+          _saveLabels();
         }
       });
     }
