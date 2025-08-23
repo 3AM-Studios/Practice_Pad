@@ -457,6 +457,8 @@ class ImagePainterState extends State<ImagePainter> {
   // Label interaction state
   bool _isDraggingLabel = false;
   ExtensionLabel? _draggedLabel;
+  bool _showAllColors = false;
+  int _currentPointerCount = 0;
   @override
   void initState() {
     super.initState();
@@ -603,7 +605,7 @@ class ImagePainterState extends State<ImagePainter> {
                         transformationController: _transformationController,
                         maxScale: 5.0,
                         minScale: 0.8,
-                        panEnabled: (_currentMenuLevel.value == 'closed' || _currentMenuLevel.value == 'main') && !_isDraggingLabel,
+                        panEnabled: (_currentMenuLevel.value == 'closed' || _currentMenuLevel.value == 'main' || _currentPointerCount > 1) && !_isDraggingLabel,
                         scaleEnabled: widget.isScalable!,
                         boundaryMargin: const EdgeInsets.all(20),
                         onInteractionStart: _scaleStartGesture,
@@ -694,6 +696,11 @@ class ImagePainterState extends State<ImagePainter> {
   }
 
   _scaleStartGesture(ScaleStartDetails onStart) {
+    // Track current pointer count
+    setState(() {
+      _currentPointerCount = onStart.pointerCount;
+    });
+    
     // Don't handle gestures if multi-touch (panning/zooming) or not in active drawing/label modes
     if (onStart.pointerCount > 1 || (_currentMenuLevel.value != 'drawing' && _currentMenuLevel.value != 'labels')) {
       return;
@@ -753,6 +760,10 @@ class ImagePainterState extends State<ImagePainter> {
 
   ///Fires while user is interacting with the screen to record painting.
   void _scaleUpdateGesture(ScaleUpdateDetails onUpdate) {
+    // Don't handle update if multi-touch or not in active drawing/label modes
+    if (_currentPointerCount > 1 || (_currentMenuLevel.value != 'drawing' && _currentMenuLevel.value != 'labels')) {
+      return;
+    }
     final _zoomAdjustedOffset =
         _transformationController.toScene(onUpdate.localFocalPoint);
     final _imageOffset = _convertToImageCoordinates(_zoomAdjustedOffset);
@@ -809,10 +820,11 @@ class ImagePainterState extends State<ImagePainter> {
 
   ///Fires when user stops interacting with the screen.
   void _scaleEndGesture(ScaleEndDetails onEnd) {
-    // Reset label dragging state
+    // Reset interaction state
     setState(() {
       _isDraggingLabel = false;
       _draggedLabel = null;
+      _currentPointerCount = 0;
     });
     
     _controller.setInProgress(false);
@@ -1286,48 +1298,137 @@ class ImagePainterState extends State<ImagePainter> {
 
   List<Widget> _buildLabelControlButtons() {
     return [
-      // Accidental buttons row (♮, b, #)
+      // TOP SECTION: Colors and Delete button
       Container(
         margin: const EdgeInsets.only(bottom: 16),
-        child: Column(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            // Title for accidentals
-            Text(
-              'Accidentals',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[600],
-              ),
-            ),
-            const SizedBox(height: 4),
+            // Compact color picker
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _buildAccidentalButton('♮'),
-                _buildAccidentalButton('b'),
-                _buildAccidentalButton('#'),
+                // Current color button that shows/hides all colors
+                AnimatedBuilder(
+                  animation: _controller,
+                  builder: (_, __) {
+                    return _buildClayButton(
+                      icon: Container(
+                        width: 20,
+                        height: 20,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.grey),
+                          color: _controller.labelColor,
+                        ),
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _showAllColors = !_showAllColors;
+                        });
+                      },
+                      tooltip: 'Color',
+                    );
+                  },
+                ),
+                // Expandable color options
+                if (_showAllColors) ...[
+                  const SizedBox(width: 8),
+                  _buildColorButton(const Color(0xFF2196F3)), // Blue
+                  const SizedBox(width: 4),
+                  _buildColorButton(const Color(0xFF4CAF50)), // Green
+                  const SizedBox(width: 4),
+                  _buildColorButton(const Color(0xFFFF9800)), // Orange
+                  const SizedBox(width: 4),
+                  _buildColorButton(const Color(0xFFF44336)), // Red
+                  const SizedBox(width: 4),
+                  _buildColorButton(const Color(0xFF9C27B0)), // Purple
+                  const SizedBox(width: 4),
+                  _buildColorButton(const Color(0xFFFFFFFF)), // White
+                ],
               ],
+            ),
+            // Delete button (if label selected)
+            AnimatedBuilder(
+              animation: _controller,
+              builder: (_, __) {
+                if (_controller.selectedLabel != null) {
+                  return _buildClayButton(
+                    icon: const Icon(Icons.delete, color: Colors.red, size: 20),
+                    onPressed: () {
+                      _controller.deleteSelectedLabel();
+                    },
+                    tooltip: 'Delete Label',
+                  );
+                } else {
+                  return const SizedBox(width: 40); // Placeholder to maintain layout
+                }
+              },
             ),
           ],
         ),
       ),
       
-      // Number pad (3x3 grid)
+      // Size controls
+      Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            _buildClayButton(
+              icon: const Icon(Icons.remove, size: 16),
+              onPressed: () {
+                _controller.decreaseLabelSize();
+              },
+              tooltip: 'Decrease Size',
+            ),
+            AnimatedBuilder(
+              animation: _controller,
+              builder: (_, __) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    '${_controller.labelSize.round()}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                );
+              },
+            ),
+            _buildClayButton(
+              icon: const Icon(Icons.add, size: 16),
+              onPressed: () {
+                _controller.increaseLabelSize();
+              },
+              tooltip: 'Increase Size',
+            ),
+          ],
+        ),
+      ),
+      
+      // Accidental buttons row (♮, b, #)
+      Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            _buildAccidentalButton('♮'),
+            _buildAccidentalButton('b'),
+            _buildAccidentalButton('#'),
+          ],
+        ),
+      ),
+      
+      // BOTTOM SECTION: Number pad (3x3 grid)
       Container(
         margin: const EdgeInsets.only(bottom: 16),
         child: Column(
           children: [
-            // Title for numbers
-            Text(
-              'Numbers',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[600],
-              ),
-            ),
-            const SizedBox(height: 4),
             // Numbers 1-9 in 3x3 grid
             for (int row = 0; row < 3; row++)
               Padding(
@@ -1342,122 +1443,6 @@ class ImagePainterState extends State<ImagePainter> {
               ),
           ],
         ),
-      ),
-      
-      // Size controls
-      Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        child: Column(
-          children: [
-            // Title for size
-            Text(
-              'Size',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[600],
-              ),
-            ),
-            const SizedBox(height: 4),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildClayButton(
-                  icon: const Icon(Icons.remove, size: 16),
-                  onPressed: () {
-                    _controller.decreaseLabelSize();
-                  },
-                  tooltip: 'Decrease Size',
-                ),
-                AnimatedBuilder(
-                  animation: _controller,
-                  builder: (_, __) {
-                    return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[200],
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        '${_controller.labelSize.round()}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-                _buildClayButton(
-                  icon: const Icon(Icons.add, size: 16),
-                  onPressed: () {
-                    _controller.increaseLabelSize();
-                  },
-                  tooltip: 'Increase Size',
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-      
-      // Color picker
-      Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        child: Column(
-          children: [
-            // Title for color
-            Text(
-              'Color',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[600],
-              ),
-            ),
-            const SizedBox(height: 4),
-            // Color buttons row
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildColorButton(const Color(0xFF2196F3)), // Blue
-                _buildColorButton(const Color(0xFF4CAF50)), // Green
-                _buildColorButton(const Color(0xFFFF9800)), // Orange
-              ],
-            ),
-            const SizedBox(height: 4),
-            // Second row of colors
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildColorButton(const Color(0xFFF44336)), // Red
-                _buildColorButton(const Color(0xFF9C27B0)), // Purple
-                _buildColorButton(const Color(0xFFFFFFFF)), // White
-              ],
-            ),
-          ],
-        ),
-      ),
-      
-      // Delete button (if label selected)
-      AnimatedBuilder(
-        animation: _controller,
-        builder: (_, __) {
-          if (_controller.selectedLabel != null) {
-            return Container(
-              margin: const EdgeInsets.only(bottom: 16),
-              child: _buildClayButton(
-                icon: const Icon(Icons.delete, color: Colors.red),
-                onPressed: () {
-                  _controller.deleteSelectedLabel();
-                },
-                tooltip: 'Delete Label',
-              ),
-            );
-          } else {
-            return const SizedBox.shrink();
-          }
-        },
       ),
     ];
   }
