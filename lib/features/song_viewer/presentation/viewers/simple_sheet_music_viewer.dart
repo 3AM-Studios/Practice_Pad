@@ -24,6 +24,10 @@ import 'package:provider/provider.dart';
 import 'package:music_sheet/index.dart';
 import 'package:practice_pad/services/local_storage_service.dart';
 
+// Import transcription viewer
+import 'transcription_viewer.dart';
+import '../../data/models/song.dart';
+
 /// Full sheet music viewer widget that contains ALL the original song viewer functionality
 /// This is essentially the entire content from song_viewer_screen_old.dart but with separate drawing keys
 class SimpleSheetMusicViewer extends StatefulWidget {
@@ -1391,6 +1395,41 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
                 ),
               ],
             ),
+            const SizedBox(height: 8),
+            // Transcription button
+            GestureDetector(
+              onTap: _openTranscriptionViewer,
+              child: ClayContainer(
+                color: surfaceColor,
+                borderRadius: 8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.secondary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.video_library,
+                        color: Theme.of(context).colorScheme.secondary,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Transcription',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.secondary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -1536,6 +1575,21 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
         
       }
     }();
+  }
+
+  void _openTranscriptionViewer() {
+    // Create a Song object from the available data
+    final song = Song(
+      title: widget.practiceArea?.name ?? 'Unknown Song',
+      composer: 'Unknown Composer',
+      path: widget.songAssetPath,
+    );
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => TranscriptionViewer(song: song),
+      ),
+    );
   }
 
   @override

@@ -22,6 +22,7 @@ class LocalStorageService {
   static const String _sheetMusicFileName = 'sheet_music.json';
   static const String _drawingsFileName = 'drawings.json';
   static const String _pdfDrawingsFileName = 'pdf_drawings.json';
+  static const String _youtubeLinksFileName = 'youtube_links.json';
 
   // Static mutex for serializing save operations to prevent race conditions
   static final Completer<void>? _saveMutex = null;
@@ -847,6 +848,60 @@ class LocalStorageService {
     );
   }
 
+  /// Save YouTube link data for a specific song
+  static Future<void> saveYoutubeLinkForSong(String songId, Map<String, dynamic> youtubeData) async {
+    try {
+      final allYoutubeLinks = await loadAllYoutubeLinks();
+      allYoutubeLinks[songId] = youtubeData;
+      
+      final file = await _getFile(_youtubeLinksFileName);
+      await file.writeAsString(json.encode(allYoutubeLinks));
+      developer.log('Saved YouTube link for song: $songId');
+    } catch (e) {
+      developer.log('Error saving YouTube link: $e', error: e);
+      throw Exception('Failed to save YouTube link: $e');
+    }
+  }
+
+  /// Load YouTube link data for a specific song
+  static Future<Map<String, dynamic>> loadYoutubeLinkForSong(String songId) async {
+    try {
+      final allYoutubeLinks = await loadAllYoutubeLinks();
+      return allYoutubeLinks[songId] ?? {};
+    } catch (e) {
+      developer.log('Error loading YouTube link for $songId: $e', error: e);
+      return {};
+    }
+  }
+
+  /// Load all YouTube links
+  static Future<Map<String, Map<String, dynamic>>> loadAllYoutubeLinks() async {
+    try {
+      final file = await _getFile(_youtubeLinksFileName);
+      if (!await file.exists()) {
+        developer.log('YouTube links file does not exist, returning empty map');
+        return {};
+      }
+
+      final content = await file.readAsString();
+      if (content.trim().isEmpty) {
+        developer.log('YouTube links file is empty, returning empty map');
+        return {};
+      }
+
+      final Map<String, dynamic> jsonData = json.decode(content);
+      final youtubeLinks = jsonData.map((songId, data) => MapEntry(
+        songId,
+        Map<String, dynamic>.from(data as Map),
+      ));
+      developer.log('Loaded YouTube links for ${youtubeLinks.length} songs');
+      return youtubeLinks;
+    } catch (e) {
+      developer.log('Error loading all YouTube links: $e', error: e);
+      return {};
+    }
+  }
+
   /// Clear all local storage
   static Future<void> clearAll() async {
     try {
@@ -859,6 +914,7 @@ class LocalStorageService {
         _sheetMusicFileName,
         _drawingsFileName,
         _pdfDrawingsFileName,
+        _youtubeLinksFileName,
       ];
 
       for (final fileName in files) {

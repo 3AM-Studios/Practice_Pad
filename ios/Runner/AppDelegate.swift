@@ -2,6 +2,7 @@ import UIKit
 import Flutter
 import CloudKit
 import WidgetKit
+import WebKit
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
@@ -54,6 +55,13 @@ import WidgetKit
         checkPendingWidgetActions()
 
         GeneratedPluginRegistrant.register(with: self)
+        
+        // Additional setup for webview plugins to handle platform view registration
+        if #available(iOS 11.0, *) {
+            // This ensures proper webview initialization
+            let _ = WKWebView()
+        }
+        
         return super.application(application, didFinishLaunchingWithOptions: launchOptions)
     }
     

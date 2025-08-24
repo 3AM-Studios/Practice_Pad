@@ -21,6 +21,10 @@ import 'models/roman_numeral_label.dart' as roman_models;
 import 'widgets/label_controls/roman_numeral_label_controls.dart';
 import 'widgets/label_controls/extension_label_controls.dart';
 
+// Import transcription viewer
+import '../transcription_viewer.dart';
+import '../../../data/models/song.dart';
+
 /// PDF viewer widget with drawing functionality using PDF-to-image conversion
 class PDFViewer extends StatefulWidget {
   final String songAssetPath;
@@ -578,6 +582,22 @@ class _PDFViewerState extends State<PDFViewer>
               fontWeight: FontWeight.w600,
             ),
           ),
+          const SizedBox(width: 12),
+          GestureDetector(
+            onTap: _openTranscriptionViewer,
+            child: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.secondary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                Icons.video_library,
+                color: Theme.of(context).colorScheme.secondary,
+                size: 20,
+              ),
+            ),
+          ),
           if (_pdfPath != null) ...[
             const SizedBox(width: 8),
             GestureDetector(
@@ -596,6 +616,21 @@ class _PDFViewerState extends State<PDFViewer>
 
   Widget _buildZoomAndDrawControls(Color surfaceColor) {
     return const SizedBox.shrink(); // Removed drawing controls from toolbar
+  }
+
+  void _openTranscriptionViewer() {
+    // Create a Song object from the available data
+    final song = Song(
+      title: widget.practiceArea?.name ?? 'Unknown Song',
+      composer: 'Unknown Composer',
+      path: widget.songAssetPath,
+    );
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => TranscriptionViewer(song: song),
+      ),
+    );
   }
 
   @override

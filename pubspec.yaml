@@ -71,6 +71,8 @@ dependencies:
   pdf_to_image_converter: ^0.0.3
   image_painter:
     path: packages/image_painter
+  youtube_player_flutter:
+    path: packages/youtube_player_flutter
 
 dev_dependencies:
   flutter_test:
