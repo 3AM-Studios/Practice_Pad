@@ -159,8 +159,8 @@ class _LoopProgressBarState extends State<LoopProgressBar>
       }
     }
     
-    // Update loop values
-    if (widget.loopStart != null && widget.loopEnd != null && mounted) {
+    // Update loop values ONLY if we're not currently dragging
+    if (widget.loopStart != null && widget.loopEnd != null && mounted && !_isDraggingLoop) {
       try {
         final totalDuration = _controller.metadata.duration.inMilliseconds;
         if (totalDuration > 0) {
@@ -270,14 +270,26 @@ class _LoopProgressBarState extends State<LoopProgressBar>
     
     try {
       final totalDuration = _controller.metadata.duration;
-      if (totalDuration.inMilliseconds <= 0) return;
+      if (totalDuration.inMilliseconds <= 0) {
+        return;
+      }
       
       final position = Duration(
         milliseconds: (value * totalDuration.inMilliseconds).round(),
       );
-      _controller.seekTo(position, allowSeekAhead: false);
+      
+      // Pause playback during drag for real-time scrubbing
+      _controller.pause();
+      
+      // Seek to the dragged position for real-time feedback
+      _controller.seekTo(position, allowSeekAhead: true);
+      
+      // Update the local position value so the UI shows correct position
+      setState(() {
+        _playedValue = value;
+      });
+      
     } catch (e) {
-      // Silently handle disposal errors
       debugPrint('Error scrubbing audio: $e');
     }
   }
@@ -295,6 +307,7 @@ class _LoopProgressBarState extends State<LoopProgressBar>
         final endDuration = Duration(
           milliseconds: (_loopEndValue * totalDuration.inMilliseconds).round(),
         );
+        debugPrint('CALLBACK: Updating parent with start=${startDuration.inSeconds}s, end=${endDuration.inSeconds}s');
         widget.onLoopUpdate!(startDuration, endDuration);
       } catch (e) {
         // Silently handle disposal errors
@@ -415,19 +428,25 @@ class _LoopProgressBarState extends State<LoopProgressBar>
                 final touchX = localPosition.dx;
                 final totalWidth = box.size.width;
                 
+                debugPrint('TOUCH: x=$touchX, width=$totalWidth');
+                debugPrint('LOOP: start=$_loopStartValue, end=$_loopEndValue');
                 
-                // Calculate actual handle positions (same logic as painter)
+                // Calculate actual handle positions (EXACT same logic as painter)
                 if (_hasLoop && totalWidth > 0) {
                   const handleRadius = 8.0;
+                  // This should match the painter exactly
                   final barWidth = totalWidth - (handleRadius * 2);
                   final startHandleX = barWidth * _loopStartValue + handleRadius;
                   final endHandleX = barWidth * _loopEndValue + handleRadius;
                   
-                  const touchTolerance = 25.0; // 25px on each side of handle
+                  debugPrint('HANDLES: start=$startHandleX, end=$endHandleX');
+                  
+                  const touchTolerance = 8.0; // Much smaller - just 8px on each side
                   
                   // Check start handle
                   if (touchX >= (startHandleX - touchTolerance) && 
                       touchX <= (startHandleX + touchTolerance)) {
+                    debugPrint('START HANDLE HIT!');
                     setState(() {
                       _isDraggingLoop = true;
                       _isDraggingStart = true;
@@ -440,6 +459,7 @@ class _LoopProgressBarState extends State<LoopProgressBar>
                   // Check end handle
                   if (touchX >= (endHandleX - touchTolerance) && 
                       touchX <= (endHandleX + touchTolerance)) {
+                    debugPrint('END HANDLE HIT!');
                     setState(() {
                       _isDraggingLoop = true;
                       _isDraggingStart = false;
@@ -450,6 +470,7 @@ class _LoopProgressBarState extends State<LoopProgressBar>
                   }
                 }
                 
+                debugPrint('NORMAL TIMELINE HIT');
                 // Normal timeline seeking
                 try {
                   if (_controller.value.errorCode == 0) {
@@ -468,6 +489,7 @@ class _LoopProgressBarState extends State<LoopProgressBar>
               },
               onHorizontalDragUpdate: (details) {
                 if (_isDraggingLoop) {
+                  debugPrint('DRAG UPDATE: Loop dragging');
                   final box = context.findRenderObject() as RenderBox;
                   final localPosition = box.globalToLocal(details.globalPosition);
                   final touchX = localPosition.dx;
@@ -476,20 +498,28 @@ class _LoopProgressBarState extends State<LoopProgressBar>
                   if (totalWidth > 0) {
                     const handleRadius = 8.0;
                     final barWidth = totalWidth - (handleRadius * 2);
-                    final relative = (touchX - handleRadius).clamp(0.0, barWidth) / barWidth;
+                    // Convert touchX back to relative position (reverse of painter logic)
+                    final relative = ((touchX - handleRadius) / barWidth).clamp(0.0, 1.0);
+                    
+                    debugPrint('DRAG: touchX=$touchX, barWidth=$barWidth, relative=$relative');
                     
                     setState(() {
                       if (_isDraggingStart) {
-                        _loopStartValue = relative.clamp(0.0, _loopEndValue - 0.01);
+                        _loopStartValue = relative.clamp(0.0, _loopEndValue - 0.02);
+                        debugPrint('Updated start to: $_loopStartValue');
                       } else if (_isDraggingEnd) {
-                        _loopEndValue = relative.clamp(_loopStartValue + 0.01, 1.0);
+                        _loopEndValue = relative.clamp(_loopStartValue + 0.02, 1.0);
+                        debugPrint('Updated end to: $_loopEndValue');
                       }
+                      _hasLoop = true; // Ensure loop is marked as active
                     });
                     
-                    // Scrub audio and update callback
+                    // IMMEDIATELY update callback to propagate changes
+                    _updateLoopCallback();
+                    
+                    // Scrub audio 
                     final currentValue = _isDraggingStart ? _loopStartValue : _loopEndValue;
                     _scrubAudioToLoopPosition(currentValue);
-                    _updateLoopCallback();
                   }
                 } else {
                   _seekToRelativePosition(details.globalPosition);
@@ -498,12 +528,37 @@ class _LoopProgressBarState extends State<LoopProgressBar>
               },
               onHorizontalDragEnd: (details) {
                 if (_isDraggingLoop) {
+                  // Final seek and resume playback
+                  final finalValue = _isDraggingStart ? _loopStartValue : _loopEndValue;
+                  try {
+                    if (mounted && _controller.value.errorCode == 0 && _controller.value.isReady) {
+                      final totalDuration = _controller.metadata.duration;
+                      if (totalDuration.inMilliseconds > 0) {
+                        final position = Duration(
+                          milliseconds: (finalValue * totalDuration.inMilliseconds).round(),
+                        );
+                        _controller.seekTo(position, allowSeekAhead: true);
+                        
+                        // Resume playback after a brief delay
+                        Future.delayed(const Duration(milliseconds: 200), () {
+                          if (mounted && _controller.value.errorCode == 0 && _controller.value.isReady) {
+                            _controller.play();
+                          }
+                        });
+                      }
+                    }
+                  } catch (e) {
+                    debugPrint('Error with final seek: $e');
+                  }
+                  
                   setState(() {
                     _isDraggingLoop = false;
                     _isDraggingStart = false;
                     _isDraggingEnd = false;
                     _hasLoop = true;
                   });
+                  
+                  // Update parent with final values
                   _updateLoopCallback();
                 } else {
                   try {

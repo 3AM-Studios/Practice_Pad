@@ -348,6 +348,7 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
                                       loopEnd: _hasLoopSection ? Duration(seconds: _loopEndTime.toInt()) : null,
                                       isLoopEnabled: _isAutoLoop,
                                       onLoopUpdate: (start, end) {
+                                        debugPrint('PARENT: Received loop update start=${start.inSeconds}s, end=${end.inSeconds}s');
                                         setState(() {
                                           _loopStartTime = start.inSeconds.toDouble();
                                           _loopEndTime = end.inSeconds.toDouble();
@@ -407,14 +408,14 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
                         ElevatedButton.icon(
                           onPressed: () {
                             setState(() {
-                              _loopStartTime = 10.0; // 10 seconds
-                              _loopEndTime = 30.0;   // 30 seconds  
+                              _loopStartTime = 20.0; // 20 seconds
+                              _loopEndTime = 60.0;   // 60 seconds - much bigger range
                               _hasLoopSection = true;
                             });
                             _saveYoutubeData();
                           },
                           icon: const Icon(Icons.add),
-                          label: const Text('Create Test Loop (10s-30s)'),
+                          label: const Text('Create Test Loop (20s-60s)'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.amber.shade100,
                           ),
