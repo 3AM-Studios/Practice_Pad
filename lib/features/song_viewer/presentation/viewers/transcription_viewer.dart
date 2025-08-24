@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
+import 'package:clay_containers/clay_containers.dart';
 import 'package:practice_pad/services/local_storage_service.dart';
 import 'package:practice_pad/features/song_viewer/data/models/song.dart';
 
@@ -162,6 +163,28 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
     return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
   }
 
+  Widget _buildClayButton({
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: ClayContainer(
+        color: Theme.of(context).colorScheme.surface,
+        depth: 20,
+        borderRadius: 12,
+        width: 44,
+        height: 44,
+        child: Icon(
+          icon,
+          color: color,
+          size: 20,
+        ),
+      ),
+    );
+  }
+
   Widget _buildWebViewFallback() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -209,55 +232,106 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Transcription - ${widget.song.title}'),
-        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            // URL input section
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'YouTube Video URL',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            children: [
+              // Wooden Header
+              ClayContainer(
+                color: Theme.of(context).colorScheme.surface,
+                depth: 20,
+                borderRadius: 20,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+                  decoration: BoxDecoration(
+                    image: const DecorationImage(
+                      image: AssetImage('assets/images/wood_texture_rotated.jpg'),
+                      fit: BoxFit.cover,
                     ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _urlController,
-                            decoration: const InputDecoration(
-                              hintText: 'Paste YouTube URL here...',
-                              border: OutlineInputBorder(),
-                            ),
+                    border: Border.all(color: Theme.of(context).colorScheme.surface, width: 4),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    children: [
+                      GestureDetector(
+                        onTap: () => Navigator.of(context).pop(),
+                        child: const Icon(
+                          Icons.arrow_back,
+                          color: Colors.white,
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Text(
+                          'Transcription - ${widget.song.title}',
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            shadows: [
+                              Shadow(
+                                offset: Offset(1, 1),
+                                blurRadius: 3,
+                                color: Colors.black54,
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        ElevatedButton(
-                          onPressed: () {
-                            if (_urlController.text.isNotEmpty) {
-                              _loadVideoFromUrl(_urlController.text);
-                            }
-                          },
-                          child: const Text('Load'),
-                        ),
-                      ],
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
+              
+              const SizedBox(height: 16),
+
+              // URL input section - Regular Clay
+              ClayContainer(
+                color: Theme.of(context).colorScheme.surface,
+                depth: 20,
+                borderRadius: 16,
+                child: Container(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'YouTube Video URL',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _urlController,
+                              decoration: const InputDecoration(
+                                hintText: 'Paste YouTube URL here...',
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton(
+                            onPressed: () {
+                              if (_urlController.text.isNotEmpty) {
+                                _loadVideoFromUrl(_urlController.text);
+                              }
+                            },
+                            child: const Text('Load'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             const SizedBox(height: 16),
 
             // Video player
@@ -363,6 +437,7 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
                                         });
                                         _saveYoutubeData();
                                       },
+                                      showControls: false, // Hide controls from video player
                                     ),
                                     const RemainingDuration(),
                                     const FullScreenButton(),
@@ -401,85 +476,347 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 16),
 
-                      // Create test loop button (if no loop exists)
-                      if (!_hasLoopSection)
-                        ElevatedButton.icon(
-                          onPressed: () {
-                            setState(() {
-                              _loopStartTime = 20.0; // 20 seconds
-                              _loopEndTime = 60.0;   // 60 seconds - much bigger range
-                              _hasLoopSection = true;
-                            });
-                            _saveYoutubeData();
-                          },
-                          icon: const Icon(Icons.add),
-                          label: const Text('Create Test Loop (20s-60s)'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.amber.shade100,
+                      // Loop status - Wooden Clay Container
+                      if (_hasLoopSection)
+                        ClayContainer(
+                          color: Theme.of(context).colorScheme.surface,
+                          depth: 20,
+                          borderRadius: 16,
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              image: const DecorationImage(
+                                image: AssetImage('assets/images/wood_texture_rotated.jpg'),
+                                fit: BoxFit.cover,
+                              ),
+                              border: Border.all(color: Theme.of(context).colorScheme.surface, width: 4),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Loop Section',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                        fontSize: 16,
+                                        shadows: [
+                                          Shadow(
+                                            offset: Offset(1, 1),
+                                            blurRadius: 2,
+                                            color: Colors.black54,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '${_formatTime(_loopStartTime)} → ${_formatTime(_loopEndTime)}',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 18,
+                                        color: Colors.white,
+                                        shadows: [
+                                          Shadow(
+                                            offset: Offset(1, 1),
+                                            blurRadius: 2,
+                                            color: Colors.black54,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: _isAutoLoop ? Colors.green.withOpacity(0.9) : Colors.grey.withOpacity(0.7),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        _isAutoLoop ? Icons.repeat : Icons.repeat_one,
+                                        color: Colors.white,
+                                        size: 16,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        _isAutoLoop ? 'Auto Loop' : 'Manual',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
 
-                      // Loop status
-                      if (_hasLoopSection)
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.blue.shade50,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.blue.shade200),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'Loop: ${_formatTime(_loopStartTime)} - ${_formatTime(_loopEndTime)}',
-                                style: const TextStyle(fontWeight: FontWeight.bold),
+                      const SizedBox(height: 16),
+
+                      // Loop Controls with Clay Containers
+                      if (_hasLoopSection) ...[
+                        // Main controls row
+                        Row(
+                          children: [
+                            // Play Loop Button
+                            Expanded(
+                              flex: 2,
+                              child: GestureDetector(
+                                onTap: _controller != null && _controller!.value.isReady ? () {
+                                  _controller!.seekTo(Duration(seconds: _loopStartTime.toInt()));
+                                  _controller!.play();
+                                } : null,
+                                child: ClayContainer(
+                                  color: Theme.of(context).colorScheme.surface,
+                                  depth: 20,
+                                  borderRadius: 16,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.play_arrow,
+                                          color: Colors.blue.shade600,
+                                          size: 24,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'Play',
+                                          style: TextStyle(
+                                            color: Colors.blue.shade600,
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
                               ),
-                              Row(
+                            ),
+                            
+                            const SizedBox(width: 12),
+                            
+                            // Auto Loop Toggle
+                            Expanded(
+                              flex: 2,
+                              child: GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    _isAutoLoop = !_isAutoLoop;
+                                  });
+                                  _saveYoutubeData();
+                                },
+                                child: ClayContainer(
+                                  color: Theme.of(context).colorScheme.surface,
+                                  depth: _isAutoLoop ? 15 : 20,
+                                  borderRadius: 16,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          _isAutoLoop ? Icons.repeat : Icons.repeat_one,
+                                          color: _isAutoLoop ? Colors.green.shade600 : Colors.grey.shade600,
+                                          size: 20,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          _isAutoLoop ? 'ON' : 'OFF',
+                                          style: TextStyle(
+                                            color: _isAutoLoop ? Colors.green.shade600 : Colors.grey.shade600,
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        
+                        const SizedBox(height: 12),
+                        
+                        // Fine-tune controls row with labels
+                        Row(
+                          children: [
+                            // Start controls
+                            Expanded(
+                              child: Column(
+                                children: [
+                                  Text(
+                                    'Start',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.grey.shade700,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      _buildClayButton(
+                                        icon: Icons.remove,
+                                        color: Colors.red.shade600,
+                                        onTap: () {
+                                          setState(() {
+                                            _loopStartTime = (_loopStartTime - 1).clamp(0, _loopEndTime - 1);
+                                          });
+                                          _saveYoutubeData();
+                                        },
+                                      ),
+                                      const SizedBox(width: 12),
+                                      _buildClayButton(
+                                        icon: Icons.add,
+                                        color: Colors.green.shade600,
+                                        onTap: () {
+                                          setState(() {
+                                            _loopStartTime = (_loopStartTime + 1).clamp(0, _loopEndTime - 1);
+                                          });
+                                          _saveYoutubeData();
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                            
+                            const SizedBox(width: 20),
+                            
+                            // End controls
+                            Expanded(
+                              child: Column(
+                                children: [
+                                  Text(
+                                    'End',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.grey.shade700,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      _buildClayButton(
+                                        icon: Icons.remove,
+                                        color: Colors.red.shade600,
+                                        onTap: () {
+                                          setState(() {
+                                            _loopEndTime = (_loopEndTime - 1).clamp(_loopStartTime + 1, double.infinity);
+                                          });
+                                          _saveYoutubeData();
+                                        },
+                                      ),
+                                      const SizedBox(width: 12),
+                                      _buildClayButton(
+                                        icon: Icons.add,
+                                        color: Colors.green.shade600,
+                                        onTap: () {
+                                          setState(() {
+                                            _loopEndTime = _loopEndTime + 1;
+                                          });
+                                          _saveYoutubeData();
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ] else ...[
+                        // Create Loop Button
+                        GestureDetector(
+                          onTap: _controller != null && _controller!.value.isReady ? () {
+                            final currentTime = _controller!.value.position.inSeconds.toDouble();
+                            setState(() {
+                              _loopStartTime = (currentTime - 10).clamp(0, double.infinity);
+                              _loopEndTime = currentTime + 10;
+                              _hasLoopSection = true;
+                            });
+                            _saveYoutubeData();
+                          } : null,
+                          child: ClayContainer(
+                            color: Theme.of(context).colorScheme.surface,
+                            depth: 20,
+                            borderRadius: 16,
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Icon(
-                                    _isAutoLoop ? Icons.repeat : Icons.repeat_one,
-                                    color: _isAutoLoop ? Colors.green : Colors.grey,
-                                    size: 16,
+                                    Icons.loop,
+                                    color: Colors.purple.shade600,
+                                    size: 24,
                                   ),
-                                  const SizedBox(width: 4),
+                                  const SizedBox(width: 12),
                                   Text(
-                                    _isAutoLoop ? 'Auto ON' : 'Auto OFF',
+                                    'Create Loop Here',
                                     style: TextStyle(
-                                      color: _isAutoLoop ? Colors.green : Colors.grey,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
+                                      color: Colors.purple.shade600,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 18,
                                     ),
                                   ),
                                 ],
                               ),
-                            ],
+                            ),
                           ),
                         ),
+                      ],
 
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 16),
 
-                      // Instructions
+                      // Simple Instructions
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.grey.shade50,
+                          color: Colors.blue.shade50,
                           borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.blue.shade100),
                         ),
                         child: const Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              'How to use the integrated loop controls:',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                            Row(
+                              children: [
+                                Icon(Icons.info_outline, size: 16, color: Colors.blue),
+                                SizedBox(width: 6),
+                                Text(
+                                  'Quick Tips',
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.blue),
+                                ),
+                              ],
                             ),
                             SizedBox(height: 6),
-                            Text('• Drag the golden handles on the progress bar to set loop points', style: TextStyle(fontSize: 12)),
-                            Text('• Use the loop button (⭯) to play from loop start', style: TextStyle(fontSize: 12)),
-                            Text('• Toggle auto-loop (⭯/⭯) to repeat automatically', style: TextStyle(fontSize: 12)),
-                            Text('• Clear button (✕) removes the current loop', style: TextStyle(fontSize: 12)),
+                            Text('• Drag timeline handles to set loop points', style: TextStyle(fontSize: 12)),
+                            Text('• Use +/- buttons for precise timing', style: TextStyle(fontSize: 12)),
                           ],
                         ),
                       ),
@@ -517,7 +854,8 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
                   ),
                 ),
               ),
-          ],
+            ],
+          ),
         ),
       ),
     );

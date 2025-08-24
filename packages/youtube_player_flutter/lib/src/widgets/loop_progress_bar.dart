@@ -76,6 +76,7 @@ class LoopProgressBar extends StatefulWidget {
     this.loopStart,
     this.loopEnd,
     this.isLoopEnabled = false,
+    this.showControls = true,
   });
 
   final YoutubePlayerController? controller;
@@ -87,6 +88,7 @@ class LoopProgressBar extends StatefulWidget {
   final Duration? loopStart;
   final Duration? loopEnd;
   final bool isLoopEnabled;
+  final bool showControls;
 
   @override
   State<LoopProgressBar> createState() => _LoopProgressBarState();
@@ -338,13 +340,14 @@ class _LoopProgressBarState extends State<LoopProgressBar>
 
   Widget _buildEnhancedBar() {
     return SizedBox(
-      height: 60,
+      height: widget.showControls ? 60 : 30,
       child: Column(
         children: [
-          // Loop controls
-          SizedBox(
-            height: 30,
-            child: Row(
+          // Loop controls (only show if showControls is true)
+          if (widget.showControls)
+            SizedBox(
+              height: 30,
+              child: Row(
               children: [
                 // Loop play button
                 AnimatedBuilder(
@@ -417,7 +420,7 @@ class _LoopProgressBarState extends State<LoopProgressBar>
             ),
           ),
           
-          const SizedBox(height: 4),
+          if (widget.showControls) const SizedBox(height: 4),
           
           // Enhanced progress bar
           Expanded(
