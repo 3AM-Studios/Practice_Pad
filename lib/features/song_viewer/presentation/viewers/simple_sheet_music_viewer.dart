@@ -4,6 +4,7 @@ import 'dart:developer' as developer;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:clay_containers/clay_containers.dart';
@@ -27,6 +28,70 @@ import 'package:practice_pad/services/local_storage_service.dart';
 // Import transcription viewer
 import 'transcription_viewer.dart';
 import '../../data/models/song.dart';
+
+/// Wrapper that allows two-finger scrolling but blocks single-finger panning in drawing mode
+class _DrawingModeScrollWrapper extends StatefulWidget {
+  final Widget child;
+
+  const _DrawingModeScrollWrapper({
+    super.key,
+    required this.child,
+  });
+
+  @override
+  State<_DrawingModeScrollWrapper> createState() => _DrawingModeScrollWrapperState();
+}
+
+class _DrawingModeScrollWrapperState extends State<_DrawingModeScrollWrapper> {
+  final ScrollController _scrollController = ScrollController();
+  int _pointerCount = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    return Listener(
+      onPointerDown: (event) {
+        setState(() {
+          _pointerCount++;
+        });
+      },
+      onPointerUp: (event) {
+        setState(() {
+          _pointerCount = math.max(0, _pointerCount - 1);
+        });
+      },
+      onPointerCancel: (event) {
+        setState(() {
+          _pointerCount = math.max(0, _pointerCount - 1);
+        });
+      },
+      child: GestureDetector(
+        onPanUpdate: (details) {
+          // Only allow scrolling with two or more fingers
+          if (_pointerCount >= 2) {
+            final scrollDelta = -details.delta.dx;
+            _scrollController.animateTo(
+              _scrollController.offset + scrollDelta,
+              duration: const Duration(milliseconds: 100),
+              curve: Curves.easeOut,
+            );
+          }
+        },
+        child: SingleChildScrollView(
+          controller: _scrollController,
+          scrollDirection: Axis.horizontal,
+          physics: const NeverScrollableScrollPhysics(), // Disable built-in scrolling
+          child: widget.child,
+        ),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+}
 
 /// Full sheet music viewer widget that contains ALL the original song viewer functionality
 /// This is essentially the entire content from song_viewer_screen_old.dart but with separate drawing keys
@@ -762,7 +827,7 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
       children: [
         // Add the dial menu widget below the key indicator
         _buildDialMenuWidget(),
-        const SizedBox(height: 20),
+        const SizedBox(height: 10),
 
         // Drawing controls (shown when in drawing mode)
         ValueListenableBuilder<bool>(
@@ -774,6 +839,10 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
             return const SizedBox.shrink();
           },
         ),
+
+        // Transcription button
+        _buildTranscriptionButton(),
+        const SizedBox(height: 10),
 
         // Sheet Music Display with Canvas-based Chord Symbols
         if (_chordMeasures.isNotEmpty)
@@ -789,9 +858,23 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
                 children: [
                   Padding(
                     padding: const EdgeInsets.all(16),
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: _buildCachedSheetMusic(),
+                    child: ValueListenableBuilder<bool>(
+                      valueListenable: _isDrawingModeNotifier,
+                      builder: (context, isDrawingMode, child) {
+                        if (isDrawingMode) {
+                          // In drawing mode: wrap with custom gesture detection
+                          return _DrawingModeScrollWrapper(
+                            child: _buildCachedSheetMusic(),
+                          );
+                        } else {
+                          // Normal mode: allow regular scrolling
+                          return SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            physics: const ClampingScrollPhysics(),
+                            child: _buildCachedSheetMusic(),
+                          );
+                        }
+                      },
                     ),
                   ),
                   // Help button in top left
@@ -893,7 +976,135 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
 
   // PLACEHOLDER METHODS - Add minimal implementations to make it compile
   Widget _buildDialMenuWidget() => const SizedBox.shrink();
-  Widget _buildDrawingControls() => Container();
+  Widget _buildDrawingControls() {
+    final theme = Theme.of(context);
+    final surfaceColor = theme.colorScheme.surface;
+
+    return ClayContainer(
+      color: surfaceColor,
+      borderRadius: 15,
+      depth: 5,
+      spread: 2,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Color picker buttons
+            _buildColorButton(Colors.black, surfaceColor),
+            const SizedBox(width: 8),
+            _buildColorButton(Colors.red, surfaceColor),
+            const SizedBox(width: 8),
+            _buildColorButton(Colors.blue, surfaceColor),
+            const SizedBox(width: 8),
+            _buildColorButton(Colors.green, surfaceColor),
+            const SizedBox(width: 16),
+            
+            // Stroke width controls
+            ClayContainer(
+              color: surfaceColor,
+              borderRadius: 8,
+              child: IconButton(
+                icon: const Icon(Icons.remove, size: 16),
+                onPressed: () {
+                  setState(() {
+                    _currentStrokeWidth = (_currentStrokeWidth - 1).clamp(1.0, 10.0);
+                    _drawingController.setStyle(
+                      color: _currentDrawingColor,
+                      strokeWidth: _currentStrokeWidth,
+                    );
+                  });
+                },
+                tooltip: 'Decrease stroke width',
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: surfaceColor,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: Text(
+                '${_currentStrokeWidth.toInt()}px',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+            ),
+            const SizedBox(width: 4),
+            ClayContainer(
+              color: surfaceColor,
+              borderRadius: 8,
+              child: IconButton(
+                icon: const Icon(Icons.add, size: 16),
+                onPressed: () {
+                  setState(() {
+                    _currentStrokeWidth = (_currentStrokeWidth + 1).clamp(1.0, 10.0);
+                    _drawingController.setStyle(
+                      color: _currentDrawingColor,
+                      strokeWidth: _currentStrokeWidth,
+                    );
+                  });
+                },
+                tooltip: 'Increase stroke width',
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              ),
+            ),
+            const SizedBox(width: 16),
+            
+            // Clear button
+            ClayContainer(
+              color: surfaceColor,
+              borderRadius: 8,
+              child: IconButton(
+                icon: const Icon(Icons.clear, size: 18, color: Colors.red),
+                onPressed: () {
+                  _drawingController.clear();
+                  _saveDrawingData();
+                },
+                tooltip: 'Clear all drawings',
+                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildColorButton(Color color, Color surfaceColor) {
+    final isSelected = _currentDrawingColor == color;
+    
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _currentDrawingColor = color;
+          _drawingController.setStyle(
+            color: _currentDrawingColor,
+            strokeWidth: _currentStrokeWidth,
+          );
+        });
+      },
+      child: ClayContainer(
+        color: surfaceColor,
+        borderRadius: 20,
+        depth: isSelected ? 2 : 8,
+        spread: isSelected ? 1 : 3,
+        child: Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            border: isSelected 
+              ? Border.all(color: Colors.white, width: 3)
+              : null,
+          ),
+        ),
+      ),
+    );
+  }
   
   /// Shows dialog to select the original key of the song
   void _showKeySelectionDialog() {
@@ -1186,6 +1397,50 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
   }
   Widget _buildChordProgressionButton() => const SizedBox.shrink();
 
+  /// Builds the transcription button
+  Widget _buildTranscriptionButton() {
+    final theme = Theme.of(context);
+    final surfaceColor = theme.colorScheme.surface;
+
+    return Center(
+      child: GestureDetector(
+        onTap: _openTranscriptionViewer,
+        child: ClayContainer(
+          color: surfaceColor,
+          borderRadius: 12,
+          depth: 5,
+          spread: 2,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.secondary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.video_library,
+                  color: theme.colorScheme.secondary,
+                  size: 18,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Transcribe',
+                  style: TextStyle(
+                    color: theme.colorScheme.secondary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   /// Builds the key controls section (key button and indicator)
   Widget _buildKeyControls() {
     return Column(
@@ -1240,6 +1495,8 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
           valueListenable: _isDrawingModeNotifier,
           builder: (context, isDrawingMode, child) {
             return ClayContainer(
+              spread: isDrawingMode ? 0 : 6,
+              depth: isDrawingMode ? 0 : 20,
               color: isDrawingMode
                   ? CupertinoColors.systemBlue.withOpacity(0.8)
                   : surfaceColor,
@@ -1393,41 +1650,6 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
                   ),
                 ),
               ],
-            ),
-            const SizedBox(height: 8),
-            // Transcription button
-            GestureDetector(
-              onTap: _openTranscriptionViewer,
-              child: ClayContainer(
-                color: surfaceColor,
-                borderRadius: 8,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.secondary.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.video_library,
-                        color: Theme.of(context).colorScheme.secondary,
-                        size: 16,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Transcription',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.secondary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
             ),
           ],
         ),

@@ -23,6 +23,7 @@ class LocalStorageService {
   static const String _drawingsFileName = 'drawings.json';
   static const String _pdfDrawingsFileName = 'pdf_drawings.json';
   static const String _youtubeLinksFileName = 'youtube_links.json';
+  static const String _booksFileName = 'books.json';
 
   // Static mutex for serializing save operations to prevent race conditions
   static final Completer<void>? _saveMutex = null;
@@ -979,6 +980,113 @@ class LocalStorageService {
       developer.log('Cleared all local storage');
     } catch (e) {
       developer.log('Error clearing local storage: $e', error: e);
+    }
+  }
+
+  // =============================================================================
+  // BOOKS MANAGEMENT
+  // =============================================================================
+
+  /// Save registered books to local storage
+  static Future<void> saveBooks(List<Map<String, dynamic>> books) async {
+    return _withSaveLock(() async {
+      try {
+        final directory = await getApplicationDocumentsDirectory();
+        final file = File('${directory.path}/$_booksFileName');
+        
+        // Use atomic save with temporary file
+        final tempFile = File('${file.path}.tmp');
+        await tempFile.parent.create(recursive: true);
+        
+        try {
+          await tempFile.writeAsString(json.encode(books));
+          await tempFile.rename(file.path);
+          developer.log('📚 Books saved successfully: ${books.length} books');
+        } catch (renameError) {
+          developer.log('⚠️ Books rename failed, falling back to direct write: $renameError');
+          await file.writeAsString(json.encode(books));
+          if (await tempFile.exists()) {
+            await tempFile.delete();
+          }
+        }
+      } catch (e) {
+        developer.log('❌ Error saving books: $e');
+        rethrow;
+      }
+    });
+  }
+
+  /// Load registered books from local storage
+  static Future<List<Map<String, dynamic>>> loadBooks() async {
+    try {
+      final directory = await getApplicationDocumentsDirectory();
+      final file = File('${directory.path}/$_booksFileName');
+      
+      if (!await file.exists()) {
+        developer.log('📚 No books file found, returning empty list');
+        return <Map<String, dynamic>>[];
+      }
+      
+      final jsonString = await file.readAsString();
+      final List<dynamic> booksJson = json.decode(jsonString);
+      final books = booksJson.cast<Map<String, dynamic>>();
+      
+      developer.log('📚 Loaded ${books.length} books from storage');
+      return books;
+    } catch (e) {
+      developer.log('❌ Error loading books: $e');
+      return <Map<String, dynamic>>[];
+    }
+  }
+
+  /// Add a new book to storage
+  static Future<void> addBook(Map<String, dynamic> book) async {
+    try {
+      final books = await loadBooks();
+      books.add(book);
+      await saveBooks(books);
+      developer.log('📚 Added new book: ${book['name']}');
+    } catch (e) {
+      developer.log('❌ Error adding book: $e');
+      rethrow;
+    }
+  }
+
+  /// Update an existing book in storage
+  static Future<void> updateBook(String bookId, Map<String, dynamic> updatedBook) async {
+    try {
+      final books = await loadBooks();
+      final index = books.indexWhere((book) => book['id'] == bookId);
+      
+      if (index != -1) {
+        books[index] = updatedBook;
+        await saveBooks(books);
+        developer.log('📚 Updated book: ${updatedBook['name']}');
+      } else {
+        throw Exception('Book with id $bookId not found');
+      }
+    } catch (e) {
+      developer.log('❌ Error updating book: $e');
+      rethrow;
+    }
+  }
+
+  /// Delete a book from storage
+  static Future<void> deleteBook(String bookId) async {
+    try {
+      final books = await loadBooks();
+      final index = books.indexWhere((book) => book['id'] == bookId);
+      
+      if (index != -1) {
+        final deletedBook = books.removeAt(index);
+        await saveBooks(books);
+        developer.log('📚 Deleted book: ${deletedBook['name']}');
+      } else {
+        throw Exception('Book with id $bookId not found');
+      }
+    } catch (e) {
+      developer.log('❌ Error deleting book: $e');
+      rethrow;
     }
   }
 }

@@ -55,15 +55,26 @@ class _SongViewerScreenState extends State<SongViewerScreen> {
       bpm: widget.bpm,
       practiceArea: widget.practiceArea,
     );
+    
+    // Ensure toolbar appears after initial build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        setState(() {});
+      }
+    });
   }
 
   // Returns the current toolbar based on mode
   Widget _buildToolbar() {
     switch (_currentMode) {
       case ViewerMode.simpleSheetMusic:
-        return (_sheetMusicKey.currentState as dynamic)?.buildToolbar() ?? Container();
+        // Use a post-frame callback to ensure the widget is built
+        return (_sheetMusicKey.currentState as dynamic)?.buildToolbar() ?? 
+               const SizedBox(height: 60); // Placeholder while loading
       case ViewerMode.pdf:
-        return (_pdfKey.currentState as dynamic)?.buildToolbar() ?? Container();
+        // Use a post-frame callback to ensure the widget is built
+        return (_pdfKey.currentState as dynamic)?.buildToolbar() ?? 
+               const SizedBox(height: 60); // Placeholder while loading
     }
   }
 
@@ -88,6 +99,12 @@ class _SongViewerScreenState extends State<SongViewerScreen> {
       onSelected: (ViewerMode mode) {
         setState(() {
           _currentMode = mode;
+        });
+        // Force rebuild after next frame to ensure toolbar appears
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            setState(() {});
+          }
         });
       },
       itemBuilder: (BuildContext context) => [
