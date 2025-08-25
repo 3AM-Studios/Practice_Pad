@@ -83,11 +83,22 @@ class _PDFViewerState extends State<PDFViewer>
       final file = await _getPDFPathFile();
       String? savedPath;
       if (await file.exists()) {
-        savedPath = await file.readAsString();
+        final savedFileName = await file.readAsString();
+        debugPrint('Loaded PDF filename from file: $savedFileName');
+        
+        // Reconstruct full path using current Documents directory
+        final directory = await getApplicationDocumentsDirectory();
+        savedPath = '${directory.path}/$savedFileName';
+        debugPrint('Reconstructed PDF path: $savedPath');
+        debugPrint('Checking if file exists: ${File(savedPath).existsSync()}');
+      } else {
+        debugPrint('PDF path file does not exist at: ${file.path}');
       }
       if (savedPath != null && savedPath.isNotEmpty && File(savedPath).existsSync()) {
+        debugPrint('Found saved PDF path: $savedPath');
         await _loadPDF(savedPath);
       } else {
+        debugPrint('PDF was not found');
         setState(() {
           _isLoading = false;
         });
@@ -104,7 +115,11 @@ class _PDFViewerState extends State<PDFViewer>
   Future<void> _savePDFPath(String path) async {
     try {
       final file = await _getPDFPathFile();
-      await file.writeAsString(path);
+      // Save only the filename, not the full path
+      final fileName = path.split('/').last;
+      await file.writeAsString(fileName);
+      debugPrint('Saved PDF filename to file: $fileName');
+      debugPrint('File location: ${file.path}');
     } catch (e) {
       debugPrint('Error saving PDF path: $e');
     }
@@ -118,8 +133,14 @@ class _PDFViewerState extends State<PDFViewer>
         _isReady = false;
       });
 
+      // Copy PDF to app documents directory for permanent storage
+      String permanentPdfPath = path;
+      if (!path.startsWith((await getApplicationDocumentsDirectory()).path)) {
+        permanentPdfPath = await _copyPDFToDocuments(path);
+      }
+
       // Open PDF with converter
-      await _converter.openPdf(path);
+      await _converter.openPdf(permanentPdfPath);
       
       // Get page count
       _totalPages = _converter.pageCount;
@@ -128,11 +149,11 @@ class _PDFViewerState extends State<PDFViewer>
       // Convert current page to image
       await _loadCurrentPageImage();
       
-      // Save PDF path
-      await _savePDFPath(path);
+      // Save permanent PDF path
+      await _savePDFPath(permanentPdfPath);
       
       setState(() {
-        _pdfPath = path;
+        _pdfPath = permanentPdfPath;
         _isReady = true;
         _isLoading = false;
       });
@@ -153,6 +174,21 @@ class _PDFViewerState extends State<PDFViewer>
         );
       }
     }
+  }
+
+  /// Copy PDF file to app documents directory for permanent storage
+  Future<String> _copyPDFToDocuments(String originalPath) async {
+    final directory = await getApplicationDocumentsDirectory();
+    final safeFilename = _getSafeFilename(widget.songAssetPath);
+    final fileName = '${safeFilename}_pdf.pdf';
+    final permanentFile = File('${directory.path}/$fileName');
+    
+    // Copy original file to documents directory
+    final originalFile = File(originalPath);
+    await originalFile.copy(permanentFile.path);
+    
+    debugPrint('Copied PDF to permanent location: ${permanentFile.path}');
+    return permanentFile.path;
   }
 
   /// Load current page as image
@@ -204,6 +240,15 @@ class _PDFViewerState extends State<PDFViewer>
       // Close PDF in converter
       if (_converter.isOpen) {
         await _converter.closePdf();
+      }
+      
+      // Delete the copied PDF file
+      if (_pdfPath != null) {
+        final pdfFile = File(_pdfPath!);
+        if (await pdfFile.exists()) {
+          await pdfFile.delete();
+          debugPrint('Deleted PDF file: $_pdfPath');
+        }
       }
       
       // Clear saved path
@@ -463,13 +508,15 @@ class _PDFViewerState extends State<PDFViewer>
         ),
 
         // Page navigation controls
-        _buildPageControls(),
+        _buildPageNavigator(),
       ],
     );
   }
 
   /// Build page navigation controls
-  Widget _buildPageControls() {
+  Widget _buildPageNavigator() {
+    if (_totalPages < 2) return const SizedBox.shrink();
+
     return Positioned(
       bottom: 16,
       left: 16,
@@ -530,7 +577,7 @@ class _PDFViewerState extends State<PDFViewer>
                 return Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _buildPDFControls(),
+                    _buildTopBar(),
                     _buildToolbarPageControls(),
                     _buildZoomAndDrawControls(surfaceColor),
                   ],
@@ -543,7 +590,7 @@ class _PDFViewerState extends State<PDFViewer>
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        _buildPDFControls(),
+                        _buildTopBar(),
                         _buildToolbarPageControls(),
                       ],
                     ),
@@ -560,7 +607,7 @@ class _PDFViewerState extends State<PDFViewer>
     );
   }
 
-  Widget _buildPDFControls() {
+  Widget _buildTopBar() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(

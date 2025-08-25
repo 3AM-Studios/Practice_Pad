@@ -17,13 +17,13 @@ class _MeasureSizeRenderObject extends RenderProxyBox {
       return;
     }
 
-    print('🎨 GET_SIZE: performLayout - size changed from $oldSize to $newSize');
+    
     oldSize = newSize;
 
     // ignore: unnecessary_cast
     (WidgetsBinding.instance as WidgetsBinding)
         .addPostFrameCallback((_) {
-          print('🎨 GET_SIZE: postFrameCallback - calling onChange with size $newSize');
+          
           onChange?.call(newSize);
         });
   }

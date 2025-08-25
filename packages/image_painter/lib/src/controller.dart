@@ -217,7 +217,7 @@ class ImagePainterController extends ChangeNotifier {
   Color get labelColor => _labelColor;
 
   ImagePainterController({
-    double strokeWidth = 4.0,
+    double strokeWidth = 0.3,
     Color color = Colors.red,
     PaintMode mode = PaintMode.freeStyle,
     String text = '',

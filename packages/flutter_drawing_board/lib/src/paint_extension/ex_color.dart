@@ -19,13 +19,8 @@ Color? stringToColor(String data) {
 }
 
 int colorToInt(Color color) {
-  print('🎨 COLOR_CONVERSION: colorToInt - input: $color (alpha: ${color.alpha}, red: ${color.red}, green: ${color.green}, blue: ${color.blue})');
-  
-  final result = color.alpha << 24 |
-      color.red << 16 |
-      color.green << 8 |
-      color.blue;
-  
-  print('🎨 COLOR_CONVERSION: colorToInt - output: 0x${result.toRadixString(16).padLeft(8, '0')}');
+  final result =
+      color.alpha << 24 | color.red << 16 | color.green << 8 | color.blue;
+
   return result;
 }

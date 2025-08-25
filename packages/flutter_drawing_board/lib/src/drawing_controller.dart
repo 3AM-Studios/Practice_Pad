@@ -145,10 +145,10 @@ class DrawingController extends ChangeNotifier {
     // Use provided stable GlobalKey or create a new one
     painterKey = globalKey ?? GlobalKey(debugLabel: uniqueId ?? 'drawing_board_${DateTime.now().millisecondsSinceEpoch}');
     
-    print('🎨 DRAW_CONTROLLER: constructor - controller hash: $hashCode');
-    print('🎨 DRAW_CONTROLLER: constructor - painterKey: ${painterKey.toString()}');
-    print('🎨 DRAW_CONTROLLER: constructor - uniqueId: $uniqueId');
-    print('🎨 DRAW_CONTROLLER: constructor - globalKey provided: ${globalKey != null}');
+    
+    
+    
+    
   }
 
   /// 绘制开始点
@@ -213,11 +213,11 @@ class DrawingController extends ChangeNotifier {
 
   /// 设置画板大小
   void setBoardSize(Size? size) {
-    print('🎨 DRAW_CONTROLLER: setBoardSize called with $size');
-    print('🎨 DRAW_CONTROLLER: setBoardSize - controller hash: $hashCode');
-    print('🎨 DRAW_CONTROLLER: setBoardSize - old size: ${drawConfig.value.size}');
+    
+    
+    
     drawConfig.value = drawConfig.value.copyWith(size: size);
-    print('🎨 DRAW_CONTROLLER: setBoardSize - new size: ${drawConfig.value.size}');
+    
   }
 
   /// 手指落下
@@ -288,16 +288,16 @@ class DrawingController extends ChangeNotifier {
 
   /// 添加多条数据
   void addContents(List<PaintContent> contents) {
-    print('🎨 DRAW_CONTROLLER: addContents called with ${contents.length} contents');
+    
     for (int i = 0; i < contents.length; i++) {
-      print('🎨 DRAW_CONTROLLER: addContents - content $i: ${contents[i].runtimeType}, toString: ${contents[i].toString()}');
+      
     }
     
     _history.addAll(contents);
     _currentIndex = _history.length;
     cachedImage = null;
     
-    print('🎨 DRAW_CONTROLLER: addContents - new currentIndex: $_currentIndex, history length: ${_history.length}');
+    
     _refreshDeep();
   }
 
@@ -310,24 +310,24 @@ class DrawingController extends ChangeNotifier {
 
   /// 开始绘制
   void startDraw(Offset startPoint) {
-    print('🎨 DRAW_CONTROLLER: startDraw called at $startPoint');
+    
     if (_currentIndex == 0 && _paintContent is Eraser) {
-      print('🎨 DRAW_CONTROLLER: startDraw skipped - eraser with no content');
+      
       return;
     }
 
     _startPoint = startPoint;
-    print('🎨 DRAW_CONTROLLER: startDraw proceeding with ${_paintContent.runtimeType}');
+    
     if (_paintContent is Eraser) {
       eraserContent = _paintContent.copy();
       eraserContent?.paint = drawConfig.value.paint.copyWith();
       eraserContent?.startDraw(startPoint);
-      print('🎨 DRAW_CONTROLLER: Created eraser content');
+      
     } else {
       currentContent = _paintContent.copy();
       currentContent?.paint = drawConfig.value.paint;
       currentContent?.startDraw(startPoint);
-      print('🎨 DRAW_CONTROLLER: Created drawing content: ${currentContent.runtimeType}');
+      
     }
   }
 
@@ -341,35 +341,35 @@ class DrawingController extends ChangeNotifier {
   /// 正在绘制
   void drawing(Offset nowPaint) {
     if (!hasPaintingContent) {
-      print('🎨 DRAW_CONTROLLER: drawing skipped - no painting content');
+      
       return;
     }
 
     _isDrawingValidContent = true;
-    print('🎨 DRAW_CONTROLLER: drawing at $nowPaint');
+    
 
     if (_paintContent is Eraser) {
       eraserContent?.drawing(nowPaint);
       _refresh();
       _refreshDeep();
-      print('🎨 DRAW_CONTROLLER: eraser drawing updated');
+      
     } else {
       currentContent?.drawing(nowPaint);
       _refresh();
-      print('🎨 DRAW_CONTROLLER: drawing content updated');
+      
     }
   }
 
   /// 结束绘制
   void endDraw() {
-    print('🎨 DRAW_CONTROLLER: endDraw called');
+    
     if (!hasPaintingContent) {
-      print('🎨 DRAW_CONTROLLER: endDraw skipped - no painting content');
+      
       return;
     }
 
     if (!_isDrawingValidContent) {
-      print('🎨 DRAW_CONTROLLER: endDraw - invalid content, cleaning up');
+      
       // 清理绘制内容
       _startPoint = null;
       currentContent = null;
@@ -378,7 +378,7 @@ class DrawingController extends ChangeNotifier {
     }
 
     _isDrawingValidContent = false;
-    print('🎨 DRAW_CONTROLLER: endDraw - valid content, adding to history');
+    
 
     _startPoint = null;
     final int hisLen = _history.length;
@@ -391,20 +391,20 @@ class DrawingController extends ChangeNotifier {
       _history.add(eraserContent!);
       _currentIndex = _history.length;
       eraserContent = null;
-      print('🎨 DRAW_CONTROLLER: Added eraser to history. New index: $_currentIndex');
+      
     }
 
     if (currentContent != null) {
       _history.add(currentContent!);
       _currentIndex = _history.length;
       currentContent = null;
-      print('🎨 DRAW_CONTROLLER: Added drawing to history. New index: $_currentIndex, total history: ${_history.length}');
+      
     }
 
     _refresh();
     _refreshDeep();
     notifyListeners();
-    print('🎨 DRAW_CONTROLLER: endDraw completed - refreshed and notified');
+    
   }
 
   /// 撤销
@@ -449,11 +449,11 @@ class DrawingController extends ChangeNotifier {
 
   /// 清理画布
   void clear() {
-    print('🎨 DRAW_CONTROLLER: clear called - before: currentIndex=$_currentIndex, history length=${_history.length}');
+    
     cachedImage = null;
     _history.clear();
     _currentIndex = 0;
-    print('🎨 DRAW_CONTROLLER: clear completed - after: currentIndex=$_currentIndex, history length=${_history.length}');
+    
     _refreshDeep();
   }
 
@@ -466,7 +466,6 @@ class DrawingController extends ChangeNotifier {
           pixelRatio: View.of(painterKey.currentContext!).devicePixelRatio);
       return await image.toByteData(format: ui.ImageByteFormat.png);
     } catch (e) {
-      debugPrint('获取图片数据出错:$e');
       return null;
     }
   }
@@ -479,22 +478,21 @@ class DrawingController extends ChangeNotifier {
       }
       return null;
     } catch (e) {
-      debugPrint('获取表层图片数据出错:$e');
       return null;
     }
   }
 
   /// 获取画板内容Json
   List<Map<String, dynamic>> getJsonList() {
-    print('🎨 DRAW_CONTROLLER: getJsonList called');
-    print('🎨 DRAW_CONTROLLER: getJsonList - controller hash: $hashCode');
-    print('🎨 DRAW_CONTROLLER: getJsonList - history length: ${_history.length}');
-    print('🎨 DRAW_CONTROLLER: getJsonList - currentIndex: $_currentIndex');
+    
+    
+    
+    
     
     final jsonList = _history.map((PaintContent e) => e.toJson()).toList();
-    print('🎨 DRAW_CONTROLLER: getJsonList - returned ${jsonList.length} items');
+    
     for (int i = 0; i < jsonList.length; i++) {
-      print('🎨 DRAW_CONTROLLER: getJsonList - item $i: ${jsonList[i]}');
+      
     }
     
     return jsonList;
@@ -502,36 +500,36 @@ class DrawingController extends ChangeNotifier {
 
   /// 刷新表层画板
   void _refresh() {
-    print('🎨 DRAW_CONTROLLER: _refresh called - controller hash: $hashCode');
-    print('🎨 DRAW_CONTROLLER: _refresh - currentContent: ${currentContent?.runtimeType}');
+    
+    
     painter?._refresh();
   }
 
   /// 刷新底层画板
   void _refreshDeep() {
-    print('🎨 DRAW_CONTROLLER: _refreshDeep called - controller hash: $hashCode');
-    print('🎨 DRAW_CONTROLLER: _refreshDeep - currentIndex: $_currentIndex');
-    print('🎨 DRAW_CONTROLLER: _refreshDeep - history length: ${_history.length}');
+    
+    
+    
     realPainter?._refresh();
   }
 
   /// 销毁控制器
   @override
   void dispose() {
-    print('🎨 DRAW_CONTROLLER: dispose called - controller hash: $hashCode');
-    print('🎨 DRAW_CONTROLLER: dispose - mounted: $_mounted');
+    
+    
     if (!_mounted) {
-      print('🎨 DRAW_CONTROLLER: dispose - already disposed, returning');
+      
       return;
     }
 
-    print('🎨 DRAW_CONTROLLER: dispose - disposing resources');
+    
     drawConfig.dispose();
     realPainter?.dispose();
     painter?.dispose();
 
     _mounted = false;
-    print('🎨 DRAW_CONTROLLER: dispose completed - controller hash: $hashCode');
+    
 
     super.dispose();
   }
@@ -540,7 +538,7 @@ class DrawingController extends ChangeNotifier {
 /// 画布刷新控制器
 class RePaintNotifier extends ChangeNotifier {
   void _refresh() {
-    print('🎨 REPAINT_NOTIFIER: _refresh called - notifying listeners');
+    
     notifyListeners();
   }
 }

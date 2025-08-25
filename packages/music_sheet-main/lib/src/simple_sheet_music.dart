@@ -556,9 +556,18 @@ void _resetInteractionState() {
           parent: AlwaysScrollableScrollPhysics(),
         ),
         padding: const EdgeInsets.only(bottom: 200.0),
-        child: SizedBox(
-          width: widget.width,
-          height: (currentLayout.totalContentHeight / widget.canvasScale) + currentLayout.upperPaddingOnCanvas,
+        child: ScrollConfiguration(
+          behavior: ScrollConfiguration.of(context).copyWith(
+            scrollbars: false,
+            overscroll: false,
+            physics: const ClampingScrollPhysics(),
+          ),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const ClampingScrollPhysics(),
+          child: SizedBox(
+            width: currentLayout.totalContentWidth / widget.canvasScale,
+            height: (currentLayout.totalContentHeight / widget.canvasScale) + currentLayout.upperPaddingOnCanvas,
           // The Stack is how we layer our static and dynamic painters.
           child: Stack(
             children: [
@@ -568,7 +577,7 @@ void _resetInteractionState() {
               RepaintBoundary(
                 key: const ValueKey('sheet_music_canvas'),
                 child: CustomPaint(
-                  size: Size(widget.width, currentLayout.totalContentHeight),
+                  size: Size(currentLayout.totalContentWidth / widget.canvasScale, currentLayout.totalContentHeight),
                   painter: staticSheetMusicRenderer,
                 ),
               ),
@@ -591,7 +600,7 @@ void _resetInteractionState() {
                       behavior: HitTestBehavior.deferToChild,
                       child: Container(
                         color: Colors.transparent,
-                        width: widget.width,
+                        width: currentLayout.totalContentWidth / widget.canvasScale,
                         height: (currentLayout.totalContentHeight / widget.canvasScale) + currentLayout.upperPaddingOnCanvas,
                       ),
                     ),
@@ -615,7 +624,7 @@ void _resetInteractionState() {
                               canvasScale: widget.canvasScale,
                               verticalOffset: currentLayout.upperPaddingOnCanvas * widget.canvasScale,
                               background: Container(
-                                width: widget.width / widget.canvasScale,
+                                width: (currentLayout.totalContentWidth / widget.canvasScale) / widget.canvasScale,
                                 height: (currentLayout.totalContentHeight / widget.canvasScale) + currentLayout.upperPaddingOnCanvas,
                                 color: Colors.transparent,
                               ),
@@ -660,7 +669,7 @@ void _resetInteractionState() {
 
                   // If there IS an interaction, we draw our fast overlay.
                   return CustomPaint(
-                    size: Size(widget.width, currentLayout.totalContentHeight),
+                    size: Size(currentLayout.totalContentWidth / widget.canvasScale, currentLayout.totalContentHeight),
                     painter: InteractionOverlayPainter(
                       interactionState: interactionState,
                       canvasScale: currentLayout.canvasScale,
@@ -670,7 +679,9 @@ void _resetInteractionState() {
               ),
             ],
           ),
+          ),
         ),
+        )
       );
       },
     );

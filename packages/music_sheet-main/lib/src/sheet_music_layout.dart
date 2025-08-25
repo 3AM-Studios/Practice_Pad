@@ -148,7 +148,6 @@ class SheetMusicLayout with ChangeNotifier {
   double get upperPaddingOnCanvas => _upperPaddingOnCanvas;
 
   // --- End of corrected logic ---
-
   double get totalContentHeight {
     double baseHeight = _staffsHeightsSum * canvasScale;
     final chordSymbolHeight = 90.0;
@@ -159,6 +158,27 @@ class SheetMusicLayout with ChangeNotifier {
     baseHeight += _upperPaddingOnCanvas * canvasScale;
     return baseHeight;
   }
+
+  double get totalContentWidth {
+    if (staffRenderers.isEmpty) return widgetWidth * 2; // Ensure some scroll space
+    
+    // Find the maximum width across all staff lines
+    double maxWidth = 0;
+    for (final staffRenderer in staffRenderers) {
+      double staffWidth = _leftPaddingOnCanvas;
+      for (final measureRenderer in staffRenderer.measureRendereres) {
+        staffWidth += measureRenderer.width;
+      }
+      maxWidth = math.max(maxWidth, staffWidth);
+    }
+    
+    // Add significant right padding to ensure scrollable space and apply canvas scale
+    final totalWidth = (maxWidth + _leftPaddingOnCanvas + 200) * canvasScale;
+    
+    // Always ensure width is larger than widget width for horizontal scrolling
+    return math.max(totalWidth, widgetWidth * 1.5);
+  }
+
 
   // --- INCREMENTAL UPDATE METHODS WITH REFLOW LOGIC ---
 

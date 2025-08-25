@@ -152,32 +152,18 @@ class _DrawingBoardState extends State<DrawingBoard> {
   @override
   void initState() {
     super.initState();
-    print('🎨 DRAWING_BOARD: Widget initState - controller ${_controller.painterKey.toString()}');
-    print('🎨 DRAWING_BOARD: Widget initState - hash: ${_controller.hashCode}');
-    print('🎨 DRAWING_BOARD: Widget initState - history length: ${_controller.getHistory.length}');
-    print('🎨 DRAWING_BOARD: Widget initState - currentIndex: ${_controller.currentIndex}');
   }
 
   @override
   void dispose() {
-    print('🎨 DRAWING_BOARD: Widget dispose - controller ${_controller.painterKey.toString()}');
-    print('🎨 DRAWING_BOARD: Widget dispose - hash: ${_controller.hashCode}');
-    print('🎨 DRAWING_BOARD: Widget dispose - history length: ${_controller.getHistory.length}');
-    print('🎨 DRAWING_BOARD: Widget dispose - currentIndex: ${_controller.currentIndex}');
     if (widget.controller == null) {
-      print('🎨 DRAWING_BOARD: Widget dispose - disposing internal controller');
       _controller.dispose();
-    } else {
-      print('🎨 DRAWING_BOARD: Widget dispose - external controller, not disposing');
-    }
+    } else {}
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    print('🎨 DRAWING_BOARD: Widget build - controller ${_controller.painterKey.toString()}');
-    print('🎨 DRAWING_BOARD: Widget build - hash: ${_controller.hashCode}');
-    print('🎨 DRAWING_BOARD: Widget build - history length: ${_controller.getHistory.length}');
     Widget content = InteractiveViewer(
       maxScale: widget.maxScale,
       minScale: widget.minScale,
@@ -254,9 +240,6 @@ class _DrawingBoardState extends State<DrawingBoard> {
   /// 构建背景
   Widget get _buildImage => GetSize(
         onChange: (Size? size) {
-          print('🎨 DRAWING_BOARD: _buildImage onChange - size: $size');
-          print('🎨 DRAWING_BOARD: _buildImage onChange - canvasScale: ${widget.canvasScale}');
-          print('🎨 DRAWING_BOARD: _buildImage onChange - verticalOffset: ${widget.verticalOffset}');
           _controller.setBoardSize(size);
         },
         child: widget.background,
@@ -264,9 +247,6 @@ class _DrawingBoardState extends State<DrawingBoard> {
 
   /// 构建绘制层
   Widget get _buildPainter {
-    print('🎨 DRAWING_BOARD: _buildPainter - canvasScale: ${widget.canvasScale}');
-    print('🎨 DRAWING_BOARD: _buildPainter - verticalOffset: ${widget.verticalOffset}');
-    
     return Transform(
       transform: Matrix4.identity()
         ..translate(0.0, widget.verticalOffset)
@@ -275,9 +255,6 @@ class _DrawingBoardState extends State<DrawingBoard> {
         valueListenable: _controller.drawConfig,
         shouldRebuild: (DrawConfig p, DrawConfig n) => p.size != n.size,
         builder: (_, DrawConfig dc, Widget? child) {
-          print('🎨 DRAWING_BOARD: _buildPainter builder - dc.size: ${dc.size}');
-          print('🎨 DRAWING_BOARD: _buildPainter builder - creating SizedBox with size: ${dc.size}');
-          
           return SizedBox(
             width: dc.size?.width,
             height: dc.size?.height,

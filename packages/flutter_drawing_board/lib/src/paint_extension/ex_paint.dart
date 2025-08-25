@@ -55,11 +55,8 @@ extension ExPaint on Paint {
 }
 
 Paint jsonToPaint(Map<String, dynamic> data) {
-  print('🎨 PAINT_CONVERSION: jsonToPaint - input color data: ${data['color']} (0x${(data['color'] as int).toRadixString(16).padLeft(8, '0')})');
-  
   final color = Color(data['color'] as int);
-  print('🎨 PAINT_CONVERSION: jsonToPaint - created color: $color (alpha: ${color.alpha}, red: ${color.red}, green: ${color.green}, blue: ${color.blue})');
-  
+
   return Paint()
     ..blendMode = BlendMode.values[data['blendMode'] as int]
     ..color = color

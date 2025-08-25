@@ -372,18 +372,19 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
           // Collect musical symbols for this measure
           final musicalSymbols = <dynamic>[];
           final measureChords = <ChordSymbol>[];
+            // Add key signature based on the global key signature
+          final keySignatureType = _getCurrentKeySignature();
+          musicalSymbols.add(_createKeySignatureFromType(keySignatureType));
+
+            // Add time signature - parse from the existing _timeSignature variable
+          final timeSigParts = _timeSignature.split('/');
 
           // Only add clef and key signature to the first measure
           if (measureNumber == 1) {
             // Add default clef
             musicalSymbols.add(music_sheet.Clef.treble());
 
-            // Add key signature based on the global key signature
-            final keySignatureType = _getCurrentKeySignature();
-            musicalSymbols.add(_createKeySignatureFromType(keySignatureType));
 
-            // Add time signature - parse from the existing _timeSignature variable
-            final timeSigParts = _timeSignature.split('/');
             if (timeSigParts.length == 2) {
               final num = int.tryParse(timeSigParts[0]) ?? 4;
               final denom = int.tryParse(timeSigParts[1]) ?? 4;
@@ -399,13 +400,11 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
               }
             }
           }
-          // else add rest of measure length 
+          // else add rests based on num beats
           else {
-            // Add a rest for the remaining measure length
-            musicalSymbols.add(music_sheet.Rest(music_sheet.RestType.quarter));
-            musicalSymbols.add(music_sheet.Rest(music_sheet.RestType.quarter));
-            musicalSymbols.add(music_sheet.Rest(music_sheet.RestType.quarter));
-            musicalSymbols.add(music_sheet.Note(music_sheet.Pitch.c4));
+            for (int i = 0; i < int.parse(timeSigParts[0]); i++) {
+              musicalSymbols.add(music_sheet.Rest(music_sheet.RestType.quarter));
+            }
           }
 
           // Process all elements in the measure

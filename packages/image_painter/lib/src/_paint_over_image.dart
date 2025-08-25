@@ -969,7 +969,7 @@ class ImagePainterState extends State<ImagePainter> {
               borderRadius: BorderRadius.circular(20),
             ),
             icon:
-                widget.brushIcon ?? Icon(Icons.brush, color: Colors.grey[700]),
+                Icon(Icons.line_style, color: Colors.grey[700]),
             itemBuilder: (_) => [_showRangeSliderPopup()],
           ),
           AnimatedBuilder(
@@ -1311,7 +1311,7 @@ class ImagePainterState extends State<ImagePainter> {
       Container(
         margin: const EdgeInsets.only(bottom: 16),
         child: _buildClayMenuButton(
-          icon: widget.brushIcon ?? Icon(Icons.brush, color: Colors.grey[700]),
+          icon: Icon(Icons.line_style, color: Colors.grey[700]),
           onPressed: _showBrushMenu,
           tooltip: textDelegate.changeBrushSize,
         ),
@@ -1962,8 +1962,8 @@ class ImagePainterState extends State<ImagePainter> {
                     Text('Brush Size: ${_controller.strokeWidth.toInt()}'),
                     Slider(
                       value: _controller.strokeWidth,
-                      min: 1.0,
-                      max: 20.0,
+                      min: 0.1,
+                      max: 2,
                       divisions: 19,
                       onChanged: (value) {
                         _controller.setStrokeWidth(value);
