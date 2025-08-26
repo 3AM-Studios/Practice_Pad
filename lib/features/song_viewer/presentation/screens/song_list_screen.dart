@@ -46,6 +46,89 @@ class _SongListScreenState extends State<SongListScreen> {
     });
   }
 
+  void _showCreateSongDialog() {
+    final nameController = TextEditingController();
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Create New Song'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Song Name',
+                  hintText: 'Enter the name of your song',
+                  border: OutlineInputBorder(),
+                ),
+                autofocus: true,
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'This will create a PDF-only song where you can upload and annotate sheet music.',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => _createNewSong(nameController.text.trim()),
+              child: const Text('Create'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _createNewSong(String songName) async {
+    if (songName.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a song name')),
+      );
+      return;
+    }
+
+    Navigator.of(context).pop(); // Close dialog
+
+    // Create a PDF-only song
+    final newSong = Song.createPdfOnly(
+      title: songName,
+      composer: 'Custom',
+    );
+
+    try {
+      // Save the custom song to local storage
+      await _manifestService.saveCustomSong(newSong);
+      
+      // Refresh the song list to show the new song
+      await _loadSongs();
+
+      if (widget.returnSelectedSong) {
+        // Return the new song to the previous screen
+        Navigator.of(context).pop(newSong);
+      } else {
+        // Navigate directly to the song viewer
+        Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => SongViewerScreen(songAssetPath: newSong.path),
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error creating song: $e')),
+        );
+      }
+    }
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -57,6 +140,13 @@ class _SongListScreenState extends State<SongListScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.returnSelectedSong ? 'Select a Song for Practice' : 'Select a Song'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.add),
+            onPressed: _showCreateSongDialog,
+            tooltip: 'Create New Song',
+          ),
+        ],
       ),
       body: Column(
         children: [

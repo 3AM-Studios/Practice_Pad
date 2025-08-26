@@ -24,6 +24,7 @@ class LocalStorageService {
   static const String _pdfDrawingsFileName = 'pdf_drawings.json';
   static const String _youtubeLinksFileName = 'youtube_links.json';
   static const String _booksFileName = 'books.json';
+  static const String _customSongsFileName = 'custom_songs.json';
 
   // Static mutex for serializing save operations to prevent race conditions
   static final Completer<void>? _saveMutex = null;
@@ -1086,6 +1087,87 @@ class LocalStorageService {
       }
     } catch (e) {
       developer.log('❌ Error deleting book: $e');
+      rethrow;
+    }
+  }
+
+  /// Save custom songs to local storage
+  static Future<void> saveCustomSongs(List<Map<String, dynamic>> songs) async {
+    return _withSaveLock(() async {
+      try {
+        final directory = await getApplicationDocumentsDirectory();
+        final file = File('${directory.path}/$_customSongsFileName');
+        final tempFile = File('${file.path}.tmp');
+        await tempFile.parent.create(recursive: true);
+        try {
+          await tempFile.writeAsString(json.encode(songs));
+          await tempFile.rename(file.path);
+          developer.log('🎵 Custom songs saved successfully: ${songs.length} songs');
+        } catch (renameError) {
+          developer.log('⚠️ Custom songs rename failed, falling back to direct write: $renameError');
+          await file.writeAsString(json.encode(songs));
+          if (await tempFile.exists()) {
+            await tempFile.delete();
+          }
+        }
+      } catch (e) {
+        developer.log('❌ Error saving custom songs: $e');
+        rethrow;
+      }
+    });
+  }
+
+  /// Load custom songs from local storage
+  static Future<List<Map<String, dynamic>>> loadCustomSongs() async {
+    try {
+      final directory = await getApplicationDocumentsDirectory();
+      final file = File('${directory.path}/$_customSongsFileName');
+      
+      if (!await file.exists()) {
+        developer.log('🎵 No custom songs file found, returning empty list');
+        return <Map<String, dynamic>>[];
+      }
+
+      final jsonString = await file.readAsString();
+      final List<dynamic> songsJson = json.decode(jsonString);
+      final songs = songsJson.cast<Map<String, dynamic>>();
+      
+      developer.log('🎵 Loaded ${songs.length} custom songs from storage');
+      return songs;
+    } catch (e) {
+      developer.log('❌ Error loading custom songs: $e');
+      return <Map<String, dynamic>>[];
+    }
+  }
+
+  /// Add a single custom song
+  static Future<void> addCustomSong(Map<String, dynamic> song) async {
+    try {
+      final songs = await loadCustomSongs();
+      songs.add(song);
+      await saveCustomSongs(songs);
+      developer.log('🎵 Added custom song: ${song['title']}');
+    } catch (e) {
+      developer.log('❌ Error adding custom song: $e');
+      rethrow;
+    }
+  }
+
+  /// Delete a custom song by path
+  static Future<void> deleteCustomSong(String songPath) async {
+    try {
+      final songs = await loadCustomSongs();
+      final index = songs.indexWhere((song) => song['path'] == songPath);
+      
+      if (index != -1) {
+        final deletedSong = songs.removeAt(index);
+        await saveCustomSongs(songs);
+        developer.log('🎵 Deleted custom song: ${deletedSong['title']}');
+      } else {
+        throw Exception('Custom song with path $songPath not found');
+      }
+    } catch (e) {
+      developer.log('❌ Error deleting custom song: $e');
       rethrow;
     }
   }

@@ -1,9 +1,31 @@
 import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:practice_pad/features/song_viewer/data/models/song.dart';
+import 'package:practice_pad/services/local_storage_service.dart';
 
 class SongManifestService {
   Future<List<Song>> loadSongs() async {
+    try {
+      // Load both asset songs and custom songs
+      final allSongs = <Song>[];
+      
+      // Load asset-based songs (existing functionality)
+      final assetSongs = await _loadAssetSongs();
+      allSongs.addAll(assetSongs);
+      
+      // Load custom songs from local storage
+      final customSongs = await _loadCustomSongs();
+      allSongs.addAll(customSongs);
+      
+      print('Successfully loaded ${allSongs.length} songs (${assetSongs.length} assets + ${customSongs.length} custom)');
+      return allSongs;
+    } catch (e) {
+      print('Critical error in loadSongs: $e');
+      return [];
+    }
+  }
+
+  Future<List<Song>> _loadAssetSongs() async {
     try {
       final assetManifest = await _loadAssetManifest();
       print('Asset manifest loaded with ${assetManifest.keys.length} total assets');
@@ -26,10 +48,21 @@ class SongManifestService {
           ));
         }
       }
-      print('Successfully loaded ${songs.length} songs');
       return songs;
     } catch (e) {
-      print('Critical error in loadSongs: $e');
+      print('Error loading asset songs: $e');
+      return [];
+    }
+  }
+
+  Future<List<Song>> _loadCustomSongs() async {
+    try {
+      final customSongsData = await LocalStorageService.loadCustomSongs();
+      final songs = customSongsData.map((data) => Song.fromJson(data)).toList();
+      print('Loaded ${songs.length} custom songs from local storage');
+      return songs;
+    } catch (e) {
+      print('Error loading custom songs: $e');
       return [];
     }
   }
@@ -57,5 +90,31 @@ class SongManifestService {
     
     print('Song paths found: $songPaths');
     return songPaths;
+  }
+
+  /// Save a custom song to local storage
+  Future<void> saveCustomSong(Song song) async {
+    if (!song.isCustom) {
+      throw ArgumentError('Only custom songs can be saved');
+    }
+    
+    try {
+      await LocalStorageService.addCustomSong(song.toJson());
+      print('Saved custom song: ${song.title}');
+    } catch (e) {
+      print('Error saving custom song: $e');
+      rethrow;
+    }
+  }
+
+  /// Delete a custom song from local storage
+  Future<void> deleteCustomSong(String songPath) async {
+    try {
+      await LocalStorageService.deleteCustomSong(songPath);
+      print('Deleted custom song with path: $songPath');
+    } catch (e) {
+      print('Error deleting custom song: $e');
+      rethrow;
+    }
   }
 }

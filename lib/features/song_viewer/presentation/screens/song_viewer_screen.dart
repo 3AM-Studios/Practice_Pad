@@ -24,9 +24,10 @@ class SongViewerScreen extends StatefulWidget {
 }
 
 class _SongViewerScreenState extends State<SongViewerScreen> {
-  ViewerMode _currentMode = ViewerMode.simpleSheetMusic;
-  late SimpleSheetMusicViewer _sheetMusicViewer;
+  late ViewerMode _currentMode;
+  late SimpleSheetMusicViewer? _sheetMusicViewer;
   late PDFViewer _pdfViewer;
+  late bool _isPdfOnly;
   
   // Keys to maintain state across mode switches
   final GlobalKey _sheetMusicKey = GlobalKey();
@@ -36,19 +37,31 @@ class _SongViewerScreenState extends State<SongViewerScreen> {
   void initState() {
     super.initState();
     
-    // Initialize both viewers - they will be created once and reused
-    _sheetMusicViewer = SimpleSheetMusicViewer(
-      key: _sheetMusicKey,
-      songAssetPath: widget.songAssetPath,
-      bpm: widget.bpm,
-      practiceArea: widget.practiceArea,
-      onStateChanged: () {
-        setState(() {
-          // Rebuild the parent to update toolbar
-        });
-      },
-    );
+    // Check if this is a PDF-only song (custom song)
+    _isPdfOnly = widget.songAssetPath.startsWith('custom://pdf_only/');
     
+    // Set initial mode based on song type
+    _currentMode = _isPdfOnly ? ViewerMode.pdf : ViewerMode.simpleSheetMusic;
+    
+    // Initialize viewers based on song type
+    if (!_isPdfOnly) {
+      // Initialize sheet music viewer for regular songs
+      _sheetMusicViewer = SimpleSheetMusicViewer(
+        key: _sheetMusicKey,
+        songAssetPath: widget.songAssetPath,
+        bpm: widget.bpm,
+        practiceArea: widget.practiceArea,
+        onStateChanged: () {
+          setState(() {
+            // Rebuild the parent to update toolbar
+          });
+        },
+      );
+    } else {
+      _sheetMusicViewer = null;
+    }
+    
+    // Always initialize PDF viewer
     _pdfViewer = PDFViewer(
       key: _pdfKey,
       songAssetPath: widget.songAssetPath,
@@ -68,6 +81,9 @@ class _SongViewerScreenState extends State<SongViewerScreen> {
   Widget _buildToolbar() {
     switch (_currentMode) {
       case ViewerMode.simpleSheetMusic:
+        if (_sheetMusicViewer == null) {
+          return const SizedBox(height: 60); // No toolbar for PDF-only songs
+        }
         // Use a post-frame callback to ensure the widget is built
         return (_sheetMusicKey.currentState as dynamic)?.buildToolbar() ?? 
                const SizedBox(height: 60); // Placeholder while loading
@@ -82,7 +98,12 @@ class _SongViewerScreenState extends State<SongViewerScreen> {
   Widget _buildContent() {
     switch (_currentMode) {
       case ViewerMode.simpleSheetMusic:
-        return _sheetMusicViewer;
+        if (_sheetMusicViewer == null) {
+          return const Center(
+            child: Text('Sheet music not available for custom songs'),
+          );
+        }
+        return _sheetMusicViewer!;
       case ViewerMode.pdf:
         return _pdfViewer;
     }
@@ -90,6 +111,30 @@ class _SongViewerScreenState extends State<SongViewerScreen> {
 
   // Builds the mode toggle button for the AppBar
   Widget _buildModeToggle() {
+    // Don't show mode toggle for PDF-only songs
+    if (_isPdfOnly) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.picture_as_pdf,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              'PDF Only',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return PopupMenuButton<ViewerMode>(
       icon: Icon(
         _currentMode == ViewerMode.simpleSheetMusic 

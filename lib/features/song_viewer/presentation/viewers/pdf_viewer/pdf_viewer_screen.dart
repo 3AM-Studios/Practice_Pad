@@ -636,26 +636,49 @@ class _PDFViewerState extends State<PDFViewer>
                 return Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _buildTopBar(),
-                    _buildToolbarPageControls(),
-                    _buildZoomAndDrawControls(surfaceColor),
+                    // Left spacer for centering
+                    Opacity(
+                      opacity: 0.0, // Invisible but takes up space
+                      child: _buildTranscribeButton(),
+                    ),
+                    
+                    // Center: Books and Upload buttons
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildBooksButton(),
+                        const SizedBox(width: 12),
+                        _buildUploadButton(),
+                      ],
+                    ),
+                    
+                    // Right side: Transcribe button
+                    _buildTranscribeButton(),
                   ],
                 );
               } else {
                 // Narrow screen: wrapped layout
-                return Column(
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // Top row: PDF controls and page controls
+                    // Left spacer for centering
+                    Opacity(
+                      opacity: 0.0, // Invisible but takes up space
+                      child: _buildTranscribeButton(),
+                    ),
+                    
+                    // Center: Books and Upload buttons
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        _buildTopBar(),
-                        _buildToolbarPageControls(),
+                        _buildBooksButton(),
+                        const SizedBox(width: 8),
+                        _buildUploadButton(),
                       ],
                     ),
-                    const SizedBox(height: 14),
-                    // Bottom row: Zoom/draw controls centered
-                    Center(child: _buildZoomAndDrawControls(surfaceColor)),
+                    
+                    // Right side: Transcribe button
+                    _buildTranscribeButton(),
                   ],
                 );
               }
@@ -666,63 +689,98 @@ class _PDFViewerState extends State<PDFViewer>
     );
   }
 
-  Widget _buildTopBar() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.picture_as_pdf,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-          const SizedBox(width: 8),
-          Text(
-            'PDF Mode',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.primary,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(width: 12),
-          GestureDetector(
-            onTap: _openTranscriptionViewer,
-            child: Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.secondary.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(
-                Icons.video_library,
+
+  Widget _buildBooksButton() {
+    return ClayContainer(
+      color: Theme.of(context).colorScheme.surface,
+      borderRadius: 12,
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: GestureDetector(
+          onTap: _showBooksDialog,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.menu_book,
                 color: Theme.of(context).colorScheme.secondary,
-                size: 20,
               ),
-            ),
+              const SizedBox(width: 8),
+              Text(
+                'Books',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.secondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ),
-          if (_pdfPath != null) ...[
-            const SizedBox(width: 8),
-            GestureDetector(
-              onTap: _removePDF,
-              child: Icon(
-                Icons.close,
-                color: Theme.of(context).colorScheme.error,
-                size: 20,
-              ),
-            ),
-          ],
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildZoomAndDrawControls(Color surfaceColor) {
-    return const SizedBox.shrink(); // Removed drawing controls from toolbar
+  Widget _buildUploadButton() {
+    return ClayContainer(
+      color: Theme.of(context).colorScheme.surface,
+      borderRadius: 12,
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: GestureDetector(
+          onTap: _uploadPDF,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.upload_file,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Upload PDF',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
+
+  Widget _buildTranscribeButton() {
+    return GestureDetector(
+      onTap: _openTranscriptionViewer,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.secondary.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.video_library,
+              color: Theme.of(context).colorScheme.secondary,
+              size: 20,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              'Transcribe',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.secondary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
 
   void _openTranscriptionViewer() {
     // Create a Song object from the available data
@@ -983,105 +1041,6 @@ class _PDFViewerState extends State<PDFViewer>
     );
   }
 
-  /// Build page controls for toolbar
-  Widget _buildToolbarPageControls() {
-    if (_pdfPath == null) {
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Books button
-          ClayContainer(
-            color: Theme.of(context).colorScheme.surface,
-            borderRadius: 12,
-            child: Padding(
-              padding: const EdgeInsets.all(8),
-              child: GestureDetector(
-                onTap: _showBooksDialog,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.menu_book,
-                      color: Theme.of(context).colorScheme.secondary,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Books',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.secondary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          // Upload PDF button
-          ClayContainer(
-            color: Theme.of(context).colorScheme.surface,
-            borderRadius: 12,
-            child: Padding(
-              padding: const EdgeInsets.all(8),
-              child: GestureDetector(
-                onTap: _uploadPDF,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.upload_file,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Upload PDF',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.primary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      );
-    }
-
-    return ClayContainer(
-      color: Theme.of(context).colorScheme.surface,
-      borderRadius: 12,
-      child: Padding(
-        padding: const EdgeInsets.all(8),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              onPressed: _currentPage > 0 ? _previousPage : null,
-              icon: const Icon(Icons.chevron_left),
-              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-              padding: const EdgeInsets.all(4),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: Text(
-                '${_currentPage + 1} / $_totalPages',
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
-            ),
-            IconButton(
-              onPressed: _currentPage < _totalPages - 1 ? _nextPage : null,
-              icon: const Icon(Icons.chevron_right),
-              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-              padding: const EdgeInsets.all(4),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   /// Load registered books from local storage
   Future<List<Map<String, dynamic>>> _loadBooks() async {
