@@ -411,9 +411,11 @@ class _PDFViewerState extends State<PDFViewer>
     if (_pdfPath == null || !_isReady) return;
     
     try {
-      final labelsData = _imagePainterController.labels.map((label) => label.toJson()).toList();
-      final file = await _getLabelsFile(_currentPage);
-      await file.writeAsString(jsonEncode(labelsData));
+      await LocalStorageService.saveLabelsForPage(
+        widget.songAssetPath,
+        _currentPage,
+        _imagePainterController.labels,
+      );
       debugPrint('Labels: Saved ${_imagePainterController.labels.length} labels for page $_currentPage');
     } catch (e) {
       debugPrint('Error saving labels: $e');
@@ -425,38 +427,36 @@ class _PDFViewerState extends State<PDFViewer>
     if (_pdfPath == null || !_isReady) return;
     
     try {
-      final file = await _getLabelsFile(_currentPage);
-      if (await file.exists()) {
-        final jsonString = await file.readAsString();
-        final labelsData = jsonDecode(jsonString) as List<dynamic>;
+      final labelsData = await LocalStorageService.loadLabelsForPage(
+        widget.songAssetPath,
+        _currentPage,
+      );
+      
+      final extensionLabels = <ExtensionLabel>[];
+      final romanLabels = <RomanNumeralLabel>[];
+      
+      for (final labelData in labelsData) {
+        final Map<String, dynamic> data = labelData as Map<String, dynamic>;
+        final labelType = data['labelType'] as String;
         
-        final extensionLabels = <ExtensionLabel>[];
-        final romanLabels = <RomanNumeralLabel>[];
-        for (final labelData in labelsData) {
-          final Map<String, dynamic> data = labelData as Map<String, dynamic>;
-          final labelType = data['labelType'] as String;
-          
-          if (labelType == 'extension') {
-            extensionLabels.add(ExtensionLabel.fromJson(data));
-          } else if (labelType == 'romanNumeral') {
-            romanLabels.add(RomanNumeralLabel.fromJson(data));
-          }
+        if (labelType == 'extension') {
+          extensionLabels.add(ExtensionLabel.fromJson(data));
+        } else if (labelType == 'romanNumeral') {
+          romanLabels.add(RomanNumeralLabel.fromJson(data));
         }
-        
-        // Clear existing labels
-        _imagePainterController.clearExtensionLabels();
-        
-        // Add loaded labels
-        final allLabels = <Label>[];
-        allLabels.addAll(extensionLabels);
-        allLabels.addAll(romanLabels);
-        for (final label in allLabels) {
-          _imagePainterController.labels.add(label);
-        }
-        debugPrint('Labels: Loaded ${allLabels.length} labels for page $_currentPage');
-      } else {
-        _imagePainterController.clearExtensionLabels();
       }
+      
+      // Clear existing labels
+      _imagePainterController.clearExtensionLabels();
+      
+      // Add loaded labels
+      final allLabels = <Label>[];
+      allLabels.addAll(extensionLabels);
+      allLabels.addAll(romanLabels);
+      for (final label in allLabels) {
+        _imagePainterController.labels.add(label);
+      }
+      debugPrint('Labels: Loaded ${allLabels.length} labels for page $_currentPage');
     } catch (e) {
       debugPrint('Error loading labels: $e');
       _imagePainterController.clearExtensionLabels();
@@ -833,12 +833,6 @@ class _PDFViewerState extends State<PDFViewer>
     return File('${directory.path}/${safeFilename}_pdf_path.txt');
   }
 
-  /// Get file for storing labels for a page
-  Future<File> _getLabelsFile(int page) async {
-    final directory = await getApplicationDocumentsDirectory();
-    final safeFilename = _getSafeFilename(widget.songAssetPath);
-    return File('${directory.path}/${safeFilename}_pdf_page_${page}_labels.json');
-  }
 
 
   /// Convert asset path to safe filename by replacing invalid characters

@@ -12,14 +12,14 @@ Widget buildGoalRing(BuildContext context, TodayViewModel viewModel, {bool isLar
   final practiceMinutes = viewModel.todaysPracticeMinutes;
   final progress = goalMinutes > 0 ? practiceMinutes / goalMinutes : 0.0;
   
-  // Size configurations based on isLarge parameter
-  final ringSize = isLarge ? 160.0 : 100.0;
-  final strokeWidth = isLarge ? 12.0 : 8.0;
-  final goalFontSize = isLarge ? 18.0 : 12.0;
-  final minutesFontSize = isLarge ? 24.0 : 16.0;
-  final containerPadding = isLarge ? 24.0 : 16.0;
-  final buttonSize = isLarge ? 40.0 : 30.0;
-  final iconSize = isLarge ? 24.0 : 18.0;
+  // Size configurations - made isLarge=false much smaller
+  final ringSize = isLarge ? 160.0 : 60.0;  // Reduced from 100.0 to 60.0
+  final strokeWidth = isLarge ? 12.0 : 5.0;  // Reduced from 8.0 to 5.0
+  final goalFontSize = isLarge ? 18.0 : 9.0;  // Reduced from 12.0 to 9.0
+  final minutesFontSize = isLarge ? 24.0 : 12.0;  // Reduced from 16.0 to 12.0
+  final containerPadding = isLarge ? 24.0 : 10.0;  // Reduced from 16.0 to 10.0
+  final buttonSize = isLarge ? 40.0 : 22.0;  // Reduced from 30.0 to 22.0
+  final iconSize = isLarge ? 24.0 : 14.0;  // Reduced from 18.0 to 14.0
   
   return Container(
     margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

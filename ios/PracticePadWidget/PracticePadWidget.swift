@@ -46,7 +46,7 @@ struct SelectPracticeAreaIntent: AppIntent {
     static var description = IntentDescription("Cycles through practice area filters in the widget.")
 
     func perform() async throws -> some IntentResult {
-        let userDefaults = UserDefaults(suiteName: "group.com.example.practicePad")
+        let userDefaults = UserDefaults(suiteName: "group.com.3amstudios.jazzpad")
         let currentFilter = userDefaults?.string(forKey: "selected_area_filter") ?? "all"
         
         let nextFilter: String
@@ -103,7 +103,7 @@ struct StartPracticeItemIntent: AppIntent {
             return .result()
         }
         
-        guard let userDefaults = UserDefaults(suiteName: "group.com.example.practicePad") else {
+        guard let userDefaults = UserDefaults(suiteName: "group.com.3amstudios.jazzpad") else {
             NSLog("Widget: ERROR - Could not access UserDefaults with app group!")
             return .result()
         }
@@ -150,7 +150,7 @@ struct ToggleSessionIntent: AppIntent {
     func perform() async throws -> some IntentResult {
         NSLog("Widget: ToggleSessionIntent.perform() called")
         
-        guard let userDefaults = UserDefaults(suiteName: "group.com.example.practicePad") else {
+        guard let userDefaults = UserDefaults(suiteName: "group.com.3amstudios.jazzpad") else {
             NSLog("Widget: ERROR - Could not access UserDefaults with app group!")
             return .result()
         }
@@ -236,7 +236,7 @@ struct PracticePadTimelineProvider: TimelineProvider {
     }
     
     private func loadCurrentData() -> PracticePadEntry {
-        let userDefaults = UserDefaults(suiteName: "group.com.example.practicePad")
+        let userDefaults = UserDefaults(suiteName: "group.com.3amstudios.jazzpad")
         
         // Load practice areas
         var practiceAreas: [PracticeAreaData] = []
@@ -410,7 +410,7 @@ struct PracticePadAppIntentTimelineProvider: AppIntentTimelineProvider {
     }
     
     private func loadCurrentData() -> PracticePadEntry {
-        let userDefaults = UserDefaults(suiteName: "group.com.example.practicePad")
+        let userDefaults = UserDefaults(suiteName: "group.com.3amstudios.jazzpad")
         
         NSLog("Widget: Loading current data from UserDefaults")
         
@@ -583,7 +583,7 @@ struct HeaderView: View {
     }
     
     private func getSelectedAreaText() -> String {
-        let userDefaults = UserDefaults(suiteName: "group.com.example.practicePad")
+        let userDefaults = UserDefaults(suiteName: "group.com.3amstudios.jazzpad")
         let selectedFilter = userDefaults?.string(forKey: "selected_area_filter") ?? "all"
         
         switch selectedFilter {
@@ -673,7 +673,7 @@ struct PracticeAreasView: View {
     }
     
     private func getFilteredAreas() -> [PracticeAreaData] {
-        let userDefaults = UserDefaults(suiteName: "group.com.example.practicePad")
+        let userDefaults = UserDefaults(suiteName: "group.com.3amstudios.jazzpad")
         let selectedFilter = userDefaults?.string(forKey: "selected_area_filter") ?? "all"
         
         // Get the active item name to filter it out

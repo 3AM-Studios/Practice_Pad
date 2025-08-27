@@ -11,6 +11,7 @@ import 'package:music_sheet/index.dart';
 import 'package:flutter_drawing_board/paint_contents.dart';
 import 'dart:developer' as developer;
 import 'package:image_painter/image_painter.dart';
+import 'package:practice_pad/services/icloud_sync_service.dart';
 
 /// Local storage service for persisting app data
 class LocalStorageService {
@@ -26,8 +27,11 @@ class LocalStorageService {
   static const String _booksFileName = 'books.json';
   static const String _customSongsFileName = 'custom_songs.json';
 
+  // iCloud Sync Integration
+  static ICloudSyncService? _icloudSyncService;
+  static bool _icloudSyncEnabled = false;
+
   // Static mutex for serializing save operations to prevent race conditions
-  static final Completer<void>? _saveMutex = null;
   static Completer<void>? _currentSaveOperation;
 
   /// Serialize save operations to prevent race conditions
@@ -61,18 +65,6 @@ class LocalStorageService {
     }
   }
 
-  /// Save practice areas to local storage
-  static Future<void> savePracticeAreas(List<PracticeArea> areas) async {
-    try {
-      final file = await _getFile(_practiceAreasFileName);
-      final jsonData = areas.map((area) => _practiceAreaToJson(area)).toList();
-      await file.writeAsString(json.encode(jsonData));
-      developer.log('Saved ${areas.length} practice areas to local storage');
-    } catch (e) {
-      developer.log('Error saving practice areas: $e', error: e);
-      throw Exception('Failed to save practice areas: $e');
-    }
-  }
 
   /// Load practice areas from local storage
   static Future<List<PracticeArea>> loadPracticeAreas() async {
@@ -101,23 +93,6 @@ class LocalStorageService {
     }
   }
 
-  /// Save practice items to local storage
-  static Future<void> savePracticeItems(
-      Map<String, List<PracticeItem>> itemsByArea) async {
-    try {
-      final file = await _getFile(_practiceItemsFileName);
-      final jsonData = itemsByArea.map((areaId, items) => MapEntry(
-            areaId,
-            items.map((item) => _practiceItemToJson(item)).toList(),
-          ));
-      await file.writeAsString(json.encode(jsonData));
-      developer.log(
-          'Saved practice items for ${itemsByArea.length} areas to local storage');
-    } catch (e) {
-      developer.log('Error saving practice items: $e', error: e);
-      throw Exception('Failed to save practice items: $e');
-    }
-  }
 
   /// Load practice items from local storage
   static Future<Map<String, List<PracticeItem>>> loadPracticeItems() async {
@@ -156,6 +131,9 @@ class LocalStorageService {
       final file = await _getFile(_weeklyScheduleFileName);
       await file.writeAsString(json.encode(schedule));
       developer.log('Saved weekly schedule to local storage');
+      
+      // Sync to iCloud after successful save
+      await _syncFileToICloud(_weeklyScheduleFileName);
     } catch (e) {
       developer.log('Error saving weekly schedule: $e', error: e);
       throw Exception('Failed to save weekly schedule: $e');
@@ -202,6 +180,9 @@ class LocalStorageService {
       final file = await _getFile(_songChangesFileName);
       await file.writeAsString(json.encode(allChanges));
       developer.log('Saved song changes for song: $songId');
+      
+      // Sync to iCloud after successful save
+      await _syncFileToICloud(_songChangesFileName);
     } catch (e) {
       developer.log('Error saving song changes: $e', error: e);
       throw Exception('Failed to save song changes: $e');
@@ -257,6 +238,9 @@ class LocalStorageService {
       final file = await _getFile(_chordKeysFileName);
       await file.writeAsString(json.encode(allChordKeys));
       developer.log('Saved chord keys for song: $songId');
+      
+      // Sync to iCloud after successful save
+      await _syncFileToICloud(_chordKeysFileName);
     } catch (e) {
       developer.log('Error saving chord keys: $e', error: e);
       throw Exception('Failed to save chord keys: $e');
@@ -378,6 +362,9 @@ class LocalStorageService {
       await file.writeAsString(json.encode(allSheetMusic));
       developer.log(
           'Saved sheet music for song: $songId (${measures.length} measures)');
+      
+      // Sync to iCloud after successful save
+      await _syncFileToICloud(_sheetMusicFileName);
     } catch (e) {
       developer.log('Error saving sheet music: $e', error: e);
       throw Exception('Failed to save sheet music: $e');
@@ -602,6 +589,9 @@ class LocalStorageService {
 
         developer.log(
             '✅ SERIALIZED SAVE: Saved ${drawingData.length} drawing elements for song: $songId with timestamp: $timestamp');
+        
+        // Sync to iCloud after successful save
+        await _syncFileToICloud(_drawingsFileName);
       } catch (e) {
         developer.log('❌ SERIALIZED SAVE ERROR: $e', error: e);
         throw Exception('Failed to save drawings: $e');
@@ -1091,31 +1081,6 @@ class LocalStorageService {
     }
   }
 
-  /// Save custom songs to local storage
-  static Future<void> saveCustomSongs(List<Map<String, dynamic>> songs) async {
-    return _withSaveLock(() async {
-      try {
-        final directory = await getApplicationDocumentsDirectory();
-        final file = File('${directory.path}/$_customSongsFileName');
-        final tempFile = File('${file.path}.tmp');
-        await tempFile.parent.create(recursive: true);
-        try {
-          await tempFile.writeAsString(json.encode(songs));
-          await tempFile.rename(file.path);
-          developer.log('🎵 Custom songs saved successfully: ${songs.length} songs');
-        } catch (renameError) {
-          developer.log('⚠️ Custom songs rename failed, falling back to direct write: $renameError');
-          await file.writeAsString(json.encode(songs));
-          if (await tempFile.exists()) {
-            await tempFile.delete();
-          }
-        }
-      } catch (e) {
-        developer.log('❌ Error saving custom songs: $e');
-        rethrow;
-      }
-    });
-  }
 
   /// Load custom songs from local storage
   static Future<List<Map<String, dynamic>>> loadCustomSongs() async {
@@ -1140,7 +1105,155 @@ class LocalStorageService {
     }
   }
 
-  /// Add a single custom song
+
+  /// Delete a custom song by path
+  static Future<void> deleteCustomSong(String songPath) async {
+    try {
+      final songs = await loadCustomSongs();
+      final index = songs.indexWhere((song) => song['path'] == songPath);
+      
+      if (index != -1) {
+        final deletedSong = songs.removeAt(index);
+        await saveCustomSongs(songs);
+        developer.log('🎵 Deleted custom song: ${deletedSong['title']}');
+        
+        // Sync to iCloud after deletion
+        await _syncFileToICloud(_customSongsFileName);
+      } else {
+        throw Exception('Custom song with path $songPath not found');
+      }
+    } catch (e) {
+      developer.log('❌ Error deleting custom song: $e');
+      rethrow;
+    }
+  }
+
+  // ============== iCloud Sync Integration ==============
+
+  /// Initialize iCloud sync service
+  static Future<void> initializeICloudSync() async {
+    try {
+      _icloudSyncService = ICloudSyncService();
+      await _icloudSyncService!.initialize();
+      _icloudSyncEnabled = await _icloudSyncService!.isICloudAvailable();
+      
+      if (_icloudSyncEnabled) {
+        developer.log('☁️ iCloud sync initialized and available');
+      } else {
+        developer.log('⚠️ iCloud sync not available on this device');
+      }
+    } catch (e) {
+      developer.log('❌ Failed to initialize iCloud sync: $e');
+      _icloudSyncEnabled = false;
+    }
+  }
+
+  /// Check if iCloud sync is enabled and available
+  static bool get isICloudSyncEnabled => _icloudSyncEnabled && _icloudSyncService != null;
+
+  /// Get iCloud sync service instance
+  static ICloudSyncService? get icloudSyncService => _icloudSyncService;
+
+  /// Enable or disable iCloud sync
+  static Future<void> setICloudSyncEnabled(bool enabled) async {
+    if (enabled && _icloudSyncService == null) {
+      await initializeICloudSync();
+    }
+    _icloudSyncEnabled = enabled && _icloudSyncService != null;
+    developer.log('☁️ iCloud sync ${_icloudSyncEnabled ? 'enabled' : 'disabled'}');
+  }
+
+  /// Sync a specific file to iCloud
+  static Future<void> _syncFileToICloud(String fileName) async {
+    if (!isICloudSyncEnabled) return;
+    
+    try {
+      await _icloudSyncService!.syncJsonFile(fileName);
+    } catch (e) {
+      developer.log('⚠️ Failed to sync $fileName to iCloud: $e');
+      // Don't rethrow - sync failures shouldn't break local operations
+    }
+  }
+
+  /// Sync all data to iCloud
+  static Future<SyncResult> syncAllToICloud() async {
+    if (!isICloudSyncEnabled) {
+      return SyncResult.error('iCloud sync not available or enabled');
+    }
+    
+    return await _icloudSyncService!.syncAllData();
+  }
+
+  /// Enhanced save methods with iCloud sync integration
+
+  /// Save custom songs with iCloud sync
+  static Future<void> saveCustomSongs(List<Map<String, dynamic>> songs) async {
+    return _withSaveLock(() async {
+      try {
+        final directory = await getApplicationDocumentsDirectory();
+        final file = File('${directory.path}/$_customSongsFileName');
+        final tempFile = File('${file.path}.tmp');
+        
+        await tempFile.parent.create(recursive: true);
+        
+        try {
+          await tempFile.writeAsString(json.encode(songs));
+          await tempFile.rename(file.path);
+          developer.log('🎵 Custom songs saved successfully: ${songs.length} songs');
+        } catch (renameError) {
+          await file.writeAsString(json.encode(songs));
+          if (await tempFile.exists()) {
+            await tempFile.delete();
+          }
+        }
+        
+        // Sync to iCloud after successful save
+        await _syncFileToICloud(_customSongsFileName);
+      } catch (e) {
+        developer.log('❌ Error saving custom songs: $e');
+        rethrow;
+      }
+    });
+  }
+
+  /// Enhanced save practice areas with iCloud sync
+  static Future<void> savePracticeAreas(List<PracticeArea> areas) async {
+    try {
+      final file = await _getFile(_practiceAreasFileName);
+      final jsonData = areas.map((area) => _practiceAreaToJson(area)).toList();
+      await file.writeAsString(json.encode(jsonData));
+      developer.log('Saved ${areas.length} practice areas to local storage');
+      
+      // Sync to iCloud after successful save
+      await _syncFileToICloud(_practiceAreasFileName);
+    } catch (e) {
+      developer.log('Error saving practice areas: $e', error: e);
+      throw Exception('Failed to save practice areas: $e');
+    }
+  }
+
+  /// Enhanced save practice items with iCloud sync
+  static Future<void> savePracticeItems(
+      Map<String, List<PracticeItem>> itemsByArea) async {
+    try {
+      final file = await _getFile(_practiceItemsFileName);
+      final jsonData = itemsByArea.map((areaId, items) => MapEntry(
+            areaId,
+            items.map((item) => _practiceItemToJson(item)).toList(),
+          ));
+      await file.writeAsString(json.encode(jsonData));
+      developer.log(
+          'Saved practice items for ${itemsByArea.length} areas to local storage');
+      
+      // Sync to iCloud after successful save
+      await _syncFileToICloud(_practiceItemsFileName);
+    } catch (e) {
+      developer.log('Error saving practice items: $e', error: e);
+      throw Exception('Failed to save practice items: $e');
+    }
+  }
+
+  /// Enhanced add custom song with iCloud sync
   static Future<void> addCustomSong(Map<String, dynamic> song) async {
     try {
       final songs = await loadCustomSongs();
@@ -1153,22 +1266,123 @@ class LocalStorageService {
     }
   }
 
-  /// Delete a custom song by path
-  static Future<void> deleteCustomSong(String songPath) async {
-    try {
-      final songs = await loadCustomSongs();
-      final index = songs.indexWhere((song) => song['path'] == songPath);
-      
-      if (index != -1) {
-        final deletedSong = songs.removeAt(index);
-        await saveCustomSongs(songs);
-        developer.log('🎵 Deleted custom song: ${deletedSong['title']}');
-      } else {
-        throw Exception('Custom song with path $songPath not found');
-      }
-    } catch (e) {
-      developer.log('❌ Error deleting custom song: $e');
-      rethrow;
+  /// Sync PDF files to iCloud (for custom song PDFs)
+  static Future<SyncResult> syncPdfToICloud(String fileName) async {
+    if (!isICloudSyncEnabled) {
+      return SyncResult.error('iCloud sync not available or enabled');
     }
+    
+    try {
+      return await _icloudSyncService!.syncPdfFile(fileName);
+    } catch (e) {
+      developer.log('❌ Failed to sync PDF $fileName to iCloud: $e');
+      return SyncResult.error('Failed to sync PDF: $e');
+    }
+  }
+
+  /// Get iCloud storage usage information
+  static Future<Map<String, int>> getICloudStorageUsage() async {
+    if (!isICloudSyncEnabled) {
+      return {
+        'totalSize': 0,
+        'fileCount': 0,
+        'jsonSize': 0,
+        'pdfSize': 0,
+      };
+    }
+    
+    return await _icloudSyncService!.getStorageUsage();
+  }
+
+  /// Save labels for a specific song page using LabelPersistenceService pattern
+  static Future<void> saveLabelsForPage(String songAssetPath, int page, List<dynamic> labels) async {
+    return _withSaveLock(() async {
+      try {
+        final labelsData = labels.map((label) => label.toJson()).toList();
+        final file = await _getLabelsFile(songAssetPath, page);
+        
+        // Atomic save with temporary file
+        final tempFile = File('${file.path}.tmp');
+        await tempFile.parent.create(recursive: true);
+        
+        try {
+          await tempFile.writeAsString(json.encode(labelsData));
+          await tempFile.rename(file.path);
+          developer.log('✅ Saved ${labelsData.length} labels for song: $songAssetPath page: $page');
+        } catch (renameError) {
+          await file.writeAsString(json.encode(labelsData));
+          if (await tempFile.exists()) {
+            await tempFile.delete();
+          }
+        }
+        
+        // Sync to iCloud after successful save
+        final fileName = file.path.split('/').last;
+        await _syncFileToICloud(fileName);
+      } catch (e) {
+        developer.log('❌ Error saving labels for $songAssetPath page $page: $e');
+        throw Exception('Failed to save labels: $e');
+      }
+    });
+  }
+
+  /// Load labels for a specific song page using LabelPersistenceService pattern
+  static Future<List<dynamic>> loadLabelsForPage(String songAssetPath, int page) async {
+    try {
+      final file = await _getLabelsFile(songAssetPath, page);
+      if (!await file.exists()) {
+        return [];
+      }
+      
+      final jsonString = await file.readAsString();
+      if (jsonString.trim().isEmpty) {
+        return [];
+      }
+      
+      final labelsData = json.decode(jsonString) as List<dynamic>;
+      developer.log('Loaded ${labelsData.length} labels for song: $songAssetPath page: $page');
+      return labelsData;
+    } catch (e) {
+      developer.log('❌ Error loading labels for $songAssetPath page $page: $e');
+      return [];
+    }
+  }
+
+  /// Check if labels file exists for a page
+  static Future<bool> labelsExistForPage(String songAssetPath, int page) async {
+    final file = await _getLabelsFile(songAssetPath, page);
+    return await file.exists();
+  }
+
+  /// Delete labels file for a page
+  static Future<void> deleteLabelsForPage(String songAssetPath, int page) async {
+    final file = await _getLabelsFile(songAssetPath, page);
+    if (await file.exists()) {
+      await file.delete();
+      developer.log('Deleted labels for song: $songAssetPath page: $page');
+    }
+  }
+
+  /// Get file for storing labels for a specific song page
+  static Future<File> _getLabelsFile(String songAssetPath, int page) async {
+    final directory = await getApplicationDocumentsDirectory();
+    final safeFilename = _getSafeFilename(songAssetPath);
+    return File('${directory.path}/${safeFilename}_pdf_page_${page}_labels.json');
+  }
+
+  /// Create a safe filename from asset path
+  static String _getSafeFilename(String path) {
+    return path
+        .split('/')
+        .last
+        .replaceAll(RegExp(r'[^a-zA-Z0-9\-_.]'), '_')
+        .replaceAll(RegExp(r'_{2,}'), '_');
+  }
+
+  /// Dispose iCloud sync service
+  static void disposeICloudSync() {
+    _icloudSyncService?.dispose();
+    _icloudSyncService = null;
+    _icloudSyncEnabled = false;
   }
 }

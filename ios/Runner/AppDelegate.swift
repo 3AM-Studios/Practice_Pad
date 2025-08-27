@@ -7,9 +7,9 @@ import WebKit
 @main
 @objc class AppDelegate: FlutterAppDelegate {
     
-    private let WIDGET_CHANNEL_NAME = "com.example.practicePad/widget"
+    private let WIDGET_CHANNEL_NAME = "com.3amstudios.jazzpad/widget"
     private let CLOUDKIT_CHANNEL_NAME = "iCloud.com.practicepad"
-    private let USER_DEFAULTS_SUITE = "group.com.example.practicePad"
+    private let USER_DEFAULTS_SUITE = "group.com.3amstudios.jazzpad"
     
     private var widgetMethodChannel: FlutterMethodChannel?
     private var userDefaults: UserDefaults?
@@ -40,6 +40,14 @@ import WebKit
             default: result(FlutterMethodNotImplemented)
             }
         })
+        
+        // --- Set up iCloud Documents Sync Channel ---
+        let icloudSyncChannel = FlutterMethodChannel(name: "icloud_documents_sync",
+                                                    binaryMessenger: controller.binaryMessenger)
+        let icloudSyncHandler = ICloudSyncHandler()
+        icloudSyncChannel.setMethodCallHandler { (call, result) in
+            icloudSyncHandler.handle(call, result: result)
+        }
 
         // --- Set up Widget Channel ---
         widgetMethodChannel = FlutterMethodChannel(name: WIDGET_CHANNEL_NAME,

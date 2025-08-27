@@ -301,6 +301,97 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
       
     }
   }
+  
+  /// Save sheet music data (measures) to local storage
+  Future<void> _saveSheetMusicData() async {
+    try {
+      if (!mounted) return;
+      
+      // Convert ChordMeasures to regular Measures for storage
+      final measures = _chordMeasures.map((chordMeasure) {
+        return Measure(
+          chordMeasure.musicalSymbols,
+          isNewLine: chordMeasure.isNewLine,
+        );
+      }).toList();
+      
+      await LocalStorageService.saveSheetMusicForSong(widget.songAssetPath, measures);
+      developer.log('✅ Saved sheet music data: ${measures.length} measures');
+    } catch (e) {
+      developer.log('❌ Error saving sheet music data: $e');
+    }
+  }
+  
+  /// Load saved sheet music data from local storage
+  Future<void> _loadSheetMusicData() async {
+    try {
+      if (!mounted) return;
+      
+      final savedMeasures = await LocalStorageService.loadSheetMusicForSong(widget.songAssetPath);
+      
+      if (savedMeasures.isNotEmpty && mounted) {
+        // Apply saved modifications to existing measures
+        final updatedMeasures = <ChordMeasure>[];
+        
+        for (int i = 0; i < _chordMeasures.length; i++) {
+          final currentMeasure = _chordMeasures[i];
+          
+          if (i < savedMeasures.length) {
+            // Use saved musical symbols if available
+            final savedMeasure = savedMeasures[i];
+            
+            // Merge saved symbols with current structure, preserving chord symbols
+            updatedMeasures.add(ChordMeasure(
+              savedMeasure.musicalSymbols,
+              chordSymbols: currentMeasure.chordSymbols, // Keep original chord symbols
+              isNewLine: currentMeasure.isNewLine, // Keep original layout
+            ));
+          } else {
+            // Keep original measure if no saved data
+            updatedMeasures.add(currentMeasure);
+          }
+        }
+        
+        setState(() {
+          _chordMeasures = updatedMeasures;
+          _cachedSheetMusicWidget = null;
+          _lastRenderedMeasures = null;
+        });
+        
+        developer.log('✅ Loaded sheet music modifications: ${savedMeasures.length} measures');
+      }
+    } catch (e) {
+      developer.log('❌ Error loading sheet music data: $e');
+    }
+  }
+  
+  /// Save chord key modifications to local storage
+  Future<void> _saveChordKeyModifications() async {
+    try {
+      if (!mounted) return;
+      
+      final chordKeys = <String, dynamic>{};
+      
+      // Save any chord modifications
+      for (int i = 0; i < _chordSymbols.length; i++) {
+        final chord = _chordSymbols[i];
+        if (chord.modifiedKeySignature != null) {
+          chordKeys[i.toString()] = {
+            'modifiedKey': chord.effectiveRootName,
+            'originalKey': _originalKey,
+            'modifiedAt': DateTime.now().toIso8601String(),
+          };
+        }
+      }
+      
+      if (chordKeys.isNotEmpty) {
+        await LocalStorageService.saveChordKeys(widget.songAssetPath, chordKeys);
+        developer.log('✅ Saved chord key modifications: ${chordKeys.length} chords');
+      }
+    } catch (e) {
+      developer.log('❌ Error saving chord key modifications: $e');
+    }
+  }
 
   /// Load saved drawing data from local storage
   Future<void> _loadDrawingData() async {
@@ -554,6 +645,9 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
 
       // Load saved chord key modifications after chord symbols are set
       await _loadChordKeys();
+      
+      // Load saved sheet music modifications
+      await _loadSheetMusicData();
 
       // --- 4. Initialize Metronome ---
       // TODO: Add proper audio assets for metronome
@@ -627,9 +721,50 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
     }
   }
 
-  // Add all the stub methods for now - these will be the full implementations from the original file
-  void _buildGlobalIndexMapping() {}
-  Future<void> _loadChordKeys() async {}
+  /// Build mapping from sheet music global indices to local chord symbol indices
+  void _buildGlobalIndexMapping() {
+    _globalToLocalIndexMap.clear();
+    int globalIndex = 0;
+    
+    for (int localIndex = 0; localIndex < _chordSymbols.length; localIndex++) {
+      _globalToLocalIndexMap[globalIndex] = localIndex;
+      globalIndex++;
+    }
+    
+    developer.log('Built global index mapping: ${_globalToLocalIndexMap.length} entries');
+  }
+  
+  /// Load saved chord key modifications from storage
+  Future<void> _loadChordKeys() async {
+    try {
+      final chordKeys = await LocalStorageService.loadChordKeys(widget.songAssetPath);
+      if (chordKeys.isNotEmpty) {
+        // Apply saved chord modifications
+        for (final entry in chordKeys.entries) {
+          final chordIndex = int.tryParse(entry.key);
+          if (chordIndex != null && chordIndex < _chordSymbols.length) {
+            final modifications = entry.value as Map<String, dynamic>;
+            if (modifications.containsKey('modifiedKey')) {
+              final modifiedKey = modifications['modifiedKey'] as String;
+              // Apply the key modification to the chord
+              final chord = _chordSymbols[chordIndex];
+              final newChord = ChordSymbol(
+                modifiedKey,
+                chord.effectiveQuality,
+                position: chord.position,
+                originalKeySignature: chord.originalKeySignature,
+                modifiedKeySignature: _stringToKeySignatureType(modifiedKey),
+              );
+              _chordSymbols[chordIndex] = newChord;
+            }
+          }
+        }
+        developer.log('Applied chord key modifications: ${chordKeys.length} chords');
+      }
+    } catch (e) {
+      developer.log('Error loading chord keys: $e');
+    }
+  }
   KeySignatureType _getCurrentKeySignature() => _stringToKeySignatureType(_originalKey) ?? KeySignatureType.cMajor;
   music_sheet.KeySignature _createKeySignatureFromType(KeySignatureType keySignatureType) {
     switch (keySignatureType) {
@@ -707,7 +842,8 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
         _cachedSheetMusicWidget = null;
         _lastRenderedMeasures = null;
         
-        
+        // 5. Save changes to storage
+        _saveSheetMusicData();
       }
     });
   }
@@ -738,7 +874,8 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
         _cachedSheetMusicWidget = null;
         _lastRenderedMeasures = null;
         
-        
+        // 5. Save changes to storage
+        _saveSheetMusicData();
       }
     });
   }
@@ -769,31 +906,87 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
         _cachedSheetMusicWidget = null;
         _lastRenderedMeasures = null;
         
-        
+        // 5. Save changes to storage
+        _saveSheetMusicData();
       }
     });
   }
   
   void _onChordSymbolTap(dynamic chordSymbol, int globalChordIndex) {
-    // Handle chord symbol tap - could be used for selection, etc.
-    
+    // Handle chord symbol tap for selection
+    if (_globalToLocalIndexMap.containsKey(globalChordIndex)) {
+      final localIndex = _globalToLocalIndexMap[globalChordIndex]!;
+      
+      setState(() {
+        if (_selectedChordIndices.contains(localIndex)) {
+          _selectedChordIndices.remove(localIndex);
+        } else {
+          _selectedChordIndices.add(localIndex);
+        }
+      });
+      
+      developer.log('Chord ${globalChordIndex} (local: ${localIndex}) selection toggled. Selected: ${_selectedChordIndices.length}');
+    }
   }
   
   void _onChordSymbolLongPress(dynamic chordSymbol, int globalChordIndex) {
-    // Handle chord symbol long press - could show context menu
-    
+    // Handle chord symbol long press to start selection mode
+    if (_globalToLocalIndexMap.containsKey(globalChordIndex)) {
+      final localIndex = _globalToLocalIndexMap[globalChordIndex]!;
+      
+      setState(() {
+        _isLongPressing = true;
+        _selectedChordIndices.clear();
+        _selectedChordIndices.add(localIndex);
+      });
+      
+      // Provide haptic feedback
+      SystemSound.play(SystemSoundType.click);
+      
+      developer.log('Started long press selection on chord ${globalChordIndex} (local: ${localIndex})');
+    }
   }
   
   void _onChordSymbolLongPressEnd(dynamic chordSymbol, int globalChordIndex, LongPressEndDetails? details) {
     // Handle end of long press
+    setState(() {
+      _isLongPressing = false;
+    });
     
+    developer.log('Ended long press selection');
   }
   
   void _onChordSymbolHover(dynamic chordSymbol, int globalChordIndex) {
-    // Handle chord symbol hover
+    // Handle chord symbol hover during drag selection
+    if (_isDragging && _globalToLocalIndexMap.containsKey(globalChordIndex)) {
+      final localIndex = _globalToLocalIndexMap[globalChordIndex]!;
+      
+      if (_lastHoveredIndex != localIndex) {
+        _lastHoveredIndex = localIndex;
+        
+        // Update selection range if dragging
+        if (_dragStartIndex != null) {
+          final startIndex = math.min(_dragStartIndex!, localIndex);
+          final endIndex = math.max(_dragStartIndex!, localIndex);
+          
+          setState(() {
+            _selectedChordIndices.clear();
+            for (int i = startIndex; i <= endIndex; i++) {
+              _selectedChordIndices.add(i);
+            }
+          });
+        }
+      }
+    }
   }
   
-  bool _isChordSelected(int globalChordIndex) => false;
+  bool _isChordSelected(int globalChordIndex) {
+    if (_globalToLocalIndexMap.containsKey(globalChordIndex)) {
+      final localIndex = _globalToLocalIndexMap[globalChordIndex]!;
+      return _selectedChordIndices.contains(localIndex);
+    }
+    return false;
+  }
 
   // Map of fifths to key signatures
   static const Map<int, String> _fifthsToKey = {
@@ -1179,6 +1372,9 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
       _cachedSheetMusicWidget = null;
       _lastRenderedMeasures = null;
     });
+    
+    // Save the key change
+    _saveChordKeyModifications();
     
     // Notify parent widget to rebuild toolbar
     widget.onStateChanged?.call();

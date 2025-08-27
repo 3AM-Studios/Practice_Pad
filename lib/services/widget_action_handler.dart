@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:flutter/services.dart';
 
 class WidgetActionHandler {
-  static const MethodChannel _channel = MethodChannel('com.example.practicePad/widget');
+  static const MethodChannel _channel = MethodChannel('com.3amstudios.jazzpad/widget');
   
   // Initialize the handler and set up listeners
   static Future<void> initialize() async {

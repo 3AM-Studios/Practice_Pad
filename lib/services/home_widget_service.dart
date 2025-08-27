@@ -18,7 +18,7 @@ class HomeWidgetService {
   static Future<void> initialize() async {
     try {
       // TODO: Replace with your actual app group ID (e.g., group.your.bundle.id.practicepad)
-      await HomeWidget.setAppGroupId('group.com.example.practicePad');
+      await HomeWidget.setAppGroupId('group.com.3amstudios.jazzpad');
     } catch (e) {
       print('Error initializing home widget: $e');
     }

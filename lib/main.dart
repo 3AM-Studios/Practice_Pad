@@ -14,6 +14,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:practice_pad/widgets/wooden_border_wrapper.dart';
 
 import 'package:practice_pad/services/cloud_kit_service.dart';
+import 'package:practice_pad/services/local_storage_service.dart';
 import 'package:practice_pad/features/edit_items/presentation/pages/edit_items_screen.dart';
 import 'package:practice_pad/features/routines/presentation/pages/edit_routines_screen.dart';
 import 'package:practice_pad/services/practice_session_manager.dart';
@@ -60,6 +61,22 @@ void main() async {
         "CloudKitService initialized successfully with container: $icloudContainerId");
   } catch (e) {
     print("FATAL: CloudKitService initialization failed: $e");
+  }
+
+  // Initialize iCloud Documents sync service
+  try {
+    print("🔄 Initializing iCloud Documents sync service...");
+    await LocalStorageService.initializeICloudSync();
+    
+    if (LocalStorageService.isICloudSyncEnabled) {
+      print("✅ iCloud Documents sync service initialized and available");
+    } else {
+      print("⚠️ iCloud Documents sync service initialized but not available");
+      print("   This is normal on simulators or if iCloud is not configured");
+    }
+  } catch (e) {
+    print("❌ iCloud Documents sync initialization failed: $e");
+    print("   Sync functionality will be disabled");
   }
 
   // Initialize home widget service
