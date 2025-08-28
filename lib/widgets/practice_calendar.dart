@@ -33,9 +33,9 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
   double get _cellSize {
     switch (widget.calendarSize) {
       case CalendarSize.small:
-        return 32.0;
+        return 28.0;
       case CalendarSize.medium:
-        return 40.0; // Current default size
+        return 28.0;// Current default size
       case CalendarSize.large:
         return 48.0;
     }
@@ -46,7 +46,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
       case CalendarSize.small:
         return 12.0;
       case CalendarSize.medium:
-        return 14.0; // Current default
+        return 12.0;// Current default
       case CalendarSize.large:
         return 16.0;
     }
@@ -57,7 +57,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
       case CalendarSize.small:
         return 14.0;
       case CalendarSize.medium:
-        return 16.0; // Current default
+        return 14.0; // Current default
       case CalendarSize.large:
         return 18.0;
     }
@@ -77,11 +77,11 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
   double get _containerPadding {
     switch (widget.calendarSize) {
       case CalendarSize.small:
-        return 12.0;
+        return 8.0;  // Reduced for small size
       case CalendarSize.medium:
-        return 16.0; // Current default
+        return 8.0; // Reduced from 16.0
       case CalendarSize.large:
-        return 20.0;
+        return 16.0; // Reduced from 20.0
     }
   }
 
@@ -129,22 +129,31 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
     return _completedDays.contains(normalizedDay);
   }
 
+  String _getMonthName(int month) {
+    const months = [
+      '', 'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    return months[month];
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     double dayButtonSpread = 2.12;
     if (_isLoading) {
       return const SizedBox(
-        height: 300,
+        height: 100,
         child: Center(
           child: CupertinoActivityIndicator(),
         ),
       );
     }
 
-    return Container(
-      margin: EdgeInsets.all(_containerPadding),
-      padding: EdgeInsets.all(_containerPadding),
+    return Flexible(
+      child: Container(
+        margin: EdgeInsets.all(_containerPadding),
+        padding: EdgeInsets.all(_containerPadding),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
@@ -160,55 +169,87 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Header with Stats button
-          Container(
-            decoration: BoxDecoration(
-              image: const DecorationImage(
-                image: AssetImage('assets/images/wood_texture_rotated.jpg'),
-                fit: BoxFit.cover,
-              ),
-              border: Border.all(
-                  color: Theme.of(context).colorScheme.surface, width: 4),
-              borderRadius: BorderRadius.circular(20),
-            ),
-          ),
+          // Custom header with month navigation and stats button
           Row(
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              // Left chevron
+              CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: () {
+                  setState(() {
+                    _focusedDay = DateTime(_focusedDay.year, _focusedDay.month - 1, 1);
+                  });
+                },
+                child: Icon(
+                  CupertinoIcons.chevron_left,
+                  color: theme.colorScheme.onSurface,
+                  size: 20,
+                ),
+              ),
+              
+              // Month title (centered)
+              Expanded(
+                child: Center(
+                  child: Text(
+                    '${_getMonthName(_focusedDay.month)} ${_focusedDay.year}',
+                    style: TextStyle(
+                      color: theme.colorScheme.onSurface,
+                      fontSize: _headerFontSize,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+              
+              // Right chevron
+              CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: () {
+                  setState(() {
+                    _focusedDay = DateTime(_focusedDay.year, _focusedDay.month + 1, 1);
+                  });
+                },
+                child: Icon(
+                  CupertinoIcons.chevron_right,
+                  color: theme.colorScheme.onSurface,
+                  size: 20,
+                ),
+              ),
+              
+              const SizedBox(width: 8),
+              
+              // Stats button
               CupertinoButton(
                 padding: EdgeInsets.zero,
                 onPressed: widget.onStatsPressed,
                 child: ClayContainer(
                   color: theme.colorScheme.surface,
-                  borderRadius: 20,
+                  borderRadius: 16,
                   child: Container(
-                    decoration:
-                    BoxDecoration(
-                          image: const DecorationImage(
-                            image: AssetImage('assets/images/wood_texture_rotated.jpg'),
-                            fit: BoxFit.cover,
-                          ),
-                        border: Border.all(color: Theme.of(context).colorScheme.surface, width: 4),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                    
+                    decoration: BoxDecoration(
+                      image: const DecorationImage(
+                        image: AssetImage('assets/images/wood_texture_rotated.jpg'),
+                        fit: BoxFit.cover,
+                      ),
+                      border: Border.all(color: Theme.of(context).colorScheme.surface, width: 3),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
                     child: const Padding(
-                      padding:
-                           EdgeInsets.symmetric(horizontal: 100, vertical: 9),
+                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
                             CupertinoIcons.chart_bar_square,
-                            size: 21,
+                            size: 14,
                             color: Colors.white
                           ),
-                           SizedBox(width: 4),
+                          SizedBox(width: 4),
                           Text(
                             'Stats',
                             style: TextStyle(
                               color: Colors.white,
-                              fontSize: 21,
+                              fontSize: 14,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -220,7 +261,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
 
           // Calendar
           TableCalendar(
@@ -231,24 +272,14 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
             startingDayOfWeek: StartingDayOfWeek.sunday,
             rowHeight: _cellSize,
             daysOfWeekHeight: _cellSize * 0.8,
-            headerStyle: HeaderStyle(
+            headerStyle: const HeaderStyle(
               formatButtonVisible: false,
-              titleCentered: true,
-              leftChevronIcon: Icon(
-                CupertinoIcons.chevron_left,
-                color: theme.colorScheme.onSurface,
-                size: 20,
-              ),
-              rightChevronIcon: Icon(
-                CupertinoIcons.chevron_right,
-                color: theme.colorScheme.onSurface,
-                size: 20,
-              ),
-              titleTextStyle: TextStyle(
-                color: theme.colorScheme.onSurface,
-                fontSize: _headerFontSize,
-                fontWeight: FontWeight.w600,
-              ),
+              titleCentered: false,
+              headerMargin: EdgeInsets.zero,
+              headerPadding: EdgeInsets.zero,
+              leftChevronVisible: false,
+              rightChevronVisible: false,
+              titleTextStyle: TextStyle(fontSize: 0), // Hide the title
             ),
             daysOfWeekStyle: DaysOfWeekStyle(
               weekdayStyle: TextStyle(
@@ -402,7 +433,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
           ),
 
           // Legend
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -422,6 +453,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
             ],
           ),
         ],
+      ),
       ),
     );
   }

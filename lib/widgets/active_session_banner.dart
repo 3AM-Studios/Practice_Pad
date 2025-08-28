@@ -7,7 +7,9 @@ import 'package:provider/provider.dart';
 
 /// Widget that shows an active practice session banner at the top of screens
 class ActiveSessionBanner extends StatelessWidget {
-  const ActiveSessionBanner({super.key});
+  final bool isTabletOrDesktop;
+  
+  const ActiveSessionBanner({super.key, this.isTabletOrDesktop = false});
 
   @override
   Widget build(BuildContext context) {
@@ -17,7 +19,10 @@ class ActiveSessionBanner extends StatelessWidget {
     return Consumer<PracticeSessionManager>(
       builder: (context, sessionManager, child) {
         return Container(
-          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          margin: EdgeInsets.symmetric(
+            horizontal: 12, 
+            vertical: isTabletOrDesktop ? 17 : 6
+          ),
           child: ClayContainer(
             color: Theme.of(context).colorScheme.surface,
             borderRadius: 20,
@@ -38,7 +43,7 @@ class ActiveSessionBanner extends StatelessWidget {
                   }
                 : null,
               child: Container(
-                padding: const EdgeInsets.all(12),
+                padding: EdgeInsets.all(isTabletOrDesktop ? 12 : 8),
                 decoration: BoxDecoration(
                   image: const DecorationImage(
                     image: AssetImage('assets/images/wood_texture_rotated.jpg'),

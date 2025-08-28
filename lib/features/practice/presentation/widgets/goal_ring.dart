@@ -13,7 +13,7 @@ Widget buildGoalRing(BuildContext context, TodayViewModel viewModel, {bool isLar
   final progress = goalMinutes > 0 ? practiceMinutes / goalMinutes : 0.0;
   
   // Size configurations - made isLarge=false much smaller
-  final ringSize = isLarge ? 160.0 : 60.0;  // Reduced from 100.0 to 60.0
+  final ringSize = isLarge ? 160.0 : 60.0;  // Further reduced for shorter height
   final strokeWidth = isLarge ? 12.0 : 5.0;  // Reduced from 8.0 to 5.0
   final goalFontSize = isLarge ? 18.0 : 9.0;  // Reduced from 12.0 to 9.0
   final minutesFontSize = isLarge ? 24.0 : 12.0;  // Reduced from 16.0 to 12.0
@@ -22,13 +22,15 @@ Widget buildGoalRing(BuildContext context, TodayViewModel viewModel, {bool isLar
   final iconSize = isLarge ? 24.0 : 14.0;  // Reduced from 18.0 to 14.0
   
   return Container(
-    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+    margin: EdgeInsets.symmetric(horizontal: 16, vertical: isLarge ? 12 : 0),
 
     child: ClayContainer(
       color: theme.colorScheme.surface,
       borderRadius: 20,
       child: Container(
-        padding: EdgeInsets.all(containerPadding),
+        padding: isLarge
+            ? EdgeInsets.all(containerPadding)
+            : EdgeInsets.symmetric(horizontal: containerPadding, vertical: 6),
         child: Row(
           children: [
             // Minus button

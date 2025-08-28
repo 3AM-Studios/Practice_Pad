@@ -74,7 +74,7 @@ class _TodayScreenState extends State<TodayScreen> {
 Widget _buildBody(BuildContext context, TodayViewModel viewModel) {
   final theme = Theme.of(context);
   final isTabletOrDesktop = deviceType == DeviceType.tablet || deviceType == DeviceType.macOS;
-
+print('Device type: $deviceType, isTabletOrDesktop: $isTabletOrDesktop');
   if (viewModel.isLoading) {
     return Center(
       child: CupertinoActivityIndicator(
@@ -133,15 +133,15 @@ Widget _buildBody(BuildContext context, TodayViewModel viewModel) {
       ),
       // Responsive bottom section
       _buildBottomSection(context, viewModel, widget.onStatsPressed, isTabletOrDesktop),
-      const SizedBox(height: 45),
+      const SizedBox(height: 30),
     ],
   );
 }
 
 Widget _buildFixedHeader(BuildContext context) {
   // Add more top padding on iPhone
-  final topPadding = Platform.isIOS && deviceType == DeviceType.phone ? 24.0 : 8.0;
-  
+  final topPadding = Platform.isIOS && deviceType == DeviceType.phone ?40.0 : 8.0;
+  final width = Platform.isIOS && deviceType == DeviceType.phone ? 13.0 : 35.0;
   return Container(
     padding: EdgeInsets.fromLTRB(16, topPadding, 16, 8),
     child: Stack(
@@ -151,7 +151,7 @@ Widget _buildFixedHeader(BuildContext context) {
           child: ClayContainer(
             borderRadius: 10,
             child: Container(
-              padding: const EdgeInsets.fromLTRB(35, 5, 35, 5),
+              padding:  EdgeInsets.fromLTRB(width, 5, width, 5),
               decoration: BoxDecoration(
                 image: const DecorationImage(
                   image: AssetImage('assets/images/wood_texture_rotated.jpg'),
@@ -160,10 +160,10 @@ Widget _buildFixedHeader(BuildContext context) {
                 border: Border.all(color: Theme.of(context).colorScheme.surface, width: 4),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Text(
+              child:  Text(
                 'Today\'s Practice',
                 style: TextStyle(
-                  fontSize: 20,
+                  fontSize: Platform.isIOS && deviceType == DeviceType.phone ? 15.0 : 20.0,
                   fontWeight: FontWeight.w700,
                   color: Colors.white
                 ),
@@ -588,8 +588,8 @@ Widget _buildBottomSection(BuildContext context, TodayViewModel viewModel, VoidC
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const ActiveSessionBanner(),
-                  buildGoalRing(context, viewModel, isLarge: !Platform.isIOS), // Large goal ring for tablets/desktop, small on iOS
+                  const ActiveSessionBanner(isTabletOrDesktop: true),
+                  buildGoalRing(context, viewModel, isLarge: true), // Large goal ring for tablets/desktop, small on iOS
                 ],
               ),
             ),
@@ -605,14 +605,16 @@ Widget _buildBottomSection(BuildContext context, TodayViewModel viewModel, VoidC
         )
       : Column(
           children: [
-            const Expanded(child: ActiveSessionBanner()),
+            
             Expanded(
-              flex: 2,
+              flex: 0,
               child: buildGoalRing(context, viewModel, isLarge: false), // Small size for phones
             ),
+            const Expanded(flex: 0, child: ActiveSessionBanner(isTabletOrDesktop: false)),
             Expanded(
-              flex: 3,
+              flex:1,
               child: PracticeCalendar(
+                calendarSize: CalendarSize.small,
                 onStatsPressed: onStatsPressed,
               ),
             ),

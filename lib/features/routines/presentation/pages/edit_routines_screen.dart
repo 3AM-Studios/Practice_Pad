@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:clay_containers/clay_containers.dart';
@@ -6,6 +8,7 @@ import 'package:practice_pad/features/routines/models/day_of_week.dart';
 import 'package:practice_pad/features/routines/presentation/pages/add_areas_to_routine_screen.dart';
 import 'package:practice_pad/features/routines/presentation/viewmodels/routines_viewmodel.dart';
 import 'package:practice_pad/models/practice_area.dart';
+import 'package:practice_pad/services/device_type.dart';
 import 'package:provider/provider.dart';
 
 class EditRoutinesScreen extends StatefulWidget {
@@ -278,7 +281,7 @@ class _EditRoutinesScreenState extends State<EditRoutinesScreen> {
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: CupertinoButton(
-                        padding: const EdgeInsets.all(16),
+                        padding:  EdgeInsets.all(Platform.isIOS && deviceType == DeviceType.phone ?5.0 : 16),
                         onPressed: () => _showCopyRoutineDialog(context, routinesViewModel),
                         child: const Row(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -400,26 +403,26 @@ class _EditRoutinesScreenState extends State<EditRoutinesScreen> {
             children: [
               Row(
                 children: [
-                  const Icon(
+                   Icon(
                     CupertinoIcons.calendar,
-                    color: CupertinoColors.activeBlue,
+                    color: Theme.of(context).colorScheme.primary,
                     size: 20,
                   ),
                   const SizedBox(width: 8),
-                  const Expanded(
+                   Expanded(
                     child: Text(
                       'Practice Areas Shared Across All Days',
                       style: TextStyle(
-                        fontSize: 16,
+                        fontSize: Platform.isIOS && deviceType == DeviceType.phone ? 14: 16.0,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
                   CupertinoButton(
                     padding: EdgeInsets.zero,
-                    child: const Icon(
+                    child:  Icon(
                       CupertinoIcons.add,
-                      color: CupertinoColors.activeBlue,
+                      color: Theme.of(context).colorScheme.primary,
                     ),
                     onPressed: () => _navigateToAddAreasToAllDaysScreen(context, routinesViewModel),
                   ),
