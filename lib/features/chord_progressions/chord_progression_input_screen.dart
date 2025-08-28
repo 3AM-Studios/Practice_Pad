@@ -25,7 +25,9 @@ class _ChordProgressionInputScreenState extends State<ChordProgressionInputScree
   
   // Roman numeral mode state
   bool _isRomanNumeralMode = false;
-  String _currentQuality = 'Maj'; // 'Maj', 'Min', 'o/', 'o', '7th'
+  bool _seventhToggled = false;
+  String _currentQuality = 'Maj'; // Track current quality state
+  String _selectedAccidental = '♮'; // Track selected accidental (natural by default)
   String _currentRomanNumeral = 'I';
 
   @override
@@ -136,58 +138,110 @@ class _ChordProgressionInputScreenState extends State<ChordProgressionInputScree
   void _toggleRomanNumeralMode() {
     setState(() {
       _isRomanNumeralMode = !_isRomanNumeralMode;
-      if (_isRomanNumeralMode) {
-        _updateTextFromRomanNumeral();
-      }
+      // No need to update text when toggling mode
     });
   }
 
   void _setQuality(String quality) {
     setState(() {
       _currentQuality = quality;
-      _updateTextFromRomanNumeral();
+      final baseNumeral = _getBaseNumeral(_chordInputController.text);
+      String newChord = _applyQuality(baseNumeral, quality, hasSeventh: _seventhToggled);
+      if (_seventhToggled) newChord += '7';
+      
+      // Add accidental prefix if not natural
+      String finalChord = _selectedAccidental == '♮' ? newChord : '$_selectedAccidental$newChord';
+      _chordInputController.text = finalChord;
     });
   }
 
   void _setRomanNumeral(String numeral) {
     setState(() {
       _currentRomanNumeral = numeral;
-      _updateTextFromRomanNumeral();
+      String baseChord = _applyQuality(numeral, _currentQuality, hasSeventh: _seventhToggled);
+      if (_seventhToggled) baseChord += '7';
+      
+      // Add accidental prefix if not natural
+      String newChord = _selectedAccidental == '♮' ? baseChord : '$_selectedAccidental$baseChord';
+      _chordInputController.text = newChord;
     });
   }
 
-  void _updateTextFromRomanNumeral() {
-    if (!_isRomanNumeralMode) return;
+  void _toggleSeventh() {
+    setState(() {
+      _seventhToggled = !_seventhToggled;
+      final baseNumeral = _getBaseNumeral(_chordInputController.text);
+      String newChord = _applyQuality(baseNumeral, _currentQuality, hasSeventh: _seventhToggled);
+      if (_seventhToggled) newChord += '7';
+      
+      // Add accidental prefix if not natural
+      String finalChord = _selectedAccidental == '♮' ? newChord : '$_selectedAccidental$newChord';
+      _chordInputController.text = finalChord;
+    });
+  }
 
-    String result = _currentRomanNumeral;
+  void _setAccidental(String accidental) {
+    setState(() {
+      _selectedAccidental = accidental;
+      final baseNumeral = _getBaseNumeral(_chordInputController.text);
+      String baseChord = _applyQuality(baseNumeral, _currentQuality, hasSeventh: _seventhToggled);
+      if (_seventhToggled) baseChord += '7';
+      
+      // Add accidental prefix if not natural
+      String newChord = accidental == '♮' ? baseChord : '$accidental$baseChord';
+      _chordInputController.text = newChord;
+    });
+  }
+
+  // Helper methods for Roman numeral chord editing
+  String _getBaseNumeral(String chord) {
+    String text = chord;
+    // Remove accidentals first
+    text = text.replaceAll('♭', '').replaceAll('♯', '').replaceAll('♮', '');
+    // Remove quality indicators and seventh
+    text = text.replaceAll('7', '');
+    text = text.replaceAll('ø', '');
+    text = text.replaceAll('°', '');
+    text = text.replaceAll(RegExp(r'maj', caseSensitive: false), ''); // Remove maj
     
-    // Apply case based on quality
-    if (_currentQuality == 'Min' || _currentQuality == 'o/' || _currentQuality == 'o') {
-      result = result.toLowerCase();
-    } else {
-      result = result.toUpperCase();
-    }
-    
-    // Apply quality suffix
-    switch (_currentQuality) {
-      case '7th':
-        result += '7';
-        break;
+    // Convert to uppercase to get base
+    String base = text.toUpperCase();
+    return base.isNotEmpty ? base : 'I';
+  }
+
+  String _applyQuality(String base, String quality, {bool hasSeventh = false}) {
+    switch (quality) {
       case 'Maj':
-        // No suffix for major
-        break;
+        if (hasSeventh) {
+          return '${base.toUpperCase()}maj'; // Major 7th chord
+        } else {
+          return base.toUpperCase(); // Simple major chord
+        }
       case 'Min':
-        // Lowercase already applied
-        break;
+        return base.toLowerCase();
       case 'o/':
-        result += 'ø7';
-        break;
+        return '${base.toLowerCase()}ø';
       case 'o':
-        result += '°7';
-        break;
+        return '${base.toLowerCase()}°';
+      default:
+        return base.toUpperCase();
     }
+  }
 
-    _chordInputController.text = result;
+  String _getCurrentQuality(String chord) {
+    if (chord.contains('ø')) return 'o/';
+    if (chord.contains('°')) return 'o';
+    
+    // Remove the 7 to check the base quality
+    String baseChord = chord.replaceAll('7', '');
+    
+    // Check if it contains 'maj' (like Imaj7)
+    if (baseChord.toLowerCase().contains('maj')) return 'Maj';
+    
+    // Check case for minor vs major
+    if (baseChord == baseChord.toLowerCase() && baseChord.isNotEmpty) return 'Min';
+    
+    return 'Maj';
   }
 
   List<String> _getRomanNumerals() {
@@ -232,16 +286,82 @@ class _ChordProgressionInputScreenState extends State<ChordProgressionInputScree
     );
   }
 
+  Widget _buildAccidentalButton(String accidental) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isSelected = _selectedAccidental == accidental;
+    
+    return GestureDetector(
+      onTap: () => _setAccidental(accidental),
+      child: Container(
+        width: 40,
+        height: 32,
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected 
+              ? colorScheme.primary 
+              : colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isSelected 
+                ? colorScheme.primary 
+                : colorScheme.outline.withOpacity(0.3),
+            width: 1,
+          ),
+        ),
+        child: Text(
+          accidental,
+          textAlign: TextAlign.center,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+            color: isSelected 
+                ? colorScheme.onPrimary 
+                : colorScheme.onSurface,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSeventhButton() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    
+    return GestureDetector(
+      onTap: _toggleSeventh,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+        decoration: BoxDecoration(
+          color: _seventhToggled 
+              ? colorScheme.primary 
+              : colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: _seventhToggled 
+                ? colorScheme.primary 
+                : colorScheme.outline.withOpacity(0.3),
+            width: 1,
+          ),
+        ),
+        child: Text(
+          '7th',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+            color: _seventhToggled 
+                ? colorScheme.onPrimary 
+                : colorScheme.onSurface,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildRomanNumeralButton(String numeral) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final isSelected = _currentRomanNumeral == numeral;
-    
-    // Display case based on quality
-    String displayText = numeral;
-    if (_currentQuality == 'Min' || _currentQuality == 'o/' || _currentQuality == 'o') {
-      displayText = displayText.toLowerCase();
-    }
+    final isCurrentBase = _getBaseNumeral(_chordInputController.text) == numeral;
     
     return Expanded(
       child: GestureDetector(
@@ -250,23 +370,23 @@ class _ChordProgressionInputScreenState extends State<ChordProgressionInputScree
           margin: const EdgeInsets.symmetric(horizontal: 4),
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-            color: isSelected 
+            color: isCurrentBase 
                 ? colorScheme.primary 
                 : colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: isSelected 
+              color: isCurrentBase 
                   ? colorScheme.primary 
                   : colorScheme.outline.withOpacity(0.3),
               width: 1,
             ),
           ),
           child: Text(
-            displayText,
+            numeral,
             textAlign: TextAlign.center,
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.bold,
-              color: isSelected 
+              color: isCurrentBase 
                   ? colorScheme.onPrimary 
                   : colorScheme.onSurface,
             ),
@@ -811,21 +931,32 @@ class _ChordProgressionInputScreenState extends State<ChordProgressionInputScree
               ),
               child: Column(
                 children: [
-                  // Row 1: Quality buttons
+                  // Row 1: Accidental buttons
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _buildQualityButton('7th', '7th'),
-                      _buildQualityButton('Maj', 'Maj'),
-                      _buildQualityButton('Min', 'min'),
-                      _buildQualityButton('o/', 'ø7'),
-                      _buildQualityButton('o', '°7'),
+                      for (final accidental in ['♮', '♭', '♯'])
+                        _buildAccidentalButton(accidental),
                     ],
                   ),
                   
                   const SizedBox(height: 12),
                   
-                  // Row 2: Roman numeral buttons
+                  // Row 2: Quality and 7th buttons
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _buildSeventhButton(),
+                      _buildQualityButton('Maj', 'Maj'),
+                      _buildQualityButton('Min', 'min'),
+                      _buildQualityButton('o/', 'ø'),
+                      _buildQualityButton('o', '°'),
+                    ],
+                  ),
+                  
+                  const SizedBox(height: 12),
+                  
+                  // Row 3: Roman numeral buttons
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: _getRomanNumerals().map((numeral) {

@@ -310,7 +310,7 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
       // Convert ChordMeasures to regular Measures for storage
       final measures = _chordMeasures.map((chordMeasure) {
         return Measure(
-          chordMeasure.musicalSymbols,
+          chordMeasure.musicalSymbols.cast<MusicalSymbol>(),
           isNewLine: chordMeasure.isNewLine,
         );
       }).toList();
@@ -341,8 +341,50 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
             final savedMeasure = savedMeasures[i];
             
             // Merge saved symbols with current structure, preserving chord symbols
+            // For first measure, ensure clef and time signature are always present
+            List<dynamic> finalSymbols = [...savedMeasure.musicalSymbols];
+            
+            if (i == 0) {
+              // Check if clef and time signature are missing from saved symbols
+              bool hasClef = finalSymbols.any((symbol) => symbol is music_sheet.Clef);
+              bool hasTimeSignature = finalSymbols.any((symbol) => symbol is music_sheet.TimeSignature);
+              bool hasKeySignature = finalSymbols.any((symbol) => symbol is music_sheet.KeySignature);
+              
+              // Add missing essential symbols at the beginning
+              final essentialSymbols = <dynamic>[];
+              
+              if (!hasClef) {
+                essentialSymbols.add(music_sheet.Clef.treble());
+              }
+              
+              if (!hasKeySignature) {
+                final keySignatureType = _getCurrentKeySignature();
+                essentialSymbols.add(_createKeySignatureFromType(keySignatureType));
+              }
+              
+              if (!hasTimeSignature) {
+                final timeSigParts = _timeSignature.split('/');
+                if (timeSigParts.length == 2) {
+                  final num = int.tryParse(timeSigParts[0]) ?? 4;
+                  final denom = int.tryParse(timeSigParts[1]) ?? 4;
+                  if (num == 4 && denom == 4) {
+                    essentialSymbols.add(music_sheet.TimeSignature.fourFour());
+                  } else if (num == 3 && denom == 4) {
+                    essentialSymbols.add(music_sheet.TimeSignature.threeFour());
+                  } else if (num == 2 && denom == 4) {
+                    essentialSymbols.add(music_sheet.TimeSignature.twoFour());
+                  } else {
+                    essentialSymbols.add(music_sheet.TimeSignature.fourFour());
+                  }
+                }
+              }
+              
+              // Prepend essential symbols to the saved symbols
+              finalSymbols = [...essentialSymbols, ...finalSymbols];
+            }
+            
             updatedMeasures.add(ChordMeasure(
-              savedMeasure.musicalSymbols,
+              finalSymbols.cast<MusicalSymbol>(),
               chordSymbols: currentMeasure.chordSymbols, // Keep original chord symbols
               isNewLine: currentMeasure.isNewLine, // Keep original layout
             ));
@@ -1421,7 +1463,7 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
     
     // Calculate the transposition interval
     final interval = _getTranspositionInterval(fromKey, toKey);
-    if (interval == 0) return; // No transposition needed
+    // Note: Even if interval is 0, we still need to update key signature context
     
     
     
@@ -1430,27 +1472,14 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
       final chord = _chordSymbols[i];
       final newRoot = _transposeNote(chord.effectiveRootName, interval);
       
-      // Capture the current Roman numeral before transposing
-      String originalRomanNumeral = '';
-      final currentKeySignature = _stringToKeySignatureType(fromKey);
-      if (currentKeySignature != null) {
-        originalRomanNumeral = chord.getRomanNumeralWithKey(currentKeySignature);
-        final qualitySuperscript = chord.getQualitySuperscript();
-        if (qualitySuperscript.isNotEmpty) {
-          originalRomanNumeral += qualitySuperscript;
-        }
-      }
-      
-      
-      
       // Create new chord symbol with transposed root
+      // Roman numerals will be calculated fresh based on the new key
       final newChord = ChordSymbol(
         newRoot,
         chord.effectiveQuality,
         position: chord.position,
         originalKeySignature: _stringToKeySignatureType(toKey),
         modifiedKeySignature: null,
-        preservedRomanNumeral: originalRomanNumeral,
       );
       
       _chordSymbols[i] = newChord;
@@ -1464,25 +1493,14 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
       for (final chord in measure.chordSymbols) {
         final newRoot = _transposeNote(chord.effectiveRootName, interval);
         
-        // Capture the current Roman numeral before transposing
-        String originalRomanNumeral = '';
-        final currentKeySignature = _stringToKeySignatureType(fromKey);
-        if (currentKeySignature != null) {
-          originalRomanNumeral = chord.getRomanNumeralWithKey(currentKeySignature);
-          final qualitySuperscript = chord.getQualitySuperscript();
-          if (qualitySuperscript.isNotEmpty) {
-            originalRomanNumeral += qualitySuperscript;
-          }
-        }
-        
         // Create new chord symbol with transposed root
+        // Roman numerals will be calculated fresh based on the new key
         final newChord = ChordSymbol(
           newRoot,
           chord.effectiveQuality,
           position: chord.position,
           originalKeySignature: _stringToKeySignatureType(toKey),
           modifiedKeySignature: null,
-          preservedRomanNumeral: originalRomanNumeral,
         );
         
         updatedChordSymbols.add(newChord);
@@ -1499,12 +1517,12 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
   /// Calculates the transposition interval between two keys in semitones
   int _getTranspositionInterval(String fromKey, String toKey) {
     const keyToSemitone = {
-      'C': 0, 'C#': 1, 'Db': 1, 'D♭': 1, 'D': 2, 'D#': 3, 'Eb': 3, 'E♭': 3,
-      'E': 4, 'F': 5, 'F#': 6, 'Gb': 6, 'G♭': 6, 'G': 7, 'G#': 8, 'Ab': 8, 'A♭': 8,
-      'A': 9, 'A#': 10, 'Bb': 10, 'B♭': 10, 'B': 11,
+      'C': 0, 'C♯': 1, 'C#': 1, 'Db': 1, 'D♭': 1, 'D': 2, 'D♯': 3, 'D#': 3, 'Eb': 3, 'E♭': 3,
+      'E': 4, 'F': 5, 'F♯': 6, 'F#': 6, 'Gb': 6, 'G♭': 6, 'G': 7, 'G♯': 8, 'G#': 8, 'Ab': 8, 'A♭': 8,
+      'A': 9, 'A♯': 10, 'A#': 10, 'Bb': 10, 'B♭': 10, 'B': 11,
       // Minor keys
-      'Am': 0, 'A#m': 1, 'Bbm': 1, 'B♭m': 1, 'Bm': 2, 'Cm': 3, 'C#m': 4,
-      'Dm': 5, 'D#m': 6, 'Ebm': 6, 'E♭m': 6, 'Em': 7, 'Fm': 8, 'F#m': 9, 'Gm': 10, 'G#m': 11
+      'Am': 0, 'A♯m': 1, 'A#m': 1, 'Bbm': 1, 'B♭m': 1, 'Bm': 2, 'Cm': 3, 'C♯m': 4, 'C#m': 4,
+      'Dm': 5, 'D♯m': 6, 'D#m': 6, 'Ebm': 6, 'E♭m': 6, 'Em': 7, 'Fm': 8, 'F♯m': 9, 'F#m': 9, 'Gm': 10, 'G♯m': 11, 'G#m': 11
     };
     
     final fromSemitone = keyToSemitone[fromKey] ?? 0;
@@ -1514,11 +1532,14 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
   
   /// Transposes a single note by the given interval (in semitones)
   String _transposeNote(String note, int interval) {
-    const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    // Use Unicode symbols to match ChordSymbol class
+    const notes = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
     const noteToIndex = {
-      'C': 0, 'C#': 1, 'Db': 1, 'D♭': 1, 'D': 2, 'D#': 3, 'Eb': 3, 'E♭': 3,
-      'E': 4, 'F': 5, 'F#': 6, 'Gb': 6, 'G♭': 6, 'G': 7, 'G#': 8, 'Ab': 8, 'A♭': 8,
-      'A': 9, 'A#': 10, 'Bb': 10, 'B♭': 10, 'B': 11
+      'C': 0, 'C♯': 1, 'C#': 1, 'Db': 1, 'D♭': 1, 
+      'D': 2, 'D♯': 3, 'D#': 3, 'Eb': 3, 'E♭': 3,
+      'E': 4, 'F': 5, 'F♯': 6, 'F#': 6, 'Gb': 6, 'G♭': 6, 
+      'G': 7, 'G♯': 8, 'G#': 8, 'Ab': 8, 'A♭': 8,
+      'A': 9, 'A♯': 10, 'A#': 10, 'Bb': 10, 'B♭': 10, 'B': 11
     };
     
     final currentIndex = noteToIndex[note] ?? 0;

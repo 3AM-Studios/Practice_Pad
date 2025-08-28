@@ -54,9 +54,6 @@ class ChordSymbol {
   /// Used when analyzing chords in a different key context
   final KeySignatureType? modifiedKeySignature;
 
-  /// Preserved Roman numeral from original analysis (used during transposition)
-  /// When this is set, it overrides the calculated Roman numeral
-  final String? preservedRomanNumeral;
 
   /// The generated chord notes based on the root and quality
   late final List<Pitch> chordNotes;
@@ -74,8 +71,7 @@ class ChordSymbol {
   ChordSymbol(String rootName, String quality,
       {this.position = 0,
       this.originalKeySignature,
-      this.modifiedKeySignature,
-      this.preservedRomanNumeral})
+      this.modifiedKeySignature})
       : rootName = rootName,
         quality = quality,
         rootStep = null,
@@ -105,7 +101,6 @@ class ChordSymbol {
     this.position = 0,
     this.originalKeySignature,
     this.modifiedKeySignature,
-    this.preservedRomanNumeral,
   })  : rootStep = rootStep,
         rootAlter = rootAlter,
         kind = kind,
@@ -687,18 +682,9 @@ class ChordSymbol {
   /// Get the Roman numeral representation of this chord relative to the given key
   /// [original] - If true, use originalKeySignature; if false, use modifiedKeySignature
   String getRomanNumeral({bool original = true}) {
-    // Use preserved Roman numeral if available (for transposed chords)
-    if (preservedRomanNumeral != null && preservedRomanNumeral!.isNotEmpty) {
-      return preservedRomanNumeral!;
-    }
-
     final keySignature = original ? originalKeySignature : modifiedKeySignature;
-
     if (keySignature == null) return '';
-
-    final result = getRomanNumeralWithKey(keySignature);
-
-    return result;
+    return getRomanNumeralWithKey(keySignature);
   }
 
   /// Get the Roman numeral representation of this chord relative to a specific key

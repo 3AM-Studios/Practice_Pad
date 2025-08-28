@@ -186,9 +186,12 @@ class _PracticeItemScreenState extends State<PracticeItemScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                'No practice items found in ${widget.practiceArea.name}.\nTap the + button to add your first item.',
-                textAlign: TextAlign.center,
+              DefaultTextStyle(
+                style: CupertinoTheme.of(context).textTheme.textStyle,
+                child: Text(
+                  'No practice items found in ${widget.practiceArea.name}.\nTap the + button to add your first item.',
+                  textAlign: TextAlign.center,
+                ),
               ),
               const SizedBox(height: 16),
               CupertinoButton.filled(
