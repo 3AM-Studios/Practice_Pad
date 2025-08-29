@@ -1,7 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:clay_containers/clay_containers.dart';
-import 'package:practice_pad/features/edit_items/presentation/pages/practice_item_screen.dart';
+import 'package:practice_pad/features/edit_items/presentation/pages/practice_items_screen.dart';
 import 'package:practice_pad/features/edit_items/presentation/viewmodels/edit_items_viewmodel.dart';
 import 'package:practice_pad/models/practice_area.dart';
 import 'package:practice_pad/services/device_type.dart';
@@ -196,7 +196,7 @@ class _ExerciseAreasScreenState extends State<ExerciseAreasScreen> {
                 Navigator.of(context).push(CupertinoPageRoute(
                   builder: (_) => ChangeNotifierProvider.value(
                     value: viewModel,
-                    child: PracticeItemScreen(practiceArea: viewModel.chordProgressionsArea),
+                    child: PracticeItemsScreen(practiceArea: viewModel.chordProgressionsArea),
                   ),
                 ));
               },
@@ -329,7 +329,7 @@ class _ExerciseAreasScreenState extends State<ExerciseAreasScreen> {
                         Navigator.of(context).push(CupertinoPageRoute(
                           builder: (_) => ChangeNotifierProvider.value(
                             value: viewModel,
-                            child: PracticeItemScreen(practiceArea: area),
+                            child: PracticeItemsScreen(practiceArea: area),
                           ),
                         ));
                       },

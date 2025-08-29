@@ -1,9 +1,14 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:clay_containers/clay_containers.dart';
+import 'package:practice_pad/features/practice/presentation/pages/practice_session_screen.dart';
 import 'package:practice_pad/models/practice_area.dart';
 import 'package:practice_pad/widgets/active_session_banner.dart';
 import 'package:practice_pad/features/song_viewer/presentation/viewers/simple_sheet_music_viewer.dart';
 import 'package:practice_pad/features/song_viewer/presentation/viewers/pdf_viewer/pdf_viewer_screen.dart';
+import 'package:practice_pad/features/edit_items/presentation/pages/practice_items_screen.dart';
+import 'package:practice_pad/features/edit_items/presentation/viewmodels/edit_items_viewmodel.dart';
+import 'package:provider/provider.dart';
 
 enum ViewerMode { simpleSheetMusic, pdf }
 
@@ -261,8 +266,152 @@ class _SongViewerScreenState extends State<SongViewerScreen> {
   }
 
   // Practice-related widgets (shared between modes)
-  Widget _buildPracticeItemsWidget() => const SizedBox.shrink();
-  
+  Widget _buildPracticeItemsWidget() {
+    if (widget.practiceArea == null ||
+        widget.practiceArea!.practiceItems.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final theme = Theme.of(context);
+    final primaryColor = theme.colorScheme.primary;
+    final secondaryColor = theme.colorScheme.secondary;
+    final surfaceColor = theme.colorScheme.surface;
+
+    return Container(
+      height: 160,
+      margin: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+      child: ClayContainer(
+        color: surfaceColor,
+        borderRadius: 15,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: GestureDetector(
+                onTap: () => _navigateToEditItems(context),
+                child: Center(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Practice Items',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: primaryColor,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Icon(
+                        CupertinoIcons.chevron_right,
+                        size: 14,
+                        color: primaryColor.withOpacity(0.7),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Expanded(
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                itemCount: widget.practiceArea!.practiceItems.length,
+                itemBuilder: (context, index) {
+                  final practiceItem =
+                      widget.practiceArea!.practiceItems[index];
+                  return GestureDetector(
+                      onTap: () async {
+                        // Start a practice session for this item
+                        await Navigator.of(context).push(
+                          CupertinoPageRoute(
+                            builder: (_) => PracticeSessionScreen(
+                              practiceItem: practiceItem,
+                            ),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        width: 200,
+                        margin: const EdgeInsets.only(right: 12, bottom: 12),
+                        child: ClayContainer(
+                          color: Theme.of(context).colorScheme.surfaceContainerHigh,
+                          borderRadius: 20,
+                          curveType: CurveType.none,
+                          child: Container(
+                            // decoration: BoxDecoration(
+                            //   image: const DecorationImage(
+                            //     image: AssetImage(
+                            //         'assets/images/wood_texture_rotated.jpg'),
+                            //     fit: BoxFit.cover,
+                            //   ),
+                            //   border: Border.all(
+                            //       color: Theme.of(context).colorScheme.surface,
+                            //       width: 4),
+                            //   borderRadius: BorderRadius.circular(20),
+                            // ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    practiceItem.name,
+                                    style:  TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: Theme.of(context).colorScheme.primary
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    softWrap: true,
+                                  ),
+                                  if (practiceItem.description.isNotEmpty) ...[
+                                     const SizedBox(height: 6),
+                                    Text(
+                                      practiceItem.description,
+                                      style:  TextStyle(
+                                        fontSize: 12,
+                                        color: Theme.of(context).colorScheme.primary,
+                                      ),
+                                      maxLines: 3,
+                                      overflow: TextOverflow.ellipsis,
+                                      softWrap: true,
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ));
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _navigateToEditItems(BuildContext context) {
+    if (widget.practiceArea == null) return;
+    
+    // Get EditItemsViewModel instance
+    final editItemsViewModel = Provider.of<EditItemsViewModel>(context, listen: false);
+    
+    Navigator.of(context).push(
+      CupertinoPageRoute(
+        builder: (_) => ChangeNotifierProvider.value(
+          value: editItemsViewModel,
+          child: PracticeItemsScreen(practiceArea: widget.practiceArea!),
+        ),
+      ),
+    );
+  }
+
   Widget _buildGeneralPracticeItemButton() {
     if (widget.practiceArea == null) {
       return const SizedBox.shrink();

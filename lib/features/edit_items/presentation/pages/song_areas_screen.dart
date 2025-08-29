@@ -1,7 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:clay_containers/clay_containers.dart';
-import 'package:practice_pad/features/edit_items/presentation/pages/practice_item_screen.dart';
+import 'package:practice_pad/features/edit_items/presentation/pages/practice_items_screen.dart';
 import 'package:practice_pad/features/edit_items/presentation/viewmodels/edit_items_viewmodel.dart';
 import 'package:practice_pad/features/song_viewer/presentation/screens/song_list_screen.dart';
 import 'package:practice_pad/features/song_viewer/data/models/song.dart';
@@ -206,7 +206,7 @@ class _SongAreasScreenState extends State<SongAreasScreen> {
                       Navigator.of(context).push(CupertinoPageRoute(
                         builder: (_) => ChangeNotifierProvider.value(
                           value: viewModel,
-                          child: PracticeItemScreen(practiceArea: area),
+                          child: PracticeItemsScreen(practiceArea: area),
                         ),
                       ));
                     },

@@ -8,16 +8,16 @@ import 'package:practice_pad/models/chord_progression.dart';
 import 'package:provider/provider.dart';
 import 'dart:developer' as developer;
 
-class PracticeItemScreen extends StatefulWidget {
+class PracticeItemsScreen extends StatefulWidget {
   final PracticeArea practiceArea;
 
-  const PracticeItemScreen({super.key, required this.practiceArea});
+  const PracticeItemsScreen({super.key, required this.practiceArea});
 
   @override
-  State<PracticeItemScreen> createState() => _PracticeItemScreenState();
+  State<PracticeItemsScreen> createState() => _PracticeItemsScreenState();
 }
 
-class _PracticeItemScreenState extends State<PracticeItemScreen> {
+class _PracticeItemsScreenState extends State<PracticeItemsScreen> {
   late EditItemsViewModel _viewModel;
   List<PracticeItem> _items = [];
 
@@ -222,56 +222,65 @@ class _PracticeItemScreenState extends State<PracticeItemScreen> {
           delegate: SliverChildBuilderDelegate(
             (context, index) {
               final item = _items[index];
-              return CupertinoContextMenu(
-                actions: <Widget>[
-                  CupertinoContextMenuAction(
-                    child: const Text('Edit Item'),
-                    onPressed: () {
-                      Navigator.pop(context); // Close context menu
-                      if (widget.practiceArea.type == PracticeAreaType.chordProgression || item.chordProgression != null) {
-                        _showChordProgressionDialog(context, item: item);
-                      } else {
-                        _showAddEditPracticeItemDialog(context, item: item);
-                      }
-                    },
+              return Material(
+                color: CupertinoTheme.of(context).scaffoldBackgroundColor,
+                child: CupertinoListTile.notched(
+                  title: Text(item.name),
+                  subtitle: Text(item.description.isNotEmpty
+                      ? item.description
+                      : 'No description'),
+                  leading: Icon(
+                    (widget.practiceArea.type == PracticeAreaType.chordProgression || item.chordProgression != null)
+                        ? CupertinoIcons.music_note_2
+                        : CupertinoIcons.doc_text,
+                    color: (widget.practiceArea.type == PracticeAreaType.chordProgression || item.chordProgression != null)
+                        ? CupertinoColors.systemPurple
+                        : CupertinoColors.systemBlue,
                   ),
-                  CupertinoContextMenuAction(
-                    isDestructiveAction: true,
-                    child: const Text('Delete Item'),
-                    onPressed: () async {
-                      Navigator.pop(context); // Close context menu
-                      // Optional: Show confirmation dialog
-                      await _viewModel.deletePracticeItem(
-                          item.id, widget.practiceArea.recordName);
-                      _loadItems(); // Refresh list
-                    },
-                  ),
-                ],
-                child: Material(
-                  color: CupertinoTheme.of(context).scaffoldBackgroundColor,
-                  child: CupertinoListTile.notched(
-                    title: Text(item.name),
-                    subtitle: Text(item.description.isNotEmpty
-                        ? item.description
-                        : 'No description'),
-                    leading: Icon(
-                      (widget.practiceArea.type == PracticeAreaType.chordProgression || item.chordProgression != null)
-                          ? CupertinoIcons.music_note_2
-                          : CupertinoIcons.doc_text,
-                      color: (widget.practiceArea.type == PracticeAreaType.chordProgression || item.chordProgression != null)
-                          ? CupertinoColors.systemPurple
-                          : CupertinoColors.systemBlue,
+                  trailing: CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    child: const Icon(
+                      CupertinoIcons.delete,
+                      color: CupertinoColors.systemRed,
+                      size: 20,
                     ),
-                    onTap: () {
-                      developer.log("Tapped on item: ${item.name} (LOCAL)",
-                          name: 'PracticeItemScreen');
-                      if (widget.practiceArea.type == PracticeAreaType.chordProgression || item.chordProgression != null) {
-                        _showChordProgressionDialog(context, item: item);
-                      } else {
-                        _showAddEditPracticeItemDialog(context, item: item);
+                    onPressed: () async {
+                      // Show confirmation dialog before deleting
+                      final bool? confirmDelete = await showCupertinoDialog<bool>(
+                        context: context,
+                        builder: (context) => CupertinoAlertDialog(
+                          title: const Text('Delete Practice Item'),
+                          content: Text('Are you sure you want to delete "${item.name}"?'),
+                          actions: [
+                            CupertinoDialogAction(
+                              child: const Text('Cancel'),
+                              onPressed: () => Navigator.of(context).pop(false),
+                            ),
+                            CupertinoDialogAction(
+                              isDestructiveAction: true,
+                              child: const Text('Delete'),
+                              onPressed: () => Navigator.of(context).pop(true),
+                            ),
+                          ],
+                        ),
+                      );
+                      
+                      if (confirmDelete == true) {
+                        await _viewModel.deletePracticeItem(
+                            item.id, widget.practiceArea.recordName);
+                        _loadItems(); // Refresh list
                       }
                     },
                   ),
+                  onTap: () {
+                    developer.log("Tapped on item: ${item.name} (LOCAL)",
+                        name: 'PracticeItemsScreen');
+                    if (widget.practiceArea.type == PracticeAreaType.chordProgression || item.chordProgression != null) {
+                      _showChordProgressionDialog(context, item: item);
+                    } else {
+                      _showAddEditPracticeItemDialog(context, item: item);
+                    }
+                  },
                 ),
               );
             },
