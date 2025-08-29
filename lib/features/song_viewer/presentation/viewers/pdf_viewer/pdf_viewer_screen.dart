@@ -631,53 +631,45 @@ class _PDFViewerState extends State<PDFViewer>
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: LayoutBuilder(
             builder: (context, constraints) {
-              if (constraints.maxWidth > 600) {
-                // Wide screen: horizontal layout
+              final isWideEnough = constraints.maxWidth > 350;
+              
+              if (isWideEnough) {
+                // Wide enough: single row layout
                 return Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // Left spacer for centering
-                    Opacity(
-                      opacity: 0.0, // Invisible but takes up space
-                      child: _buildTranscribeButton(),
+                    // Books and Upload buttons (flexible to take available space)
+                    Expanded(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _buildBooksButton(),
+                          const SizedBox(width: 8),
+                          _buildUploadButton(),
+                        ],
+                      ),
                     ),
                     
-                    // Center: Books and Upload buttons
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildBooksButton(),
-                        const SizedBox(width: 12),
-                        _buildUploadButton(),
-                      ],
-                    ),
-                    
-                    // Right side: Transcribe button
+                    // Transcribe button (fixed size)
                     _buildTranscribeButton(),
                   ],
                 );
               } else {
-                // Narrow screen: wrapped layout
-                return Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                // Narrow: stacked layout
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Left spacer for centering
-                    Opacity(
-                      opacity: 0.0, // Invisible but takes up space
-                      child: _buildTranscribeButton(),
-                    ),
-                    
-                    // Center: Books and Upload buttons
+                    // Top row: Books and Upload buttons
                     Row(
-                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         _buildBooksButton(),
                         const SizedBox(width: 8),
                         _buildUploadButton(),
                       ],
                     ),
-                    
-                    // Right side: Transcribe button
+                    const SizedBox(height: 8),
+                    // Bottom row: Transcribe button centered
                     _buildTranscribeButton(),
                   ],
                 );

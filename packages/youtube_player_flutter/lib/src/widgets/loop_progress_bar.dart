@@ -280,10 +280,8 @@ class _LoopProgressBarState extends State<LoopProgressBar>
         milliseconds: (value * totalDuration.inMilliseconds).round(),
       );
       
-      // Pause playback during drag for real-time scrubbing
-      _controller.pause();
-      
-      // Seek to the dragged position for real-time feedback
+      // Keep playing while scrubbing - don't pause
+      // Just seek to the dragged position for real-time feedback
       _controller.seekTo(position, allowSeekAhead: true);
       
       // Update the local position value so the UI shows correct position
@@ -531,29 +529,7 @@ class _LoopProgressBarState extends State<LoopProgressBar>
               },
               onHorizontalDragEnd: (details) {
                 if (_isDraggingLoop) {
-                  // Final seek and resume playback
-                  final finalValue = _isDraggingStart ? _loopStartValue : _loopEndValue;
-                  try {
-                    if (mounted && _controller.value.errorCode == 0 && _controller.value.isReady) {
-                      final totalDuration = _controller.metadata.duration;
-                      if (totalDuration.inMilliseconds > 0) {
-                        final position = Duration(
-                          milliseconds: (finalValue * totalDuration.inMilliseconds).round(),
-                        );
-                        _controller.seekTo(position, allowSeekAhead: true);
-                        
-                        // Resume playback after a brief delay
-                        Future.delayed(const Duration(milliseconds: 200), () {
-                          if (mounted && _controller.value.errorCode == 0 && _controller.value.isReady) {
-                            _controller.play();
-                          }
-                        });
-                      }
-                    }
-                  } catch (e) {
-                    debugPrint('Error with final seek: $e');
-                  }
-                  
+                  // End loop dragging - just clean up state
                   setState(() {
                     _isDraggingLoop = false;
                     _isDraggingStart = false;

@@ -5,7 +5,6 @@ import 'package:practice_pad/features/edit_items/presentation/pages/practice_ite
 import 'package:practice_pad/features/edit_items/presentation/viewmodels/edit_items_viewmodel.dart';
 import 'package:practice_pad/features/song_viewer/presentation/screens/song_list_screen.dart';
 import 'package:practice_pad/features/song_viewer/data/models/song.dart';
-import 'package:practice_pad/models/practice_area.dart';
 import 'package:practice_pad/services/device_type.dart';
 import 'package:provider/provider.dart';
 import 'dart:developer' as developer;
@@ -32,46 +31,6 @@ class _SongAreasScreenState extends State<SongAreasScreen> {
     }
   }
 
-  void _showEditSongDialog(
-      BuildContext context, EditItemsViewModel viewModel, PracticeArea area) {
-    final TextEditingController nameController =
-        TextEditingController(text: area.name);
-
-    showCupertinoDialog(
-      context: context,
-      builder: (dialogContext) {
-        return CupertinoAlertDialog(
-          title: const Text('Edit Song Name'),
-          content: CupertinoTextField(
-            controller: nameController,
-            placeholder: 'Song Name',
-            autofocus: true,
-          ),
-          actions: <CupertinoDialogAction>[
-            CupertinoDialogAction(
-              child: const Text('Cancel'),
-              onPressed: () => Navigator.of(dialogContext).pop(),
-            ),
-            CupertinoDialogAction(
-              isDefaultAction: true,
-              child: const Text('Save'),
-              onPressed: () {
-                final name = nameController.text.trim();
-                if (name.isNotEmpty) {
-                  Navigator.of(dialogContext).pop(name);
-                }
-              },
-            ),
-          ],
-        );
-      },
-    ).then((value) {
-      if (value is String && value.isNotEmpty) {
-        area.name = value;
-        viewModel.updatePracticeArea(area);
-      }
-    });
-  }
 
   @override
   Widget build(BuildContext context) {

@@ -1165,38 +1165,45 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
             LayoutBuilder(
               builder: (context, constraints) {
                 // Check if we have enough width for single row layout
-                final isWideScreen = constraints.maxWidth > 600;
+                final canFitSingleRow = constraints.maxWidth > 500;
                 
-
-                if (isWideScreen) {
-                  // Wide screen: single row layout
-                  
+                if (canFitSingleRow) {
+                  // Wide screen: single row layout with proper spacing
                   return Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
+                      // Key controls (left side)
                       _buildKeyControls(),
-                      _buildZoomAndDrawControls(surfaceColor),
+                      // Spacer to push zoom controls to center
+                      Expanded(
+                        child: Center(
+                          child: _buildZoomAndDrawControls(surfaceColor),
+                        ),
+                      ),
+                      // Extension controls (right side)
                       _buildExtensionControls(surfaceColor),
                     ],
                   );
                 } else {
-                  // Narrow screen: wrapped layout
-                  
+                  // Narrow screen: stacked layout
                   return Column(
                     children: [
-                      // Top row: Key controls and extension controls
+                      // Top row: Key controls and zoom/draw controls
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          _buildKeyControls(),
-                          _buildExtensionControls(surfaceColor),
+                          Flexible(
+                            flex: 1,
+                            child: _buildKeyControls(),
+                          ),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            flex: 1,
+                            child: _buildZoomAndDrawControls(surfaceColor),
+                          ),
                         ],
                       ),
-                      const SizedBox(height: 14),
-                      // Bottom row: Zoom/draw controls centered
-                      Center(
-                          child: _buildZoomAndDrawControls(surfaceColor)),
+                      const SizedBox(height: 12),
+                      // Bottom row: Extension controls centered
+                      _buildExtensionControls(surfaceColor),
                     ],
                   );
                 }
@@ -1673,11 +1680,15 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
 
   /// Builds the zoom and draw controls section
   Widget _buildZoomAndDrawControls(Color surfaceColor) {
+    final isTabletOrDesktop = deviceType == DeviceType.tablet || deviceType == DeviceType.macOS;
+    final buttonSize = isTabletOrDesktop ? 40.0 : 30.0;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         // Zoom controls
         ClayContainer(
+          width: buttonSize,
+          height: buttonSize,
           color: surfaceColor,
           borderRadius: 8,
           child: IconButton(
@@ -1693,6 +1704,8 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
         ),
         const SizedBox(width: 4),
         ClayContainer(
+          width: buttonSize,
+          height: buttonSize,
           color: surfaceColor,
           borderRadius: 8,
           child: IconButton(
@@ -1712,6 +1725,8 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
           valueListenable: _isDrawingModeNotifier,
           builder: (context, isDrawingMode, child) {
             return ClayContainer(
+              width: buttonSize,
+              height: buttonSize,
               spread: isDrawingMode ? 0 : 6,
               depth: isDrawingMode ? 0 : 20,
               color: isDrawingMode
@@ -1882,6 +1897,7 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
     }
 
     final isMinorKey = _originalKey.endsWith('m');
+    final isTabletOrDesktop = deviceType == DeviceType.tablet || deviceType == DeviceType.macOS;
 
     return GestureDetector(
       onTap: _showKeySelectionDialog,
@@ -1900,29 +1916,37 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
                 color: Theme.of(context).colorScheme.surface, width: 4),
             borderRadius: BorderRadius.circular(20),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          padding: EdgeInsets.symmetric(
+            horizontal: isTabletOrDesktop ? 20 : 18, 
+            vertical: isTabletOrDesktop ? 12 : 8
+          ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               const Icon(
                 Icons.music_note,
                 color: Colors.white,
-                size: 18,
+                size: 16,
               ),
-              const SizedBox(width: 8),
-              Text(
-                'Key: $_originalKey ${isMinorKey ? 'Minor' : 'Major'}',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
+              SizedBox(width: isTabletOrDesktop ? 8 : 4),
+              Flexible(
+                child: Text(
+                  isTabletOrDesktop 
+                    ? 'Key: $_originalKey ${isMinorKey ? 'Minor' : 'Major'}'
+                    : 'Key: $_originalKey ${isMinorKey ? 'Min' : 'Maj'}',
+                  style: TextStyle(
+                    fontSize: isTabletOrDesktop ? 16 : 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: isTabletOrDesktop ? 8 : 4),
               const Icon(
                 Icons.keyboard_arrow_down,
                 color: Colors.white,
-                size: 18,
+                size: 16,
               ),
             ],
           ),

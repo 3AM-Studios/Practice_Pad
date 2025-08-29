@@ -21,8 +21,8 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
   final TextEditingController _urlController = TextEditingController();
   bool _isAutoLoop = false;
   double _loopStartTime = 0.0;
-  double _loopEndTime = 0.0;
-  bool _hasLoopSection = false;
+  double _loopEndTime = 30.0; // Default 30-second loop
+  bool _hasLoopSection = true; // Always true now
   String? _currentVideoId;
   bool _isLoadingVideo = false;
   String? _videoError;
@@ -57,9 +57,8 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
         if (url != null && url.isNotEmpty) {
           _urlController.text = url;
           _loopStartTime = loopStartTime;
-          _loopEndTime = loopEndTime;
+          _loopEndTime = loopEndTime > loopStartTime ? loopEndTime : loopStartTime + 30.0;
           _isAutoLoop = isAutoLoop;
-          _hasLoopSection = loopEndTime > loopStartTime;
           await _loadVideoFromUrl(url);
         }
       }
@@ -134,7 +133,7 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
   }
 
   void _videoListener() {
-    if (_controller != null && _controller!.value.isReady && _isAutoLoop && _hasLoopSection) {
+    if (_controller != null && _controller!.value.isReady && _isAutoLoop) {
       final currentTime = _controller!.value.position.inSeconds.toDouble();
       if (currentTime >= _loopEndTime && currentTime > 0) {
         _controller!.seekTo(Duration(seconds: _loopStartTime.toInt()));
@@ -150,7 +149,7 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
 
 
   void _playFromLoopStart() {
-    if (_controller != null && _controller!.value.isReady && _hasLoopSection) {
+    if (_controller != null && _controller!.value.isReady) {
       _controller!.seekTo(Duration(seconds: _loopStartTime.toInt()));
       _controller!.play();
     }
@@ -271,6 +270,13 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
+                            shadows: [
+                              Shadow(
+                                offset: Offset(1, 1),
+                                blurRadius: 3,
+                                color: Colors.black54,
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -291,13 +297,11 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Center(
-                        child: const Text(
-                          'YouTube Video URL',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
+                      const Text(
+                        'YouTube Video URL',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -308,7 +312,7 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
                               controller: _urlController,
                               decoration: const InputDecoration(
                                 hintText: 'Paste YouTube URL here...',
-                                border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(40))),
+                                border: OutlineInputBorder(),
                               ),
                             ),
                           ),
@@ -413,8 +417,8 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
                                     const CurrentPosition(),
                                     LoopProgressBar(
                                       isExpanded: true,
-                                      loopStart: _hasLoopSection ? Duration(seconds: _loopStartTime.toInt()) : null,
-                                      loopEnd: _hasLoopSection ? Duration(seconds: _loopEndTime.toInt()) : null,
+                                      loopStart: Duration(seconds: _loopStartTime.toInt()),
+                                      loopEnd: Duration(seconds: _loopEndTime.toInt()),
                                       isLoopEnabled: _isAutoLoop,
                                       onLoopUpdate: (start, end) {
                                         debugPrint('PARENT: Received loop update start=${start.inSeconds}s, end=${end.inSeconds}s');
@@ -465,128 +469,178 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
 
-                      // Loop Section with embedded controls
-                      if (_hasLoopSection) ...[
+                      // Loop status - Wooden Clay Container
                         ClayContainer(
                           color: Theme.of(context).colorScheme.surface,
                           depth: 20,
                           borderRadius: 16,
                           child: Container(
                             width: double.infinity,
-                            padding: const EdgeInsets.all(16),
+                            padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+                            decoration: BoxDecoration(
+                              image: const DecorationImage(
+                                image: AssetImage('assets/images/wood_texture_rotated.jpg'),
+                                fit: BoxFit.cover,
+                              ),
+                              border: Border.all(color: Theme.of(context).colorScheme.surface, width: 4),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
                             child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                // Left side - Loop Section Info
-                                Expanded(
-                                  flex: 3,
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Loop Section',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.grey.shade700,
-                                          fontSize: 16,
-                                        ),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Loop Section',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                        fontSize: 16,
+                                        shadows: [
+                                          Shadow(
+                                            offset: Offset(1, 1),
+                                            blurRadius: 2,
+                                            color: Colors.black54,
+                                          ),
+                                        ],
                                       ),
-                                      const SizedBox(height: 4),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '${_formatTime(_loopStartTime)} → ${_formatTime(_loopEndTime)}',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 18,
+                                        color: Colors.white,
+                                        shadows: [
+                                          Shadow(
+                                            offset: Offset(1, 1),
+                                            blurRadius: 2,
+                                            color: Colors.black54,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: _isAutoLoop ? Colors.green.withOpacity(0.9) : Colors.grey.withOpacity(0.7),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        _isAutoLoop ? Icons.repeat : Icons.repeat_one,
+                                        color: Colors.white,
+                                        size: 16,
+                                      ),
+                                      const SizedBox(width: 4),
                                       Text(
-                                        '${_formatTime(_loopStartTime)} → ${_formatTime(_loopEndTime)}',
-                                        style: TextStyle(
+                                        _isAutoLoop ? 'Auto Loop' : 'Manual',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 12,
                                           fontWeight: FontWeight.bold,
-                                          fontSize: 18,
-                                          color: Colors.grey.shade700,
                                         ),
                                       ),
                                     ],
                                   ),
                                 ),
-                                
-                                const SizedBox(width: 16),
-                                
-                                // Right side - Control buttons
-                                Row(
-                                  children: [
-                                    // Play Loop Button
-                                    GestureDetector(
-                                      onTap: _controller != null && _controller!.value.isReady ? () {
-                                        _controller!.seekTo(Duration(seconds: _loopStartTime.toInt()));
-                                        _controller!.play();
-                                      } : null,
-                                      child: ClayContainer(
-                                        color: Theme.of(context).colorScheme.surface,
-                                        depth: 15,
-                                        borderRadius: 12,
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 50),
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(
-                                                Icons.play_arrow,
-                                                color: Colors.blue.shade600,
-                                                size: 20,
-                                              ),
-                                              const SizedBox(width: 6),
-                                              Text(
-                                                'Play',
-                                                style: TextStyle(
-                                                  color: Colors.blue.shade600,
-                                                  fontWeight: FontWeight.w600,
-                                                  fontSize: 14,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    
-                                    const SizedBox(width: 8),
-                                    
-                                    // Auto Loop Toggle
-                                    GestureDetector(
-                                      onTap: () {
-                                        setState(() {
-                                          _isAutoLoop = !_isAutoLoop;
-                                        });
-                                        _saveYoutubeData();
-                                      },
-                                      child: ClayContainer(
-                                        color: Theme.of(context).colorScheme.surface,
-                                        depth: _isAutoLoop ? 10 : 15,
-                                        borderRadius: 12,
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 50),
-                                          child: Column(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(
-                                                _isAutoLoop ? Icons.repeat : Icons.repeat_one,
-                                                color: _isAutoLoop ? Colors.green.shade600 : Colors.grey.shade600,
-                                                size: 16,
-                                              ),
-                                              const SizedBox(height: 3),
-                                              Text(
-                                                _isAutoLoop ? 'Auto Loop On' : 'Auto Loop Off',
-                                                textAlign: TextAlign.center,
-                                                style: TextStyle(
-                                                  color: _isAutoLoop ? Colors.green.shade600 : Colors.grey.shade600,
-                                                  fontWeight: FontWeight.w600,
-                                                  fontSize: 9,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
                               ],
                             ),
                           ),
+                        ),
+
+                      const SizedBox(height: 16),
+
+                      // Loop Controls with Clay Containers - Always show controls
+                        // Main controls row
+                        Row(
+                          children: [
+                            // Play Loop Button
+                            Expanded(
+                              flex: 2,
+                              child: GestureDetector(
+                                onTap: _controller != null && _controller!.value.isReady ? () {
+                                  _controller!.seekTo(Duration(seconds: _loopStartTime.toInt()));
+                                  _controller!.play();
+                                } : null,
+                                child: ClayContainer(
+                                  color: Theme.of(context).colorScheme.surface,
+                                  depth: 20,
+                                  borderRadius: 16,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.play_arrow,
+                                          color: Colors.blue.shade600,
+                                          size: 24,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'Play',
+                                          style: TextStyle(
+                                            color: Colors.blue.shade600,
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            
+                            const SizedBox(width: 12),
+                            
+                            // Auto Loop Toggle
+                            Expanded(
+                              flex: 2,
+                              child: GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    _isAutoLoop = !_isAutoLoop;
+                                  });
+                                  _saveYoutubeData();
+                                },
+                                child: ClayContainer(
+                                  color: Theme.of(context).colorScheme.surface,
+                                  depth: _isAutoLoop ? 15 : 20,
+                                  borderRadius: 16,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          _isAutoLoop ? Icons.repeat : Icons.repeat_one,
+                                          color: _isAutoLoop ? Colors.green.shade600 : Colors.grey.shade600,
+                                          size: 20,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          _isAutoLoop ? 'ON' : 'OFF',
+                                          style: TextStyle(
+                                            color: _isAutoLoop ? Colors.green.shade600 : Colors.grey.shade600,
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                         
                         const SizedBox(height: 12),
@@ -683,110 +737,34 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
                             ),
                           ],
                         ),
-                      ] else ...[
-                        // Create Loop Button
-                        GestureDetector(
-                          onTap: _controller != null && _controller!.value.isReady ? () {
-                            final currentTime = _controller!.value.position.inSeconds.toDouble();
-                            setState(() {
-                              _loopStartTime = (currentTime - 10).clamp(0, double.infinity);
-                              _loopEndTime = currentTime + 10;
-                              _hasLoopSection = true;
-                            });
-                            _saveYoutubeData();
-                          } : null,
-                          child: ClayContainer(
-                            color: Theme.of(context).colorScheme.surface,
-                            depth: 20,
-                            borderRadius: 16,
-                            child: Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.loop,
-                                    color: Colors.purple.shade600,
-                                    size: 24,
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Text(
-                                    'Create Loop Here',
-                                    style: TextStyle(
-                                      color: Colors.purple.shade600,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 18,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
 
                       const SizedBox(height: 16),
 
-                      // Simple Instructions - Centered Wooden Clay
-                      Center(
-                        child: ClayContainer(
-                          color: Theme.of(context).colorScheme.surface,
-                          depth: 20,
-                          borderRadius: 12,
-                          child: Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              image: const DecorationImage(
-                                image: AssetImage('assets/images/wood_texture_rotated.jpg'),
-                                fit: BoxFit.cover,
-                              ),
-                              border: Border.all(color: Theme.of(context).colorScheme.surface, width: 4),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
+                      // Simple Instructions
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.blue.shade100),
+                        ),
+                        child: const Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
                               children: [
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(
-                                      Icons.info_outline, 
-                                      size: 16, 
-                                      color: Colors.white,
-                                    ),
-                                    const SizedBox(width: 6),
-                                    const Text(
-                                      'Quick Tips',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold, 
-                                        fontSize: 14, 
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                const Text(
-                                  '• Drag timeline handles to set loop points',
-                                  style: TextStyle(
-                                    fontSize: 12, 
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                                const Text(
-                                  '• Use +/- buttons for precise timing',
-                                  style: TextStyle(
-                                    fontSize: 12, 
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  ),
+                                Icon(Icons.info_outline, size: 16, color: Colors.blue),
+                                SizedBox(width: 6),
+                                Text(
+                                  'Quick Tips',
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.blue),
                                 ),
                               ],
                             ),
-                          ),
+                            SizedBox(height: 6),
+                            Text('• Drag timeline handles to set loop points', style: TextStyle(fontSize: 12)),
+                            Text('• Use +/- buttons for precise timing', style: TextStyle(fontSize: 12)),
+                          ],
                         ),
                       ),
                     ],
