@@ -27,10 +27,11 @@ import 'package:practice_pad/services/widget_integration.dart';
 import 'dart:math' as math;
 
 import 'package:window_manager/window_manager.dart';
+import 'package:flutter/services.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: []);   
   deviceType = await getDeviceType();
   print('device type: $deviceType');
 

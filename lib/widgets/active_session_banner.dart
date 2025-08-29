@@ -107,13 +107,13 @@ class ActiveSessionBanner extends StatelessWidget {
                     ),
                       ],
                     )
-                  : const Center(
+                  :  Center(
                       child: Text(
                         'No active practice session',
                         style: TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
-                          fontSize: 16,
+                          fontSize: isTabletOrDesktop ? 20 : 14,
                         ),
                       ),
                     ),

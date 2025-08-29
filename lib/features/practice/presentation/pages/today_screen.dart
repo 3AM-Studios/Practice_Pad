@@ -89,7 +89,6 @@ print('Device type: $deviceType, isTabletOrDesktop: $isTabletOrDesktop');
         const SizedBox(height: 10),
         // Fixed header with Today's Practice banner and sync buttons (also shown in empty state)
         _buildFixedHeader(context),
-        const SizedBox(height: 10),
         Expanded(
           child: Center(
             child: Padding(
@@ -117,10 +116,10 @@ print('Device type: $deviceType, isTabletOrDesktop: $isTabletOrDesktop');
       const SizedBox(height: 10),
       // Fixed header with Today's Practice banner and sync buttons
       _buildFixedHeader(context),
-      const SizedBox(height: 10),
       // Scrollable practice areas in the middle (takes remaining space)
       Expanded(
         child: ListView.builder(
+          padding: const EdgeInsets.fromLTRB(0, 4, 0, 0),
           itemCount: viewModel.todaysAreas.length,
           itemBuilder: (context, index) {
             final area = viewModel.todaysAreas[index];
@@ -139,50 +138,98 @@ print('Device type: $deviceType, isTabletOrDesktop: $isTabletOrDesktop');
 }
 
 Widget _buildFixedHeader(BuildContext context) {
-  // Add more top padding on iPhone
-  final topPadding = Platform.isIOS && deviceType == DeviceType.phone ?40.0 : 8.0;
-  final width = Platform.isIOS && deviceType == DeviceType.phone ? 13.0 : 35.0;
-  return Container(
-    padding: EdgeInsets.fromLTRB(16, topPadding, 16, 8),
-    child: Stack(
+  final isIPhone = Platform.isIOS && deviceType == DeviceType.phone;
+  
+  if (isIPhone) {
+    return Column(
       children: [
-        // Centered banner (ignores buttons completely)
-        Center(
-          child: ClayContainer(
-            borderRadius: 10,
-            child: Container(
-              padding:  EdgeInsets.fromLTRB(width, 5, width, 5),
-              decoration: BoxDecoration(
-                image: const DecorationImage(
-                  image: AssetImage('assets/images/wood_texture_rotated.jpg'),
-                  fit: BoxFit.cover,
-                ),
-                border: Border.all(color: Theme.of(context).colorScheme.surface, width: 4),
-                borderRadius: BorderRadius.circular(10),
+        // Top section with sync buttons
+        Container(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(right: 20.0),
+                child: _buildSyncButtons(context),
               ),
-              child:  Text(
-                'Today\'s Practice',
-                style: TextStyle(
-                  fontSize: Platform.isIOS && deviceType == DeviceType.phone ? 15.0 : 20.0,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white
+            ],
+          ),
+        ),
+        // Banner section with top padding
+        Container(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8), // 60 - 8 = 52 to match original positioning
+          child: Center(
+            child: ClayContainer(
+              borderRadius: 10,
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(13.0, 5, 13.0, 5),
+                decoration: BoxDecoration(
+                  image: const DecorationImage(
+                    image: AssetImage('assets/images/wood_texture_rotated.jpg'),
+                    fit: BoxFit.cover,
+                  ),
+                  border: Border.all(color: Theme.of(context).colorScheme.surface, width: 4),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Text(
+                  'Today\'s Practice',
+                  style: TextStyle(
+                    fontSize: 14.0,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white
+                  ),
                 ),
               ),
             ),
           ),
         ),
-        // Sync buttons positioned absolutely on the right
-        Positioned(
-          right: 0,
-          top: 0,
-          bottom: 0,
-          child: Center(
-            child: _buildSyncButtons(context),
-          ),
-        ),
       ],
-    ),
-  );
+    );
+  } else {
+    // Non-iPhone layout
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 8.0, 16, 8),
+      child: Stack(
+        children: [
+          // Centered banner
+          Center(
+            child: ClayContainer(
+              borderRadius: 10,
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(35.0, 5, 35.0, 5),
+                decoration: BoxDecoration(
+                  image: const DecorationImage(
+                    image: AssetImage('assets/images/wood_texture_rotated.jpg'),
+                    fit: BoxFit.cover,
+                  ),
+                  border: Border.all(color: Theme.of(context).colorScheme.surface, width: 4),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Text(
+                  'Today\'s Practice',
+                  style: TextStyle(
+                    fontSize: 20.0,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white
+                  ),
+                ),
+              ),
+            ),
+          ),
+          // Sync buttons positioned absolutely on the right
+          Positioned(
+            right: 50,
+            top: 50,
+            bottom: 0,
+            child: Center(
+              child: _buildSyncButtons(context),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 Widget _buildSyncButtons(BuildContext context) {
@@ -598,7 +645,7 @@ Widget _buildBottomSection(BuildContext context, TodayViewModel viewModel, VoidC
               flex: 1,
               child: PracticeCalendar(
                 onStatsPressed: onStatsPressed,
-                calendarSize: CalendarSize.small, // Use medium size for better visibility
+                calendarSize: CalendarSize.medium, // Use medium size for better visibility
               ),
             ),
           ],

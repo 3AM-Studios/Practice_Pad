@@ -35,7 +35,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
       case CalendarSize.small:
         return 28.0;
       case CalendarSize.medium:
-        return 28.0;// Current default size
+        return 40.0;// Current default size
       case CalendarSize.large:
         return 48.0;
     }
@@ -46,7 +46,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
       case CalendarSize.small:
         return 12.0;
       case CalendarSize.medium:
-        return 12.0;// Current default
+        return 17.0;// Current default
       case CalendarSize.large:
         return 16.0;
     }
@@ -234,7 +234,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                       border: Border.all(color: Theme.of(context).colorScheme.surface, width: 3),
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    child: const Padding(
+                    child:  Padding(
                       padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -249,7 +249,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                             'Stats',
                             style: TextStyle(
                               color: Colors.white,
-                              fontSize: 14,
+                              fontSize: widget.calendarSize == CalendarSize.small ? 14 : 19,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
