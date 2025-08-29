@@ -6,6 +6,7 @@ import 'package:practice_pad/features/edit_items/presentation/viewmodels/edit_it
 import 'package:practice_pad/features/song_viewer/presentation/screens/song_list_screen.dart';
 import 'package:practice_pad/features/song_viewer/data/models/song.dart';
 import 'package:practice_pad/models/practice_area.dart';
+import 'package:practice_pad/services/device_type.dart';
 import 'package:provider/provider.dart';
 import 'dart:developer' as developer;
 
@@ -115,7 +116,7 @@ class _SongAreasScreenState extends State<SongAreasScreen> {
 
     final bool hasErrorAndData =
         viewModel.error != null && viewModel.songAreas.isNotEmpty;
-
+    final isTabletOrDesktop = deviceType == DeviceType.tablet || deviceType == DeviceType.macOS;
     return CustomScrollView(
       slivers: [
         CupertinoSliverRefreshControl(
@@ -133,9 +134,9 @@ class _SongAreasScreenState extends State<SongAreasScreen> {
               ),
             ),
           ),
-        const SliverToBoxAdapter(
-          child: SizedBox(height: 80),
-        ),  
+         SliverToBoxAdapter(
+          child: SizedBox(height: isTabletOrDesktop ? 55 : 110),
+        ),
         if (viewModel.songAreas.isEmpty &&
             !viewModel.isLoadingAreas &&
             viewModel.error == null)
@@ -227,48 +228,29 @@ class _SongAreasScreenState extends State<SongAreasScreen> {
             delegate: SliverChildBuilderDelegate(
               (context, index) {
                 final area = viewModel.songAreas[index];
-                return CupertinoContextMenu(
-                  actions: <Widget>[
-                    CupertinoContextMenuAction(
-                      child: const Text('Edit Song Name'),
-                      onPressed: () {
-                        Navigator.pop(context);
-                        _showEditSongDialog(context, viewModel, area);
-                      },
+                return Material(
+                  color: CupertinoTheme.of(context).scaffoldBackgroundColor,
+                  child: CupertinoListTile.notched(
+                    title: Text(area.name),
+                    subtitle: Text(area.song != null 
+                      ? 'Song: ${area.song!.title} • ${area.practiceItems.length} practice items'
+                      : '${area.practiceItems.length} practice items'),
+                    leading: const Icon(
+                      CupertinoIcons.music_note_2,
+                      color: CupertinoColors.systemBlue,
                     ),
-                    CupertinoContextMenuAction(
-                      isDestructiveAction: true,
-                      child: const Text('Delete Song'),
-                      onPressed: () {
-                        Navigator.pop(context);
-                        viewModel.deletePracticeArea(area.recordName);
-                      },
-                    ),
-                  ],
-                  child: Material(
-                    color: CupertinoTheme.of(context).scaffoldBackgroundColor,
-                    child: CupertinoListTile.notched(
-                      title: Text(area.name),
-                      subtitle: Text(area.song != null 
-                        ? 'Song: ${area.song!.title} • ${area.practiceItems.length} practice items'
-                        : '${area.practiceItems.length} practice items'),
-                      leading: const Icon(
-                        CupertinoIcons.music_note_2,
-                        color: CupertinoColors.systemBlue,
-                      ),
-                      trailing: const Icon(CupertinoIcons.right_chevron),
-                      onTap: () {
-                        developer.log(
-                            "Tapped on song: ${area.name} - Navigating",
-                            name: 'SongAreasScreen');
-                        Navigator.of(context).push(CupertinoPageRoute(
-                          builder: (_) => ChangeNotifierProvider.value(
-                            value: viewModel,
-                            child: PracticeItemScreen(practiceArea: area),
-                          ),
-                        ));
-                      },
-                    ),
+                    trailing: const Icon(CupertinoIcons.right_chevron),
+                    onTap: () {
+                      developer.log(
+                          "Tapped on song: ${area.name} - Navigating",
+                          name: 'SongAreasScreen');
+                      Navigator.of(context).push(CupertinoPageRoute(
+                        builder: (_) => ChangeNotifierProvider.value(
+                          value: viewModel,
+                          child: PracticeItemScreen(practiceArea: area),
+                        ),
+                      ));
+                    },
                   ),
                 );
               },

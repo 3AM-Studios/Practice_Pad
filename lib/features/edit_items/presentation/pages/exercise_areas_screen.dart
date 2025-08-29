@@ -4,6 +4,7 @@ import 'package:clay_containers/clay_containers.dart';
 import 'package:practice_pad/features/edit_items/presentation/pages/practice_item_screen.dart';
 import 'package:practice_pad/features/edit_items/presentation/viewmodels/edit_items_viewmodel.dart';
 import 'package:practice_pad/models/practice_area.dart';
+import 'package:practice_pad/services/device_type.dart';
 import 'package:practice_pad/services/local_storage_service.dart';
 import 'package:provider/provider.dart';
 import 'dart:developer' as developer;
@@ -152,6 +153,7 @@ class _ExerciseAreasScreenState extends State<ExerciseAreasScreen> {
 
     final bool hasErrorAndData =
         viewModel.error != null && viewModel.exerciseAreas.isNotEmpty;
+  final isTabletOrDesktop = deviceType == DeviceType.tablet || deviceType == DeviceType.macOS;
 
     return CustomScrollView(
       slivers: [
@@ -171,8 +173,8 @@ class _ExerciseAreasScreenState extends State<ExerciseAreasScreen> {
             ),
           ),
         // Add padding for navigation bar
-        const SliverToBoxAdapter(
-          child: SizedBox(height: 80),
+        SliverToBoxAdapter(
+          child: SizedBox(height: isTabletOrDesktop ? 55 : 110),
         ),
         
         // Always show Chord Progressions area at the top
