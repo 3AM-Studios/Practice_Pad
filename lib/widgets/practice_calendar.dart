@@ -409,11 +409,11 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                     margin: const EdgeInsets.all(4),
                     child: ClayContainer(
                       color: theme.colorScheme.primary,
-                      borderRadius: _cellSize / 2,
-                      spread: dayButtonSpread,
+                      borderRadius: _cellSize / 1.5,
+                      spread: 1,
                       child: SizedBox(
-                        width: _cellSize - 8,
-                        height: _cellSize - 8,
+                        width: _cellSize - 5,
+                        height: _cellSize - 5,
                         child: Center(
                           child: Text(
                             '${day.day}',

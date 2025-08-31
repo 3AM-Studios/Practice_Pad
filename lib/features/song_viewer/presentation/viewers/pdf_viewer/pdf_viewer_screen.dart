@@ -477,6 +477,10 @@ class _PDFViewerState extends State<PDFViewer>
       children: [
         const SizedBox(height: 20),
 
+        // Page navigation controls (moved outside and above PDF container)
+        if (_pdfPath != null) _buildPageNavigator(),
+        if (_pdfPath != null) const SizedBox(height: 12),
+
         // PDF Display with Drawing
         Container(
           height: 600,

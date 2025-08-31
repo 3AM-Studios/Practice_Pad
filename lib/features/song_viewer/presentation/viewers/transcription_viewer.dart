@@ -422,6 +422,84 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
     );
   }
 
+  Widget _buildSpeedButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: ClayContainer(
+        color: Theme.of(context).colorScheme.surface,
+        depth: 15,
+        borderRadius: 16,
+        width: 48,
+        height: 48,
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                color.withOpacity(0.8),
+                color,
+              ],
+            ),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                color: Colors.white,
+                size: 16,
+              ),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSimpleButton({
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: ClayContainer(
+        color: color,
+        depth: 10,
+        borderRadius: 8,
+        child: Container(
+          width: 32,
+          height: 32,
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildWebViewFallback() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -482,7 +560,7 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
                 borderRadius: 20,
                 child: Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
                   decoration: BoxDecoration(
                     image: const DecorationImage(
                       image: AssetImage('assets/images/wood_texture_rotated.jpg'),
@@ -509,7 +587,7 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
                               child: Text(
                                 'Transcription - ${widget.song.title}',
                                 style: const TextStyle(
-                                  fontSize: 20,
+                                  fontSize: 25,
                                   fontWeight: FontWeight.bold,
                                   color: Colors.white,
                                   shadows: [
@@ -543,18 +621,21 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
                                   children: [
                                     // Timer display
                                     if (_sessionManager?.hasActiveSession == true)
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                        decoration: BoxDecoration(
-                                          color: Theme.of(context).colorScheme.surface,
-                                          borderRadius: BorderRadius.circular(6),
-                                        ),
-                                        child: Text(
-                                          _formatPracticeTime(_elapsedSeconds),
-                                          style: const TextStyle(
-                                            color: Colors.black,
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
+                                      ClayContainer(
+                                        spread: 1,
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: Theme.of(context).colorScheme.surface,
+                                            borderRadius: BorderRadius.circular(6),
+                                          ),
+                                          child: Text(
+                                            _formatPracticeTime(_elapsedSeconds),
+                                            style: const TextStyle(
+                                              color: Colors.black,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                            ),
                                           ),
                                         ),
                                       ),
@@ -564,9 +645,8 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
                                     // Start/Stop timer button
                                     GestureDetector(
                                       onTap: _isTimerRunning ? _stopPracticeTimer : _startPracticeTimer,
-                                      child: Container(
-                                        
-                                        padding: const EdgeInsets.all(6),
+                                      child: Container(                               
+                                        padding: const EdgeInsets.all(4),
                                         decoration: BoxDecoration(
                                           color: _isTimerRunning ? Colors.red.shade600 : Colors.green.shade600,
                                           borderRadius: BorderRadius.circular(6),
@@ -578,6 +658,20 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
                                         ),
                                       ),
                                     ),
+                                    
+                                    // "Start practice session" text when no session is active
+                                    if (_sessionManager?.hasActiveSession != true)
+                                      const SizedBox(width: 8),
+                                    if (_sessionManager?.hasActiveSession != true)
+                                      const Text(
+                                        'Start practice session',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                             
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
                                     
                                  
                                     
@@ -612,49 +706,199 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
               
               const SizedBox(height: 16),
 
-              // URL input section - Regular Clay
-              ClayContainer(
-                color: Theme.of(context).colorScheme.surface,
-                depth: 20,
-                borderRadius: 16,
-                child: Container(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'YouTube Video URL',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _urlController,
-                              decoration: const InputDecoration(
-                                hintText: 'Paste YouTube URL here...',
-                                border: OutlineInputBorder(),
+              // URL and Loop Section Row
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // YouTube URL section - 60% width
+                  Expanded(
+                    flex: 6,
+                    child: ClayContainer(
+                      color: Theme.of(context).colorScheme.surface,
+                      depth: 20,
+                      borderRadius: 16,
+                      child: Container(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Center(
+                              child: ClayContainer(
+                                color: Theme.of(context).colorScheme.surface,
+                                borderRadius: 8,
+                                child: Container(
+                                  padding: EdgeInsets.fromLTRB(50, 4, 50, 4),
+                                  child: const Text(
+                                    'YouTube Video URL',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          ElevatedButton(
-                            onPressed: () {
-                              if (_urlController.text.isNotEmpty) {
-                                _loadVideoFromUrl(_urlController.text);
-                              }
-                            },
-                            child: const Text('Load'),
-                          ),
-                        ],
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    controller: _urlController,
+                                    decoration: const InputDecoration(
+                                      hintText: 'Paste YouTube URL here...',
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(17))),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Theme.of(context).colorScheme.surface,
+                                    
+                                  ),
+                                  onPressed: () {
+                                    if (_urlController.text.isNotEmpty) {
+                                      _loadVideoFromUrl(_urlController.text);
+                                    }
+                                  },
+                                  child: const Text('Load'),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
-                    ],
+                    ),
                   ),
-                ),
+                  
+                  const SizedBox(width: 16),
+                  
+                  // Loop section - 40% width - Only show if there's a video URL
+                  if (_urlController.text.isNotEmpty)
+                    Expanded(
+                      flex: 2,
+                      child: ClayContainer(
+                        color: Theme.of(context).colorScheme.surface,
+                        depth: 20,
+                        borderRadius: 16,
+                        child: Container(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            children: [
+                              // Wooden header for Loop Section
+                              ClayContainer(
+                                color: Theme.of(context).colorScheme.surface,
+                                depth: 15,
+                                borderRadius: 12,
+                                child: Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                                  decoration: BoxDecoration(
+                                    image: const DecorationImage(
+                                      image: AssetImage('assets/images/wood_texture_rotated.jpg'),
+                                      fit: BoxFit.cover,
+                                    ),
+                                    border: Border.all(color: Theme.of(context).colorScheme.surface, width: 2),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Text(
+                                    'Loop Section',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                      fontSize: 17,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              
+                              const SizedBox(height: 12),
+                              
+                              // Start time, arrow, end time row
+                              Row(
+                                children: [
+                                  // Start time clay container
+                                  Expanded(
+                                    child: ClayContainer(
+                                      color: Theme.of(context).colorScheme.surface,
+                                      depth: 10,
+                                      borderRadius: 8,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                                        child: Column(
+                                          children: [
+                                            const Text(
+                                              'Start',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600,
+                                                color: Colors.grey,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              _formatTime(_loopStartTime),
+                                              style: const TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  
+                                  // Arrow
+                                  const Padding(
+                                    padding: EdgeInsets.symmetric(horizontal: 8),
+                                    child: Icon(
+                                      Icons.arrow_forward,
+                                      size: 20,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                  
+                                  // End time clay container
+                                  Expanded(
+                                    child: ClayContainer(
+                                      color: Theme.of(context).colorScheme.surface,
+                                      depth: 10,
+                                      borderRadius: 8,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                                        child: Column(
+                                          children: [
+                                            const Text(
+                                              'End',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600,
+                                                color: Colors.grey,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              _formatTime(_loopEndTime),
+                                              style: const TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             const SizedBox(height: 16),
 
@@ -785,7 +1029,7 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
 
             const SizedBox(height: 16),
 
-            // Loop status and instructions
+            // Loop Controls and Saved Loops Section - Only show if video is loaded
             if (_controller != null)
               Card(
                 child: Padding(
@@ -793,442 +1037,375 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-
-                      // Loop status - Wooden Clay Container
-                        ClayContainer(
-                          color: Theme.of(context).colorScheme.surface,
-                          depth: 20,
-                          borderRadius: 16,
-                          child: Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
-                            decoration: BoxDecoration(
-                              image: const DecorationImage(
-                                image: AssetImage('assets/images/wood_texture_rotated.jpg'),
-                                fit: BoxFit.cover,
-                              ),
-                              border: Border.all(color: Theme.of(context).colorScheme.surface, width: 4),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text(
-                                      'Loop Section',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.white,
-                                        fontSize: 16,
-                                        shadows: [
-                                          Shadow(
-                                            offset: Offset(1, 1),
-                                            blurRadius: 2,
-                                            color: Colors.black54,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      '${_formatTime(_loopStartTime)} → ${_formatTime(_loopEndTime)}',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 18,
-                                        color: Colors.white,
-                                        shadows: [
-                                          Shadow(
-                                            offset: Offset(1, 1),
-                                            blurRadius: 2,
-                                            color: Colors.black54,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: _isAutoLoop ? Colors.green.withOpacity(0.9) : Colors.grey.withOpacity(0.7),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
+                      // Main controls row
+                      Row(
+                        children: [
+                          // Play Loop Button
+                          Expanded(
+                            flex: 2,
+                            child: GestureDetector(
+                              onTap: _controller != null && _controller!.value.isReady ? () {
+                                _controller!.seekTo(Duration(seconds: _loopStartTime.toInt()));
+                                _controller!.play();
+                              } : null,
+                              child: ClayContainer(
+                                color: Theme.of(context).colorScheme.surface,
+                                depth: 20,
+                                borderRadius: 16,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
                                   child: Row(
-                                    mainAxisSize: MainAxisSize.min,
+                                    mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       Icon(
-                                        _isAutoLoop ? Icons.repeat : Icons.repeat_one,
-                                        color: Colors.white,
-                                        size: 16,
+                                        Icons.play_arrow,
+                                        color: Colors.blue.shade600,
+                                        size: 24,
                                       ),
-                                      const SizedBox(width: 4),
+                                      const SizedBox(width: 8),
                                       Text(
-                                        _isAutoLoop ? 'Auto Loop' : 'Manual',
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold,
+                                        'Play Loop',
+                                        style: TextStyle(
+                                          color: Colors.blue.shade600,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 16,
                                         ),
                                       ),
                                     ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          
+                          const SizedBox(width: 12),
+                          
+                          // Auto Loop Toggle
+                          Expanded(
+                            flex: 2,
+                            child: GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  _isAutoLoop = !_isAutoLoop;
+                                });
+                                _saveYoutubeData();
+                              },
+                              child: ClayContainer(
+                                color: Theme.of(context).colorScheme.surface,
+                                depth: _isAutoLoop ? 15 : 20,
+                                borderRadius: 16,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        _isAutoLoop ? Icons.repeat : Icons.repeat_one,
+                                        color: _isAutoLoop ? Colors.green.shade600 : Colors.grey.shade600,
+                                        size: 20,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        _isAutoLoop ? 'Auto Loop ON' : 'Auto Loop OFF',
+                                        style: TextStyle(
+                                          color: _isAutoLoop ? Colors.green.shade600 : Colors.grey.shade600,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      
+                      const SizedBox(height: 12),
+                      
+                      // Fine-tune controls row with labels
+                      Row(
+                        children: [
+                          // Start controls
+                          Expanded(
+                            child: Column(
+                              children: [
+                                Text(
+                                  'Start',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.grey.shade700,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    _buildClayButton(
+                                      icon: Icons.remove,
+                                      color: Colors.red.shade600,
+                                      onTap: () {
+                                        setState(() {
+                                          _loopStartTime = (_loopStartTime - 1).clamp(0, _loopEndTime - 1);
+                                        });
+                                        _saveYoutubeData();
+                                      },
+                                    ),
+                                    const SizedBox(width: 12),
+                                    _buildClayButton(
+                                      icon: Icons.add,
+                                      color: Colors.green.shade600,
+                                      onTap: () {
+                                        setState(() {
+                                          _loopStartTime = (_loopStartTime + 1).clamp(0, _loopEndTime - 1);
+                                        });
+                                        _saveYoutubeData();
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          
+                          const SizedBox(width: 20),
+                          
+                          // Speed controls
+                          Expanded(
+                            child: Column(
+                              children: [
+                                Text(
+                                  'Speed',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.grey.shade700,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                ClayContainer(
+                                  color: Theme.of(context).colorScheme.surface,
+                                  depth: 15,
+                                  borderRadius: 12,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        _buildSimpleButton(
+                                          label: '-',
+                                          color: Theme.of(context).colorScheme.surface,
+                                          onTap: () {
+                                            setState(() {
+                                              _playbackSpeed = (_playbackSpeed - 0.25).clamp(0.25, 2.0);
+                                            });
+                                            _updatePlaybackSpeed();
+                                            _saveYoutubeData();
+                                          },
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          '${_playbackSpeed.toStringAsFixed(2)}x',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            color: Theme.of(context).colorScheme.onSurface,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        _buildSimpleButton(
+                                          label: '+',
+                                          color: Theme.of(context).colorScheme.surface,
+                                          onTap: () {
+                                            setState(() {
+                                              _playbackSpeed = (_playbackSpeed + 0.25).clamp(0.25, 2.0);
+                                            });
+                                            _updatePlaybackSpeed();
+                                            _saveYoutubeData();
+                                          },
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                        ),
-
-                      const SizedBox(height: 16),
-
-                      // Loop Controls with Clay Containers - Always show controls
-                        // Main controls row
-                        Row(
-                          children: [
-                            // Play Loop Button
-                            Expanded(
-                              flex: 2,
-                              child: GestureDetector(
-                                onTap: _controller != null && _controller!.value.isReady ? () {
-                                  _controller!.seekTo(Duration(seconds: _loopStartTime.toInt()));
-                                  _controller!.play();
-                                } : null,
-                                child: ClayContainer(
-                                  color: Theme.of(context).colorScheme.surface,
-                                  depth: 20,
-                                  borderRadius: 16,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.play_arrow,
-                                          color: Colors.blue.shade600,
-                                          size: 24,
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          'Play',
-                                          style: TextStyle(
-                                            color: Colors.blue.shade600,
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 16,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
+                          
+                          const SizedBox(width: 20),
+                          
+                          // End controls
+                          Expanded(
+                            child: Column(
+                              children: [
+                                Text(
+                                  'End',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.grey.shade700,
+                                    fontSize: 14,
                                   ),
                                 ),
-                              ),
-                            ),
-                            
-                            const SizedBox(width: 12),
-                            
-                            // Auto Loop Toggle
-                            Expanded(
-                              flex: 2,
-                              child: GestureDetector(
-                                onTap: () {
-                                  setState(() {
-                                    _isAutoLoop = !_isAutoLoop;
-                                  });
-                                  _saveYoutubeData();
-                                },
-                                child: ClayContainer(
-                                  color: Theme.of(context).colorScheme.surface,
-                                  depth: _isAutoLoop ? 15 : 20,
-                                  borderRadius: 16,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          _isAutoLoop ? Icons.repeat : Icons.repeat_one,
-                                          color: _isAutoLoop ? Colors.green.shade600 : Colors.grey.shade600,
-                                          size: 20,
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          _isAutoLoop ? 'ON' : 'OFF',
-                                          style: TextStyle(
-                                            color: _isAutoLoop ? Colors.green.shade600 : Colors.grey.shade600,
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 14,
-                                          ),
-                                        ),
-                                      ],
+                                const SizedBox(height: 8),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    _buildClayButton(
+                                      icon: Icons.remove,
+                                      color: Colors.red.shade600,
+                                      onTap: () {
+                                        setState(() {
+                                          _loopEndTime = (_loopEndTime - 1).clamp(_loopStartTime + 1, double.infinity);
+                                        });
+                                        _saveYoutubeData();
+                                      },
                                     ),
-                                  ),
+                                    const SizedBox(width: 12),
+                                    _buildClayButton(
+                                      icon: Icons.add,
+                                      color: Colors.green.shade600,
+                                      onTap: () {
+                                        setState(() {
+                                          _loopEndTime = _loopEndTime + 1;
+                                        });
+                                        _saveYoutubeData();
+                                      },
+                                    ),
+                                  ],
                                 ),
-                              ),
+                              ],
                             ),
-                          ],
-                        ),
-                        
-                        const SizedBox(height: 12),
-                        
-                        // Fine-tune controls row with labels
-                        Row(
-                          children: [
-                            // Start controls
-                            Expanded(
-                              child: Column(
-                                children: [
-                                  Text(
-                                    'Start',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.grey.shade700,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      _buildClayButton(
-                                        icon: Icons.remove,
-                                        color: Colors.red.shade600,
-                                        onTap: () {
-                                          setState(() {
-                                            _loopStartTime = (_loopStartTime - 1).clamp(0, _loopEndTime - 1);
-                                          });
-                                          _saveYoutubeData();
-                                        },
-                                      ),
-                                      const SizedBox(width: 12),
-                                      _buildClayButton(
-                                        icon: Icons.add,
-                                        color: Colors.green.shade600,
-                                        onTap: () {
-                                          setState(() {
-                                            _loopStartTime = (_loopStartTime + 1).clamp(0, _loopEndTime - 1);
-                                          });
-                                          _saveYoutubeData();
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                            
-                            const SizedBox(width: 20),
-                            
-                            // Speed controls
-                            Expanded(
-                              child: Column(
-                                children: [
-                                  Text(
-                                    '${_playbackSpeed.toStringAsFixed(2)}x',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.grey.shade700,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      _buildClayButton(
-                                        icon: Icons.remove,
-                                        color: Colors.orange.shade600,
-                                        onTap: () {
-                                          setState(() {
-                                            _playbackSpeed = (_playbackSpeed - 0.25).clamp(0.25, 2.0);
-                                          });
-                                          _updatePlaybackSpeed();
-                                          _saveYoutubeData();
-                                        },
-                                      ),
-                                      const SizedBox(width: 12),
-                                      _buildClayButton(
-                                        icon: Icons.add,
-                                        color: Colors.purple.shade600,
-                                        onTap: () {
-                                          setState(() {
-                                            _playbackSpeed = (_playbackSpeed + 0.25).clamp(0.25, 2.0);
-                                          });
-                                          _updatePlaybackSpeed();
-                                          _saveYoutubeData();
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                            
-                            const SizedBox(width: 20),
-                            
-                            // End controls
-                            Expanded(
-                              child: Column(
-                                children: [
-                                  Text(
-                                    'End',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.grey.shade700,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      _buildClayButton(
-                                        icon: Icons.remove,
-                                        color: Colors.red.shade600,
-                                        onTap: () {
-                                          setState(() {
-                                            _loopEndTime = (_loopEndTime - 1).clamp(_loopStartTime + 1, double.infinity);
-                                          });
-                                          _saveYoutubeData();
-                                        },
-                                      ),
-                                      const SizedBox(width: 12),
-                                      _buildClayButton(
-                                        icon: Icons.add,
-                                        color: Colors.green.shade600,
-                                        onTap: () {
-                                          setState(() {
-                                            _loopEndTime = _loopEndTime + 1;
-                                          });
-                                          _saveYoutubeData();
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
+                      ),
 
                       const SizedBox(height: 16),
 
                       // Saved Loops Section - Fixed height with scrollable content
-                      Container(
-                        height: 250, // Reduced height container
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.green.shade50,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.green.shade100),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Row(
-                                  children: [
-                                    Icon(Icons.bookmark, size: 16, color: Colors.green.shade700),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      'Saved Loops',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold, 
-                                        fontSize: 14, 
-                                        color: Colors.green.shade700
+                      ClayContainer(
+                        color: Theme.of(context).colorScheme.surface,
+                        depth: 20,
+                        borderRadius: 16,
+                        child: Container(
+                          height: 250,
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(Icons.bookmark, size: 16, color: Theme.of(context).colorScheme.primary),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'Saved Loops',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold, 
+                                          fontSize: 14, 
+                                          color: Theme.of(context).colorScheme.onSurface
+                                        ),
                                       ),
-                                    ),
-                                  ],
-                                ),
-                                ElevatedButton.icon(
-                                  onPressed: _showSaveLoopDialog,
-                                  icon: const Icon(Icons.add, size: 16),
-                                  label: const Text('Save', style: TextStyle(fontSize: 12)),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.green.shade600,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                    minimumSize: Size.zero,
-                                    alignment: Alignment.center,
-                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    ],
                                   ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Expanded(
-                              child: _savedLoops.isEmpty
-                                  ? Center(
-                                      child: Text(
-                                        'No saved loops yet. Tap "Save" to save the current loop.',
-                                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                                        textAlign: TextAlign.center,
-                                      ),
-                                    )
-                                  : ListView.builder(
-                                      itemCount: _savedLoops.length,
-                                      itemBuilder: (context, index) {
-                                        final loop = _savedLoops[index];
-                                        return Padding(
-                                          padding: const EdgeInsets.only(bottom: 6),
-                                          child: Row(
-                                            children: [
-                                              Expanded(
-                                                child: GestureDetector(
-                                                  onTap: () => _loadLoop(loop),
-                                                  child: Container(
-                                                    padding: const EdgeInsets.all(8),
-                                                    decoration: BoxDecoration(
-                                                      color: Colors.white,
-                                                      borderRadius: BorderRadius.circular(6),
-                                                      border: Border.all(color: Colors.green.shade200),
-                                                    ),
-                                                    child: Column(
-                                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                                      children: [
-                                                        Text(
-                                                          loop['title'] as String,
-                                                          style: const TextStyle(
-                                                            fontWeight: FontWeight.w600,
-                                                            fontSize: 12,
-                                                          ),
-                                                        ),
-                                                        Text(
-                                                          '${_formatTime((loop['startTime'] as num).toDouble())} → ${_formatTime((loop['endTime'] as num).toDouble())} (${((loop['speed'] as num?)?.toDouble() ?? 1.0).toStringAsFixed(2)}x)',
-                                                          style: TextStyle(
-                                                            fontSize: 10,
-                                                            color: Colors.grey.shade600,
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                              const SizedBox(width: 6),
-                                              GestureDetector(
-                                                onTap: () => _deleteLoop(index),
-                                                child: Container(
-                                                  padding: const EdgeInsets.all(4),
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.red.shade100,
-                                                    borderRadius: BorderRadius.circular(4),
-                                                  ),
-                                                  child: Icon(
-                                                    Icons.delete_outline,
-                                                    size: 16,
-                                                    color: Colors.red.shade600,
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        );
-                                      },
+                                  ElevatedButton.icon(
+                                    onPressed: _showSaveLoopDialog,
+                                    icon: const Icon(Icons.add, size: 16),
+                                    label: const Text('Save', style: TextStyle(fontSize: 12)),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.green.shade600,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      minimumSize: Size.zero,
+                                      alignment: Alignment.center,
+                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                     ),
-                            ),
-                          ],
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Expanded(
+                                child: _savedLoops.isEmpty
+                                    ? Center(
+                                        child: Text(
+                                          'No saved loops yet. Tap "Save" to save the current loop.',
+                                          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                      )
+                                    : ListView.builder(
+                                        itemCount: _savedLoops.length,
+                                        itemBuilder: (context, index) {
+                                          final loop = _savedLoops[index];
+                                          return Padding(
+                                            padding: const EdgeInsets.only(bottom: 6),
+                                            child: Container(
+                                              padding: const EdgeInsets.all(4),
+                                              child: Row(
+                                                children: [
+                                                  Expanded(
+                                                    child: GestureDetector(
+                                                      onTap: () => _loadLoop(loop),
+                                                      child: ClayContainer(
+                                                        color: Theme.of(context).colorScheme.surfaceContainerHigh,
+                                                        depth: 15,
+                                                        borderRadius: 12,
+                                                        child: Container(
+                                                          padding: const EdgeInsets.all(12),
+                                                          child: Column(
+                                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                                            children: [
+                                                              Text(
+                                                                loop['title'] as String,
+                                                                style: const TextStyle(
+                                                                  fontWeight: FontWeight.w600,
+                                                                  fontSize: 12,
+                                                                ),
+                                                              ),
+                                                              Text(
+                                                                '${_formatTime((loop['startTime'] as num).toDouble())} → ${_formatTime((loop['endTime'] as num).toDouble())} (${((loop['speed'] as num?)?.toDouble() ?? 1.0).toStringAsFixed(2)}x)',
+                                                                style: TextStyle(
+                                                                  fontSize: 10,
+                                                                  color: Colors.grey.shade600,
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 15),
+                                                  GestureDetector(
+                                                    onTap: () => _deleteLoop(index),
+                                                    child: ClayContainer(
+                                                      color: Colors.red.shade100,
+                                                      depth: 10,
+                                                      spread: 2,
+                                                      borderRadius: 8,
+                                                      child: Container(
+                                                        padding: const EdgeInsets.all(6),
+                                                        child: Icon(
+                                                          Icons.delete_outline,
+                                                          size: 16,
+                                                          color: Colors.red.shade600,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ],
@@ -1266,8 +1443,6 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
                   ),
                 ),
               ),
-              
-              const SizedBox(height: 20), // Extra bottom padding
             ],
             ),
           ),
