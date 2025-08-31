@@ -113,7 +113,7 @@ class ActiveSessionBanner extends StatelessWidget {
                         style: TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
-                          fontSize: isTabletOrDesktop ? 20 : 14,
+                          fontSize: isTabletOrDesktop ? 17.5 : 14,
                         ),
                       ),
                     ),

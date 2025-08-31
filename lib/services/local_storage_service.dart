@@ -24,6 +24,7 @@ class LocalStorageService {
   static const String _drawingsFileName = 'drawings.json';
   static const String _pdfDrawingsFileName = 'pdf_drawings.json';
   static const String _youtubeLinksFileName = 'youtube_links.json';
+  static const String _savedLoopsFileName = 'saved_loops.json';
   static const String _booksFileName = 'books.json';
   static const String _customSongsFileName = 'custom_songs.json';
 
@@ -947,6 +948,66 @@ class LocalStorageService {
     }
   }
 
+  /// Save loop data for a specific song
+  static Future<void> saveSavedLoopsForSong(
+      String songId, List<Map<String, dynamic>> loops) async {
+    try {
+      final allSavedLoops = await loadAllSavedLoops();
+      allSavedLoops[songId] = loops;
+
+      final file = await _getFile(_savedLoopsFileName);
+      await file.writeAsString(json.encode(allSavedLoops));
+      developer.log('Saved ${loops.length} loops for song: $songId');
+      
+      // Sync to iCloud after successful save
+      await _syncFileToICloud(_savedLoopsFileName);
+    } catch (e) {
+      developer.log('Error saving loops: $e', error: e);
+      throw Exception('Failed to save loops: $e');
+    }
+  }
+
+  /// Load saved loops for a specific song
+  static Future<List<Map<String, dynamic>>> loadSavedLoopsForSong(
+      String songId) async {
+    try {
+      final allSavedLoops = await loadAllSavedLoops();
+      final loops = allSavedLoops[songId] ?? [];
+      return List<Map<String, dynamic>>.from(loops);
+    } catch (e) {
+      developer.log('Error loading loops for $songId: $e', error: e);
+      return [];
+    }
+  }
+
+  /// Load all saved loops
+  static Future<Map<String, List<dynamic>>> loadAllSavedLoops() async {
+    try {
+      final file = await _getFile(_savedLoopsFileName);
+      if (!await file.exists()) {
+        developer.log('Saved loops file does not exist, returning empty map');
+        return {};
+      }
+
+      final content = await file.readAsString();
+      if (content.trim().isEmpty) {
+        developer.log('Saved loops file is empty, returning empty map');
+        return {};
+      }
+
+      final Map<String, dynamic> jsonData = json.decode(content);
+      final savedLoops = jsonData.map((songId, loops) => MapEntry(
+            songId,
+            List<dynamic>.from(loops as List),
+          ));
+      developer.log('Loaded saved loops for ${savedLoops.length} songs');
+      return savedLoops;
+    } catch (e) {
+      developer.log('Error loading all saved loops: $e', error: e);
+      return {};
+    }
+  }
+
   /// Clear all local storage
   static Future<void> clearAll() async {
     try {
@@ -960,6 +1021,7 @@ class LocalStorageService {
         _drawingsFileName,
         _pdfDrawingsFileName,
         _youtubeLinksFileName,
+        _savedLoopsFileName,
       ];
 
       for (final fileName in files) {

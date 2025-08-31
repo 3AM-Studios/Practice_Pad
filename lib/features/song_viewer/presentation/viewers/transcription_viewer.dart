@@ -3,6 +3,10 @@ import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:clay_containers/clay_containers.dart';
 import 'package:practice_pad/services/local_storage_service.dart';
 import 'package:practice_pad/features/song_viewer/data/models/song.dart';
+import 'package:practice_pad/services/practice_session_manager.dart';
+import 'package:practice_pad/models/practice_item.dart';
+import 'package:practice_pad/models/statistics.dart';
+import 'package:provider/provider.dart';
 
 class TranscriptionViewer extends StatefulWidget {
   final Song song;
@@ -26,11 +30,31 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
   String? _currentVideoId;
   bool _isLoadingVideo = false;
   String? _videoError;
+  double _playbackSpeed = 1.0;
+  List<Map<String, dynamic>> _savedLoops = [];
+  
+  // Practice session state
+  PracticeSessionManager? _sessionManager;
+  int _elapsedSeconds = 0;
+  bool _isTimerRunning = false;
 
   @override
   void initState() {
     super.initState();
     _loadYoutubeData();
+    _loadSavedLoops();
+    
+    // Initialize practice session manager
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _sessionManager = Provider.of<PracticeSessionManager>(context, listen: false);
+      if (_sessionManager!.hasActiveSession) {
+        setState(() {
+          _elapsedSeconds = _sessionManager!.elapsedSeconds;
+          _isTimerRunning = _sessionManager!.isTimerRunning;
+        });
+        _sessionManager!.addListener(_syncWithSessionManager);
+      }
+    });
   }
 
   @override
@@ -41,6 +65,7 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
       _controller!.dispose();
       _controller = null;
     }
+    _sessionManager?.removeListener(_syncWithSessionManager);
     _urlController.dispose();
     super.dispose();
   }
@@ -53,12 +78,14 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
         final loopStartTime = (youtubeData['loopStartTime'] as num?)?.toDouble() ?? 0.0;
         final loopEndTime = (youtubeData['loopEndTime'] as num?)?.toDouble() ?? 0.0;
         final isAutoLoop = youtubeData['isAutoLoop'] as bool? ?? false;
+        final playbackSpeed = (youtubeData['playbackSpeed'] as num?)?.toDouble() ?? 1.0;
 
         if (url != null && url.isNotEmpty) {
           _urlController.text = url;
           _loopStartTime = loopStartTime;
           _loopEndTime = loopEndTime > loopStartTime ? loopEndTime : loopStartTime + 30.0;
           _isAutoLoop = isAutoLoop;
+          _playbackSpeed = playbackSpeed;
           await _loadVideoFromUrl(url);
         }
       }
@@ -74,6 +101,7 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
         'loopStartTime': _loopStartTime,
         'loopEndTime': _loopEndTime,
         'isAutoLoop': _isAutoLoop,
+        'playbackSpeed': _playbackSpeed,
       };
       await LocalStorageService.saveYoutubeLinkForSong(widget.song.path, youtubeData);
     } catch (e) {
@@ -111,6 +139,7 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
         );
 
         _controller!.addListener(_videoListener);
+        _updatePlaybackSpeed();
         setState(() {
           _isLoadingVideo = false;
         });
@@ -138,6 +167,215 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
       if (currentTime >= _loopEndTime && currentTime > 0) {
         _controller!.seekTo(Duration(seconds: _loopStartTime.toInt()));
       }
+    }
+  }
+
+  Future<void> _loadSavedLoops() async {
+    try {
+      final loops = await LocalStorageService.loadSavedLoopsForSong(widget.song.path);
+      setState(() {
+        _savedLoops = loops;
+      });
+    } catch (e) {
+      debugPrint('Error loading saved loops: $e');
+    }
+  }
+
+  Future<void> _saveSavedLoops() async {
+    try {
+      await LocalStorageService.saveSavedLoopsForSong(widget.song.path, _savedLoops);
+    } catch (e) {
+      debugPrint('Error saving loops: $e');
+    }
+  }
+
+  void _showSaveLoopDialog() {
+    final titleController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Save Loop'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Loop: ${_formatTime(_loopStartTime)} → ${_formatTime(_loopEndTime)}'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: titleController,
+              decoration: const InputDecoration(
+                labelText: 'Loop Title',
+                border: OutlineInputBorder(),
+              ),
+              autofocus: true,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (titleController.text.isNotEmpty) {
+                _saveCurrentLoop(titleController.text);
+                Navigator.pop(context);
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _saveCurrentLoop(String title) {
+    final newLoop = {
+      'title': title,
+      'startTime': _loopStartTime,
+      'endTime': _loopEndTime,
+      'speed': _playbackSpeed,
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    };
+    
+    setState(() {
+      _savedLoops.add(newLoop);
+    });
+    
+    _saveSavedLoops();
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Loop "$title" saved!')),
+    );
+  }
+
+  void _loadLoop(Map<String, dynamic> loop) {
+    setState(() {
+      _loopStartTime = (loop['startTime'] as num).toDouble();
+      _loopEndTime = (loop['endTime'] as num).toDouble();
+      _playbackSpeed = (loop['speed'] as num?)?.toDouble() ?? 1.0;
+    });
+    
+    _updatePlaybackSpeed();
+    _saveYoutubeData();
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Loaded loop "${loop['title']}"')),
+    );
+  }
+
+  void _deleteLoop(int index) {
+    final loop = _savedLoops[index];
+    setState(() {
+      _savedLoops.removeAt(index);
+    });
+    
+    _saveSavedLoops();
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Deleted loop "${loop['title']}"')),
+    );
+  }
+
+  void _syncWithSessionManager() {
+    if (mounted && _sessionManager != null && _sessionManager!.hasActiveSession) {
+      setState(() {
+        _elapsedSeconds = _sessionManager!.elapsedSeconds;
+        _isTimerRunning = _sessionManager!.isTimerRunning;
+      });
+    }
+  }
+
+  void _startPracticeTimer() {
+    if (_sessionManager == null) return;
+    
+    // Create a dummy practice item for the song
+    final practiceItem = PracticeItem(
+      id: 'transcription_${widget.song.path}',
+      name: 'Transcription - ${widget.song.title}',
+      description: 'Practice session for ${widget.song.title}',
+    );
+
+    if (!_sessionManager!.hasActiveSession) {
+      _sessionManager!.startSession(
+        item: practiceItem,
+        targetSeconds: 1800, // Default 30 minutes
+      );
+    }
+    
+    _sessionManager!.startTimer();
+    _sessionManager!.addListener(_syncWithSessionManager);
+    
+    setState(() {
+      _isTimerRunning = true;
+    });
+  }
+
+  void _stopPracticeTimer() {
+    _sessionManager?.stopTimer();
+    setState(() {
+      _isTimerRunning = false;
+    });
+  }
+
+  void _completePracticeSession() async {
+    if (_sessionManager == null || !_sessionManager!.hasActiveSession) return;
+
+    try {
+      // Create and save the practice session as statistics
+      final statistics = Statistics(
+        practiceItemId: 'transcription_${widget.song.path}',
+        timestamp: DateTime.now(),
+        totalReps: 0,
+        totalTime: Duration(seconds: _elapsedSeconds),
+        metadata: {
+          'time': _elapsedSeconds,
+          'songTitle': widget.song.title,
+          'type': 'transcription',
+        },
+      );
+
+      // Save to statistics
+      await statistics.save();
+
+      // Complete the session in the global manager
+      _sessionManager!.completeSession();
+
+      setState(() {
+        _elapsedSeconds = 0;
+        _isTimerRunning = false;
+      });
+
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Practice session completed! ${_formatPracticeTime(_elapsedSeconds)} logged.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving practice session: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  String _formatPracticeTime(int seconds) {
+    final minutes = seconds ~/ 60;
+    final remainingSeconds = seconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
+  }
+
+  void _updatePlaybackSpeed() {
+    if (_controller != null && _controller!.value.isReady) {
+      _controller!.setPlaybackRate(_playbackSpeed);
     }
   }
 
@@ -234,8 +472,9 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
-          child: Column(
-            children: [
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
               // Wooden Header
               ClayContainer(
                 color: Theme.of(context).colorScheme.surface,
@@ -264,20 +503,106 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
                       ),
                       const SizedBox(width: 16),
                       Expanded(
-                        child: Text(
-                          'Transcription - ${widget.song.title}',
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            shadows: [
-                              Shadow(
-                                offset: Offset(1, 1),
-                                blurRadius: 3,
-                                color: Colors.black54,
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Transcription - ${widget.song.title}',
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                  shadows: [
+                                    Shadow(
+                                      offset: Offset(1, 1),
+                                      blurRadius: 3,
+                                      color: Colors.black54,
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ],
-                          ),
+                            ),
+                            const SizedBox(width: 12),
+                            // Practice session controls - Wooden clay container
+                            ClayContainer(
+                              color: Color.fromARGB(255, 172, 139, 103),
+                              depth: 15,
+                              borderRadius: 12,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  image: const DecorationImage(
+                                    image: AssetImage('assets/images/wood_texture_rotated.jpg'),
+                                    fit: BoxFit.cover,
+                                  ),
+                                  border: Border.all(color: Theme.of(context).colorScheme.surface, width: 4),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    // Timer display
+                                    if (_sessionManager?.hasActiveSession == true)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: Theme.of(context).colorScheme.surface,
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          _formatPracticeTime(_elapsedSeconds),
+                                          style: const TextStyle(
+                                            color: Colors.black,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    if (_sessionManager?.hasActiveSession == true)
+                                      const SizedBox(width: 6),
+                                    
+                                    // Start/Stop timer button
+                                    GestureDetector(
+                                      onTap: _isTimerRunning ? _stopPracticeTimer : _startPracticeTimer,
+                                      child: Container(
+                                        
+                                        padding: const EdgeInsets.all(6),
+                                        decoration: BoxDecoration(
+                                          color: _isTimerRunning ? Colors.red.shade600 : Colors.green.shade600,
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Icon(
+                                          _isTimerRunning ? Icons.pause : Icons.play_arrow,
+                                          color: Colors.white,
+                                          size: 16,
+                                        ),
+                                      ),
+                                    ),
+                                    
+                                 
+                                    
+                                    // Complete session button
+                                    if (_sessionManager?.hasActiveSession == true)
+                                      GestureDetector(
+                                        onTap: _completePracticeSession,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(6),
+                                          decoration: BoxDecoration(
+                                            color: Colors.blue.shade600,
+                                            borderRadius: BorderRadius.circular(6),
+                                          ),
+                                          child: const Icon(
+                                            Icons.check,
+                                            color: Colors.white,
+                                            size: 16,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -333,10 +658,10 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
               ),
             const SizedBox(height: 16),
 
-            // Video player
+            // Video player - Fixed height instead of Expanded
             if (_isLoadingVideo)
-              const Expanded(
-                flex: 3,
+              SizedBox(
+                height: 250,
                 child: Card(
                   child: Center(
                     child: Column(
@@ -351,8 +676,8 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
                 ),
               )
             else if (_videoError != null)
-              Expanded(
-                flex: 3,
+              SizedBox(
+                height: 250,
                 child: Card(
                   child: Center(
                     child: Column(
@@ -392,8 +717,8 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
                 ),
               )
             else if (_controller != null)
-              Expanded(
-                flex: 3,
+              SizedBox(
+                height: 250,
                 child: Card(
                   child: Column(
                     children: [
@@ -693,6 +1018,53 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
                             
                             const SizedBox(width: 20),
                             
+                            // Speed controls
+                            Expanded(
+                              child: Column(
+                                children: [
+                                  Text(
+                                    '${_playbackSpeed.toStringAsFixed(2)}x',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.grey.shade700,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      _buildClayButton(
+                                        icon: Icons.remove,
+                                        color: Colors.orange.shade600,
+                                        onTap: () {
+                                          setState(() {
+                                            _playbackSpeed = (_playbackSpeed - 0.25).clamp(0.25, 2.0);
+                                          });
+                                          _updatePlaybackSpeed();
+                                          _saveYoutubeData();
+                                        },
+                                      ),
+                                      const SizedBox(width: 12),
+                                      _buildClayButton(
+                                        icon: Icons.add,
+                                        color: Colors.purple.shade600,
+                                        onTap: () {
+                                          setState(() {
+                                            _playbackSpeed = (_playbackSpeed + 0.25).clamp(0.25, 2.0);
+                                          });
+                                          _updatePlaybackSpeed();
+                                          _saveYoutubeData();
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                            
+                            const SizedBox(width: 20),
+                            
                             // End controls
                             Expanded(
                               child: Column(
@@ -740,30 +1112,122 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
 
                       const SizedBox(height: 16),
 
-                      // Simple Instructions
+                      // Saved Loops Section - Fixed height with scrollable content
                       Container(
+                        height: 250, // Reduced height container
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.blue.shade50,
+                          color: Colors.green.shade50,
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.blue.shade100),
+                          border: Border.all(color: Colors.green.shade100),
                         ),
-                        child: const Column(
+                        child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Icon(Icons.info_outline, size: 16, color: Colors.blue),
-                                SizedBox(width: 6),
-                                Text(
-                                  'Quick Tips',
-                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.blue),
+                                Row(
+                                  children: [
+                                    Icon(Icons.bookmark, size: 16, color: Colors.green.shade700),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'Saved Loops',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold, 
+                                        fontSize: 14, 
+                                        color: Colors.green.shade700
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                ElevatedButton.icon(
+                                  onPressed: _showSaveLoopDialog,
+                                  icon: const Icon(Icons.add, size: 16),
+                                  label: const Text('Save', style: TextStyle(fontSize: 12)),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.green.shade600,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    minimumSize: Size.zero,
+                                    alignment: Alignment.center,
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  ),
                                 ),
                               ],
                             ),
-                            SizedBox(height: 6),
-                            Text('• Drag timeline handles to set loop points', style: TextStyle(fontSize: 12)),
-                            Text('• Use +/- buttons for precise timing', style: TextStyle(fontSize: 12)),
+                            const SizedBox(height: 8),
+                            Expanded(
+                              child: _savedLoops.isEmpty
+                                  ? Center(
+                                      child: Text(
+                                        'No saved loops yet. Tap "Save" to save the current loop.',
+                                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    )
+                                  : ListView.builder(
+                                      itemCount: _savedLoops.length,
+                                      itemBuilder: (context, index) {
+                                        final loop = _savedLoops[index];
+                                        return Padding(
+                                          padding: const EdgeInsets.only(bottom: 6),
+                                          child: Row(
+                                            children: [
+                                              Expanded(
+                                                child: GestureDetector(
+                                                  onTap: () => _loadLoop(loop),
+                                                  child: Container(
+                                                    padding: const EdgeInsets.all(8),
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.white,
+                                                      borderRadius: BorderRadius.circular(6),
+                                                      border: Border.all(color: Colors.green.shade200),
+                                                    ),
+                                                    child: Column(
+                                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                                      children: [
+                                                        Text(
+                                                          loop['title'] as String,
+                                                          style: const TextStyle(
+                                                            fontWeight: FontWeight.w600,
+                                                            fontSize: 12,
+                                                          ),
+                                                        ),
+                                                        Text(
+                                                          '${_formatTime((loop['startTime'] as num).toDouble())} → ${_formatTime((loop['endTime'] as num).toDouble())} (${((loop['speed'] as num?)?.toDouble() ?? 1.0).toStringAsFixed(2)}x)',
+                                                          style: TextStyle(
+                                                            fontSize: 10,
+                                                            color: Colors.grey.shade600,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 6),
+                                              GestureDetector(
+                                                onTap: () => _deleteLoop(index),
+                                                child: Container(
+                                                  padding: const EdgeInsets.all(4),
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.red.shade100,
+                                                    borderRadius: BorderRadius.circular(4),
+                                                  ),
+                                                  child: Icon(
+                                                    Icons.delete_outline,
+                                                    size: 16,
+                                                    color: Colors.red.shade600,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      },
+                                    ),
+                            ),
                           ],
                         ),
                       ),
@@ -774,7 +1238,8 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
 
             // No video loaded message
             if (_controller == null)
-              const Expanded(
+              const SizedBox(
+                height: 250,
                 child: Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -801,7 +1266,10 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
                   ),
                 ),
               ),
+              
+              const SizedBox(height: 20), // Extra bottom padding
             ],
+            ),
           ),
         ),
       ),
