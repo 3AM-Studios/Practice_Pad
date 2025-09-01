@@ -15,6 +15,10 @@ import 'package:image_painter/image_painter.dart';
 import '../transcription_viewer.dart';
 import '../../../data/models/song.dart';
 
+// Import label controls
+import 'widgets/label_controls/extension_label_controls.dart';
+import 'widgets/label_controls/roman_numeral_label_controls.dart';
+
 /// PDF viewer widget with drawing functionality using PDF-to-image conversion
 class PDFViewer extends StatefulWidget {
   final String songAssetPath;
@@ -41,7 +45,9 @@ class _PDFViewerState extends State<PDFViewer>
   final PdfImageConverter _converter = PdfImageConverter();
   Uint8List? _currentPageImage;
   
-  // Note: Each ImagePainter widget now manages its own controller
+  // ImagePainter controller for drawing functionality
+  late ImagePainterController _imagePainterController;
+  bool _isReady = false;
   
   // PDF viewer specific controls
   int _currentPage = 0; // 0-based indexing for pdf_to_image_converter
@@ -55,6 +61,11 @@ class _PDFViewerState extends State<PDFViewer>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    
+    // Initialize ImagePainter controller
+    _imagePainterController = ImagePainterController();
+    _imagePainterController.addListener(_onDrawingChanged);
+    // Note: Labels are handled through the controller's built-in mechanisms
     
     _loadSavedPDF();
   }
@@ -150,10 +161,13 @@ class _PDFViewerState extends State<PDFViewer>
       
       setState(() {
         _pdfPath = permanentPdfPath;
+        _isReady = true;
         _isLoading = false;
       });
       
-      // Note: Drawing and label persistence removed for now to fix controller lifecycle issues
+      // Load drawings and labels for current page
+      await _loadDrawingDataForCurrentPage();
+      await _loadLabels();
       
     } catch (e) {
       debugPrint('Error loading PDF: $e');
@@ -241,7 +255,7 @@ class _PDFViewerState extends State<PDFViewer>
         final oldPage = _currentPage;
         final newPage = _currentPage + 1;
         
-        // Load the new page image FIRST
+        // Load the new page image
         debugPrint('_nextPage: Loading image for page $newPage');
         final pageImage = await _converter.renderPage(newPage);
         
@@ -251,8 +265,11 @@ class _PDFViewerState extends State<PDFViewer>
             _currentPage = newPage;
             _currentPageImage = pageImage;
           });
+          
           debugPrint('_nextPage: changed from page $oldPage to $_currentPage with new image');
         }
+      } catch (e) {
+        debugPrint('Error in _nextPage: $e');
       } finally {
         _isNavigating = false;
       }
@@ -270,7 +287,7 @@ class _PDFViewerState extends State<PDFViewer>
         final oldPage = _currentPage;
         final newPage = _currentPage - 1;
         
-        // Load the new page image FIRST
+        // Load the new page image
         debugPrint('_previousPage: Loading image for page $newPage');
         final pageImage = await _converter.renderPage(newPage);
         
@@ -280,8 +297,11 @@ class _PDFViewerState extends State<PDFViewer>
             _currentPage = newPage;
             _currentPageImage = pageImage;
           });
+          
           debugPrint('_previousPage: changed from page $oldPage to $_currentPage with new image');
         }
+      } catch (e) {
+        debugPrint('Error in _previousPage: $e');
       } finally {
         _isNavigating = false;
       }
@@ -290,11 +310,164 @@ class _PDFViewerState extends State<PDFViewer>
     }
   }
 
+  /// Save drawing data for current page
+  Future<void> _saveDrawingData() async {
+    if (!mounted || _pdfPath == null || _currentPageImage == null) return;
+    
+    try {
+      // Safety check to prevent usage after disposal
+      if (_isDisposed) return;
+      
+      // Save PaintInfo data using LocalStorageService
+      final safeFilename = _getSafeFilename(widget.songAssetPath);
+      await LocalStorageService.savePDFDrawingsForSongPage(
+        safeFilename,
+        _currentPage,
+        _imagePainterController.paintHistory,
+      );
+      debugPrint('PDF Drawing: Saved paint history for page $_currentPage');
+    } catch (e) {
+      debugPrint('Error saving drawing data: $e');
+    }
+  }
+
+  /// Load drawing data for current page
+  Future<void> _loadDrawingDataForCurrentPage() async {
+    if (!mounted || _pdfPath == null) return;
+    
+    try {
+      // Safety check to prevent usage after disposal
+      if (_isDisposed) return;
+      
+      // Load PaintInfo data using LocalStorageService
+      final safeFilename = _getSafeFilename(widget.songAssetPath);
+      final paintHistory = await LocalStorageService.loadPDFDrawingsForSongPage(
+        safeFilename,
+        _currentPage,
+      );
+      
+      if (paintHistory.isNotEmpty && mounted && !_isDisposed) {
+        // Clear existing history and add loaded drawings
+        _imagePainterController.clear();
+        for (final paintInfo in paintHistory) {
+          _imagePainterController.addPaintInfo(paintInfo);
+        }
+        debugPrint('PDF Drawing: Loaded ${paintHistory.length} drawings for page $_currentPage');
+      }
+    } catch (e) {
+      debugPrint('Error loading drawing data: $e');
+    }
+  }
+
+  /// Save labels for current page
+  Future<void> _saveLabels() async {
+    if (_pdfPath == null) return;
+    
+    try {
+      await LocalStorageService.saveLabelsForPage(
+        widget.songAssetPath,
+        _currentPage,
+        _imagePainterController.labels,
+      );
+      debugPrint('Labels: Saved ${_imagePainterController.labels.length} labels for page $_currentPage');
+    } catch (e) {
+      debugPrint('Error saving labels: $e');
+    }
+  }
+
+  /// Load labels for current page
+  Future<void> _loadLabels() async {
+    if (_pdfPath == null) return;
+    
+    try {
+      final labelsData = await LocalStorageService.loadLabelsForPage(
+        widget.songAssetPath,
+        _currentPage,
+      );
+      
+      // Clear existing labels
+      _imagePainterController.clearExtensionLabels();
+      
+      // Convert loaded data to image_painter's Label format
+      final imagePainterLabels = <Label>[];
+      
+      for (final labelData in labelsData) {
+        final Map<String, dynamic> data = labelData as Map<String, dynamic>;
+        final labelType = data['labelType'] as String;
+        
+        if (labelType == 'extension') {
+          // Create image_painter ExtensionLabel
+          final position = Offset(
+            data['position']['dx'] as double,
+            data['position']['dy'] as double,
+          );
+          final label = ExtensionLabel(
+            id: data['id'],
+            position: position,
+            number: data['number'] ?? '1',
+            size: data['size'] ?? 10.0,
+            color: Color(data['color'] ?? 0xFF2196F3),
+          );
+          imagePainterLabels.add(label);
+        } else if (labelType == 'romanNumeral') {
+          // Create image_painter RomanNumeralLabel
+          final position = Offset(
+            data['position']['dx'] as double,
+            data['position']['dy'] as double,
+          );
+          final label = RomanNumeralLabel(
+            id: data['id'],
+            position: position,
+            romanNumeral: data['numeral'] ?? 'I',
+            size: data['size'] ?? 10.0,
+            color: Color(data['color'] ?? 0xFF2196F3),
+          );
+          imagePainterLabels.add(label);
+        }
+      }
+      
+      // Add loaded labels to controller
+      _imagePainterController.labels.addAll(imagePainterLabels);
+      debugPrint('Labels: Loaded ${imagePainterLabels.length} labels for page $_currentPage');
+    } catch (e) {
+      debugPrint('Error loading labels: $e');
+      _imagePainterController.clearExtensionLabels();
+    }
+  }
+
+  /// Called when drawing changes to auto-save
+  void _onDrawingChanged() {
+    // Safety check to prevent usage after disposal
+    if (!mounted || _isDisposed) return;
+    
+    // Debounce auto-save to avoid excessive saves
+    if (_pdfPath != null) {
+      // Use a small delay to batch rapid changes
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted && _pdfPath != null) {
+          _saveDrawingData();
+          _saveLabels(); // Also save labels when drawing changes
+        }
+      });
+    }
+  }
 
 
-
-
-
+  /// Reinitialize the ImagePainterController to prevent disposal issues
+  void _reinitializeController() {
+    try {
+      // Remove listeners from old controller
+      _imagePainterController.removeListener(_onDrawingChanged);
+      
+      // Create new controller
+      _imagePainterController = ImagePainterController();
+      _imagePainterController.addListener(_onDrawingChanged);
+      
+      debugPrint('ImagePainterController reinitialized');
+    } catch (e) {
+      debugPrint('Error reinitializing controller: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -381,8 +554,7 @@ class _PDFViewerState extends State<PDFViewer>
             ? const Center(child: CircularProgressIndicator())
             : ImagePainter.memory(
                 _currentPageImage!,
-                key: ValueKey('page_$_currentPage'), // Force rebuild on page change
-                controller: ImagePainterController(), // Each page gets its own controller
+                controller: _imagePainterController,
                 scalable: true,
                 textDelegate: TextDelegate(),
                 controlsAtTop: false,
@@ -391,6 +563,12 @@ class _PDFViewerState extends State<PDFViewer>
                 selectedColor: Theme.of(context).colorScheme.primary,
                 unselectedColor: Theme.of(context).colorScheme.onSurface,
                 optionColor: Theme.of(context).colorScheme.onSurface,
+                romanNumeralControlsWidget: RomanNumeralLabelControls(
+                  controller: _imagePainterController,
+                ),
+                extensionLabelControlsWidget: ExtensionLabelControls(
+                  controller: _imagePainterController,
+                ),
               ),
       ),
     );
@@ -613,6 +791,15 @@ class _PDFViewerState extends State<PDFViewer>
   void dispose() {
     // Mark as disposed to prevent further usage
     _isDisposed = true;
+    
+    // Save current drawing and labels before disposing
+    if (_isReady && _pdfPath != null) {
+      _saveDrawingData();
+      _saveLabels();
+    }
+    
+    // Remove listeners from controller
+    _imagePainterController.removeListener(_onDrawingChanged);
     
     // Close PDF converter if open
     if (_converter.isOpen) {
@@ -1096,7 +1283,11 @@ class _PDFViewerState extends State<PDFViewer>
     try {
       setState(() {
         _isLoading = true;
+        _isReady = false;
       });
+
+      // Reinitialize the ImagePainterController for the new PDF
+      _reinitializeController();
 
       // Close current PDF if open - with better error handling
       if (_converter.isOpen) {
@@ -1124,10 +1315,13 @@ class _PDFViewerState extends State<PDFViewer>
       
       setState(() {
         _pdfPath = bookPath;
+        _isReady = true;
         _isLoading = false;
       });
       
-      // Note: Drawing and label persistence removed for now to fix controller lifecycle issues
+      // Load drawings for current page
+      await _loadDrawingDataForCurrentPage();
+      await _loadLabels();
       
     } catch (e) {
       debugPrint('Error loading book page: $e');

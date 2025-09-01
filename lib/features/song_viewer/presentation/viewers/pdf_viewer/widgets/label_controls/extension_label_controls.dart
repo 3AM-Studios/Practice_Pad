@@ -20,8 +20,11 @@ class _ExtensionLabelControlsState extends State<ExtensionLabelControls> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
+    return Container(
+      width: 200, // Smaller width for better numpad layout
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
         // TOP SECTION: Colors, Size and Delete button
         Container(
           margin: const EdgeInsets.only(bottom: 16),
@@ -74,9 +77,9 @@ class _ExtensionLabelControlsState extends State<ExtensionLabelControls> {
               // Numbers 1-9 in 3x3 grid
               for (int row = 0; row < 3; row++)
                 Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  padding: const EdgeInsets.symmetric(vertical: 2),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
                       for (int col = 0; col < 3; col++)
                         _buildNumberButton('${row * 3 + col + 1}'),
@@ -86,7 +89,8 @@ class _ExtensionLabelControlsState extends State<ExtensionLabelControls> {
             ],
           ),
         ),
-      ],
+        ],
+      ),
     );
   }
 

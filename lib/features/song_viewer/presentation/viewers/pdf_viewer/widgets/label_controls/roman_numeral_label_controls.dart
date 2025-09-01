@@ -61,9 +61,13 @@ class _RomanNumeralLabelControlsState extends State<RomanNumeralLabelControls> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
+    return Container(
+      width: 350, // Increased width to prevent button cutoff
+      padding: const EdgeInsets.all(8), // Add padding to prevent clipping
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
         // Color and size controls (centered with input)
         Container(
           margin: const EdgeInsets.only(bottom: 16),
@@ -138,7 +142,7 @@ class _RomanNumeralLabelControlsState extends State<RomanNumeralLabelControls> {
 
         // Row 1: Quality modifiers and Delete button (centered with input)
         Container(
-          margin: const EdgeInsets.only(bottom: 12),
+          margin: const EdgeInsets.only(bottom: 8), // Reduced margin to prevent clipping
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
@@ -159,38 +163,47 @@ class _RomanNumeralLabelControlsState extends State<RomanNumeralLabelControls> {
                   ),
                 ),
                 _buildModifierButton('Maj', () {
+                  setState(() {
+                    _currentQuality = 'Maj';
+                  });
                   final baseNumeral = _getBaseNumeral(widget.controller.currentChordText);
                   String newChord = _applyQuality(baseNumeral, 'Maj', hasSeventh: _seventhToggled);
-                  if (_seventhToggled) newChord += '7';
                   widget.controller.setCurrentChordText(newChord);
                 }),
                 const SizedBox(width: 6),
                 _buildModifierButton('Min', () {
+                  setState(() {
+                    _currentQuality = 'Min';
+                  });
                   final baseNumeral = _getBaseNumeral(widget.controller.currentChordText);
                   String newChord = _applyQuality(baseNumeral, 'Min', hasSeventh: _seventhToggled);
-                  if (_seventhToggled) newChord += '7';
                   widget.controller.setCurrentChordText(newChord);
                 }),
                 const SizedBox(width: 6),
-                if (_seventhToggled) ...[
-                  _buildModifierButton('Dom', () {
-                    final baseNumeral = _getBaseNumeral(widget.controller.currentChordText);
-                    String newChord = '${baseNumeral.toUpperCase()}7';
-                    widget.controller.setCurrentChordText(newChord);
-                  }),
-                  const SizedBox(width: 6),
-                ],
+                _buildModifierButton('Dom', _seventhToggled ? () {
+                  setState(() {
+                    _currentQuality = 'Dom';
+                  });
+                  final baseNumeral = _getBaseNumeral(widget.controller.currentChordText);
+                  String newChord = '${baseNumeral.toUpperCase()}7';
+                  widget.controller.setCurrentChordText(newChord);
+                } : null), // Disabled when 7th not selected
+                const SizedBox(width: 6),
                 _buildModifierButton('ø', () {
+                  setState(() {
+                    _currentQuality = 'ø';
+                  });
                   final baseNumeral = _getBaseNumeral(widget.controller.currentChordText);
                   String newChord = _applyQuality(baseNumeral, 'ø', hasSeventh: _seventhToggled);
-                  if (_seventhToggled) newChord += '7';
                   widget.controller.setCurrentChordText(newChord);
                 }),
                 const SizedBox(width: 6),
                 _buildModifierButton('°', () {
+                  setState(() {
+                    _currentQuality = 'o';
+                  });
                   final baseNumeral = _getBaseNumeral(widget.controller.currentChordText);
                   String newChord = _applyQuality(baseNumeral, 'o', hasSeventh: _seventhToggled);
-                  if (_seventhToggled) newChord += '7';
                   widget.controller.setCurrentChordText(newChord);
                 }),
                 const SizedBox(width: 12),
@@ -238,7 +251,8 @@ class _RomanNumeralLabelControlsState extends State<RomanNumeralLabelControls> {
             ],
           ),
         ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -270,7 +284,7 @@ class _RomanNumeralLabelControlsState extends State<RomanNumeralLabelControls> {
 
   Widget _buildToggleButton(String label, bool isToggled, VoidCallback onPressed) {
     return SizedBox(
-      height: 32,
+      height: 28, // Reduced height to prevent clipping
       child: FloatingActionButton(
         mini: true,
         onPressed: onPressed,
@@ -280,7 +294,7 @@ class _RomanNumeralLabelControlsState extends State<RomanNumeralLabelControls> {
         child: Text(
           label,
           style: const TextStyle(
-            fontSize: 10,
+            fontSize: 9,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -288,19 +302,20 @@ class _RomanNumeralLabelControlsState extends State<RomanNumeralLabelControls> {
     );
   }
 
-  Widget _buildModifierButton(String label, VoidCallback onPressed) {
+  Widget _buildModifierButton(String label, VoidCallback? onPressed) {
+    final isEnabled = onPressed != null;
     return SizedBox(
-      height: 32,
+      height: 28, // Reduced height to prevent clipping
       child: FloatingActionButton(
         mini: true,
         onPressed: onPressed,
-        backgroundColor: Colors.grey[200],
-        foregroundColor: Colors.grey[700],
-        elevation: 4,
+        backgroundColor: isEnabled ? Colors.grey[200] : Colors.grey[100],
+        foregroundColor: isEnabled ? Colors.grey[700] : Colors.grey[400],
+        elevation: isEnabled ? 4 : 1,
         child: Text(
           label,
           style: const TextStyle(
-            fontSize: 10,
+            fontSize: 9, // Reduced font size
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -316,13 +331,12 @@ class _RomanNumeralLabelControlsState extends State<RomanNumeralLabelControls> {
         
         return SizedBox(
           width: 40,
-          height: 32,
+          height: 28, // Reduced height to prevent clipping
           child: FloatingActionButton(
             mini: true,
             onPressed: () {
-              final currentQuality = _getCurrentQuality(widget.controller.currentChordText);
-              String baseChord = _applyQuality(numeral, currentQuality, hasSeventh: _seventhToggled);
-              if (_seventhToggled) baseChord += '7';
+              // Use the stored _currentQuality instead of parsing from text
+              String baseChord = _applyQuality(numeral, _currentQuality, hasSeventh: _seventhToggled);
               
               // Add accidental prefix if not natural
               String newChord = _selectedAccidental == '♮' ? baseChord : '$_selectedAccidental$baseChord';
@@ -334,7 +348,7 @@ class _RomanNumeralLabelControlsState extends State<RomanNumeralLabelControls> {
             child: Text(
               numeral,
               style: const TextStyle(
-                fontSize: 10,
+                fontSize: 9, // Reduced font size
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -370,14 +384,22 @@ class _RomanNumeralLabelControlsState extends State<RomanNumeralLabelControls> {
   // Helper methods for Roman numeral chord editing
   String _getBaseNumeral(String chord) {
     String text = chord;
-    // Remove quality indicators and seventh
+    
+    // Remove all quality indicators and modifiers
     text = text.replaceAll('7', '');
     text = text.replaceAll('ø', '');
     text = text.replaceAll('°', '');
     text = text.replaceAll(RegExp(r'maj', caseSensitive: false), ''); // Remove maj
+    text = text.replaceAll(RegExp(r'min', caseSensitive: false), ''); // Remove min
+    text = text.replaceAll(RegExp(r'dom', caseSensitive: false), ''); // Remove dom
     
-    // Convert to uppercase to get base
-    String base = text.toUpperCase();
+    // Remove any accidentals at the start
+    text = text.replaceAll('♯', '');
+    text = text.replaceAll('♭', '');
+    text = text.replaceAll('♮', '');
+    
+    // Convert to uppercase to get base roman numeral
+    String base = text.toUpperCase().trim();
     return base.isNotEmpty ? base : 'I';
   }
 
@@ -385,18 +407,36 @@ class _RomanNumeralLabelControlsState extends State<RomanNumeralLabelControls> {
     switch (quality) {
       case 'Maj':
         if (hasSeventh) {
-          return '${base.toUpperCase()}maj'; // Major 7th chord
+          return '${base.toUpperCase()}maj7'; // Major 7th chord
         } else {
           return base.toUpperCase(); // Simple major chord
         }
       case 'Min':
-        return base.toLowerCase();
+        if (hasSeventh) {
+          return '${base.toLowerCase()}min7'; // Minor 7th chord - shows as "iimin7"
+        } else {
+          return base.toLowerCase(); // Simple minor chord
+        }
+      case 'Dom':
+        return '${base.toUpperCase()}7'; // Dominant 7th chord (always has 7)
       case 'ø':
-        return '${base.toLowerCase()}ø';
+        if (hasSeventh) {
+          return '${base.toLowerCase()}ø7'; // Half-diminished 7th chord
+        } else {
+          return '${base.toLowerCase()}ø'; // Half-diminished chord
+        }
       case 'o':
-        return '${base.toLowerCase()}°';
+        if (hasSeventh) {
+          return '${base.toLowerCase()}°7'; // Diminished 7th chord
+        } else {
+          return '${base.toLowerCase()}°'; // Diminished chord
+        }
       default:
-        return base.toUpperCase();
+        if (hasSeventh) {
+          return '${base.toUpperCase()}7';
+        } else {
+          return base.toUpperCase();
+        }
     }
   }
 
@@ -405,14 +445,19 @@ class _RomanNumeralLabelControlsState extends State<RomanNumeralLabelControls> {
     if (chord.contains('ø')) return 'ø';
     if (chord.contains('°')) return 'o';
     
-    // Remove the 7 to check the base quality
-    String baseChord = chord.replaceAll('7', '');
+    // Check for dominant 7th chord (uppercase with just 7, no maj)
+    if (chord.contains('7') && !chord.toLowerCase().contains('maj') && !chord.toLowerCase().contains('min') && chord == chord.toUpperCase()) {
+      return 'Dom';
+    }
     
     // Check if it contains 'maj' (like Imaj7)
-    if (baseChord.toLowerCase().contains('maj')) return 'Maj';
+    if (chord.toLowerCase().contains('maj')) return 'Maj';
+    
+    // Check if it contains 'min' (like iimin7)
+    if (chord.toLowerCase().contains('min')) return 'Min';
     
     // Check case for minor vs major
-    if (baseChord == baseChord.toLowerCase() && baseChord.isNotEmpty) return 'Min';
+    if (chord.replaceAll('7', '') == chord.replaceAll('7', '').toLowerCase() && chord.replaceAll('7', '').isNotEmpty) return 'Min';
     
     return 'Maj';
   }
