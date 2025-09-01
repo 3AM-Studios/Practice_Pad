@@ -48,13 +48,13 @@ class _PDFViewerState extends State<PDFViewer>
   // ImagePainter controller for drawing functionality
   late ImagePainterController _imagePainterController;
   bool _isReady = false;
+  int _controllerPageId = -1; // Track which page the controller belongs to
   
   // PDF viewer specific controls
   int _currentPage = 0; // 0-based indexing for pdf_to_image_converter
   int _totalPages = 0;
   String? _pdfPath;
   bool _isDisposed = false;
-  bool _isNavigating = false;
   
 
   @override
@@ -165,6 +165,9 @@ class _PDFViewerState extends State<PDFViewer>
         _isLoading = false;
       });
       
+      // Set controller page ID for initial page
+      _controllerPageId = _currentPage;
+      
       // Load drawings and labels for current page
       await _loadDrawingDataForCurrentPage();
       await _loadLabels();
@@ -248,65 +251,55 @@ class _PDFViewerState extends State<PDFViewer>
 
   /// Navigate to next page
   Future<void> _nextPage() async {
-    debugPrint('_nextPage called: currentPage=$_currentPage, totalPages=$_totalPages');
-    if (_currentPage < _totalPages - 1 && !_isNavigating) {
-      _isNavigating = true;
-      try {
-        final oldPage = _currentPage;
-        final newPage = _currentPage + 1;
-        
-        // Load the new page image
-        debugPrint('_nextPage: Loading image for page $newPage');
-        final pageImage = await _converter.renderPage(newPage);
-        
-        if (pageImage != null && mounted && !_isDisposed) {
-          // Update both page number and image in single setState
-          setState(() {
-            _currentPage = newPage;
-            _currentPageImage = pageImage;
-          });
-          
-          debugPrint('_nextPage: changed from page $oldPage to $_currentPage with new image');
-        }
-      } catch (e) {
-        debugPrint('Error in _nextPage: $e');
-      } finally {
-        _isNavigating = false;
-      }
-    } else {
-      debugPrint('_nextPage: navigation blocked (currentPage=$_currentPage, totalPages=$_totalPages, isNavigating=$_isNavigating)');
+    if (_currentPage < _totalPages - 1) {
+      await _saveDrawingData(); // Save current page drawings
+      await _saveLabels(); // Save current page labels
+      _currentPage++;
+      await _loadCurrentPageImage(); // Load new page image first
+      _reinitializeControllerForPage(); // Reinitialize controller after image is loaded
+      await _loadDrawingDataForCurrentPage(); // Load drawings into new controller
+      await _loadLabels(); // Load labels into new controller
+      // setState is called to rebuild the widget with new controller state
+      setState(() {});
     }
   }
 
   /// Navigate to previous page
   Future<void> _previousPage() async {
-    debugPrint('_previousPage called: currentPage=$_currentPage, totalPages=$_totalPages');
-    if (_currentPage > 0 && !_isNavigating) {
-      _isNavigating = true;
-      try {
-        final oldPage = _currentPage;
-        final newPage = _currentPage - 1;
-        
-        // Load the new page image
-        debugPrint('_previousPage: Loading image for page $newPage');
-        final pageImage = await _converter.renderPage(newPage);
-        
-        if (pageImage != null && mounted && !_isDisposed) {
-          // Update both page number and image in single setState
-          setState(() {
-            _currentPage = newPage;
-            _currentPageImage = pageImage;
-          });
-          
-          debugPrint('_previousPage: changed from page $oldPage to $_currentPage with new image');
-        }
-      } catch (e) {
-        debugPrint('Error in _previousPage: $e');
-      } finally {
-        _isNavigating = false;
-      }
-    } else {
-      debugPrint('_previousPage: navigation blocked (currentPage=$_currentPage, totalPages=$_totalPages, isNavigating=$_isNavigating)');
+    if (_currentPage > 0) {
+      await _saveDrawingData(); // Save current page drawings
+      await _saveLabels(); // Save current page labels
+      _currentPage--;
+      await _loadCurrentPageImage(); // Load new page image first
+      _reinitializeControllerForPage(); // Reinitialize controller after image is loaded
+      await _loadDrawingDataForCurrentPage(); // Load drawings into new controller
+      await _loadLabels(); // Load labels into new controller
+      // setState is called to rebuild the widget with new controller state
+      setState(() {});
+    }
+  }
+
+  /// Reinitialize controller for the current page to prevent disposal errors
+  void _reinitializeControllerForPage() {
+    if (_controllerPageId == _currentPage) {
+      // Controller is already initialized for this page, no need to reinitialize
+      return;
+    }
+    
+    try {
+      // Remove listener from old controller
+      _imagePainterController.removeListener(_onDrawingChanged);
+      
+      // Create new controller for this page
+      _imagePainterController = ImagePainterController();
+      _imagePainterController.addListener(_onDrawingChanged);
+      
+      // Update the page tracking
+      _controllerPageId = _currentPage;
+      
+      debugPrint('Reinitialized controller for page $_currentPage');
+    } catch (e) {
+      debugPrint('Error reinitializing controller: $e');
     }
   }
 
@@ -346,13 +339,17 @@ class _PDFViewerState extends State<PDFViewer>
         _currentPage,
       );
       
+      // Always clear existing history first
+      _imagePainterController.clear();
+      
       if (paintHistory.isNotEmpty && mounted && !_isDisposed) {
-        // Clear existing history and add loaded drawings
-        _imagePainterController.clear();
+        // Add loaded drawings
         for (final paintInfo in paintHistory) {
           _imagePainterController.addPaintInfo(paintInfo);
         }
         debugPrint('PDF Drawing: Loaded ${paintHistory.length} drawings for page $_currentPage');
+      } else {
+        debugPrint('PDF Drawing: No drawings found for page $_currentPage - cleared canvas');
       }
     } catch (e) {
       debugPrint('Error loading drawing data: $e');
@@ -554,6 +551,7 @@ class _PDFViewerState extends State<PDFViewer>
             ? const Center(child: CircularProgressIndicator())
             : ImagePainter.memory(
                 _currentPageImage!,
+                key: Key('pdf_page_$_currentPage'),
                 controller: _imagePainterController,
                 scalable: true,
                 textDelegate: TextDelegate(),
