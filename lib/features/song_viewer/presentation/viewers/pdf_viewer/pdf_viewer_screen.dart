@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -11,15 +10,6 @@ import 'package:practice_pad/models/practice_area.dart';
 import 'package:practice_pad/services/local_storage_service.dart';
 import 'package:pdf_to_image_converter/pdf_to_image_converter.dart';
 import 'package:image_painter/image_painter.dart';
-
-// Import new label system
-import 'models/label_base.dart' as base_models;
-import 'models/extension_label.dart' as models;
-import 'models/roman_numeral_label.dart' as roman_models;
-
-// Import control widgets
-import 'widgets/label_controls/roman_numeral_label_controls.dart';
-import 'widgets/label_controls/extension_label_controls.dart';
 
 // Import transcription viewer
 import '../transcription_viewer.dart';
@@ -51,15 +41,14 @@ class _PDFViewerState extends State<PDFViewer>
   final PdfImageConverter _converter = PdfImageConverter();
   Uint8List? _currentPageImage;
   
-  // Image Painter controller
-  late ImagePainterController _imagePainterController;
+  // Note: Each ImagePainter widget now manages its own controller
   
   // PDF viewer specific controls
   int _currentPage = 0; // 0-based indexing for pdf_to_image_converter
   int _totalPages = 0;
   String? _pdfPath;
-  bool _isReady = false;
   bool _isDisposed = false;
+  bool _isNavigating = false;
   
 
   @override
@@ -67,15 +56,9 @@ class _PDFViewerState extends State<PDFViewer>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     
-    // Initialize the ImagePainterController
-    _imagePainterController = ImagePainterController();
-    
-    // Add listeners for auto-save functionality
-    _imagePainterController.addListener(_onDrawingChanged);
-    _imagePainterController.addListener(_onLabelChanged);
-    
     _loadSavedPDF();
   }
+
 
   /// Load previously saved PDF path
   Future<void> _loadSavedPDF() async {
@@ -126,54 +109,13 @@ class _PDFViewerState extends State<PDFViewer>
     }
   }
 
-  /// Reinitialize the ImagePainterController for a new PDF
-  void _reinitializeController() {
-    // Safety check to prevent double disposal
-    if (_isDisposed) return;
-    
-    try {
-      // Remove listeners from current controller if it exists
-      try {
-        _imagePainterController.removeListener(_onDrawingChanged);
-        _imagePainterController.removeListener(_onLabelChanged);
-      } catch (e) {
-        debugPrint('Error removing listeners from old controller: $e');
-      }
-      
-      // Dispose current controller safely
-      try {
-        _imagePainterController.dispose();
-      } catch (e) {
-        debugPrint('Error disposing old controller: $e');
-      }
-      
-      // Create new controller
-      _imagePainterController = ImagePainterController();
-      
-      // Add listeners to new controller
-      _imagePainterController.addListener(_onDrawingChanged);
-      _imagePainterController.addListener(_onLabelChanged);
-      
-      debugPrint('ImagePainterController reinitialized successfully');
-    } catch (e) {
-      debugPrint('Error reinitializing ImagePainterController: $e');
-      // Create a fresh controller as fallback
-      _imagePainterController = ImagePainterController();
-      _imagePainterController.addListener(_onDrawingChanged);
-      _imagePainterController.addListener(_onLabelChanged);
-    }
-  }
 
   /// Load PDF file and convert first page to image
   Future<void> _loadPDF(String path) async {
     try {
       setState(() {
         _isLoading = true;
-        _isReady = false;
       });
-
-      // Reinitialize the ImagePainterController for the new PDF
-      _reinitializeController();
 
       // Copy PDF to app documents directory for permanent storage
       String permanentPdfPath = path;
@@ -198,6 +140,7 @@ class _PDFViewerState extends State<PDFViewer>
       // Get page count
       _totalPages = _converter.pageCount;
       _currentPage = 0;
+      debugPrint('PDF loaded: totalPages=$_totalPages, starting at currentPage=$_currentPage');
       
       // Convert current page to image
       await _loadCurrentPageImage();
@@ -207,13 +150,10 @@ class _PDFViewerState extends State<PDFViewer>
       
       setState(() {
         _pdfPath = permanentPdfPath;
-        _isReady = true;
         _isLoading = false;
       });
       
-      // Load drawings for current page
-      await _loadDrawingDataForCurrentPage();
-      await _loadLabels();
+      // Note: Drawing and label persistence removed for now to fix controller lifecycle issues
       
     } catch (e) {
       debugPrint('Error loading PDF: $e');
@@ -247,15 +187,19 @@ class _PDFViewerState extends State<PDFViewer>
   /// Load current page as image
   Future<void> _loadCurrentPageImage() async {
     try {
+      debugPrint('_loadCurrentPageImage: Loading page $_currentPage of $_totalPages');
       final pageImage = await _converter.renderPage(_currentPage);
-      if (pageImage != null) {
+      if (pageImage != null && mounted && !_isDisposed) {
         setState(() {
           _currentPageImage = pageImage;
         });
-        debugPrint('Loaded page $_currentPage image (${pageImage.length} bytes)');
+        
+        debugPrint('_loadCurrentPageImage: Successfully loaded page $_currentPage image (${pageImage.length} bytes)');
+      } else {
+        debugPrint('_loadCurrentPageImage: Failed to load page $_currentPage - pageImage is null or widget not mounted');
       }
     } catch (e) {
-      debugPrint('Error loading page image: $e');
+      debugPrint('_loadCurrentPageImage: Error loading page image for page $_currentPage: $e');
     }
   }
 
@@ -287,185 +231,74 @@ class _PDFViewerState extends State<PDFViewer>
     }
   }
 
-  /// Remove current PDF
-  Future<void> _removePDF() async {
-    try {
-      // Close PDF in converter
-      if (_converter.isOpen) {
-        await _converter.closePdf();
-      }
-      
-      // Delete the copied PDF file
-      if (_pdfPath != null) {
-        final pdfFile = File(_pdfPath!);
-        if (await pdfFile.exists()) {
-          await pdfFile.delete();
-          debugPrint('Deleted PDF file: $_pdfPath');
-        }
-      }
-      
-      // Clear saved path
-      await _savePDFPath('');
-      
-      setState(() {
-        _pdfPath = null;
-        _currentPage = 0;
-        _totalPages = 0;
-        _isReady = false;
-        _currentPageImage = null;
-      });
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('PDF removed successfully!')),
-        );
-      }
-    } catch (e) {
-      debugPrint('Error removing PDF: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error removing PDF: $e')),
-        );
-      }
-    }
-  }
 
   /// Navigate to next page
   Future<void> _nextPage() async {
-    if (_currentPage < _totalPages - 1) {
-      await _saveDrawingData(); // Save current page drawings
-      await _saveLabels(); // Save current page labels
-      _currentPage++;
-      await _loadCurrentPageImage();
-      await _loadDrawingDataForCurrentPage();
-      await _loadLabels();
-      setState(() {});
+    debugPrint('_nextPage called: currentPage=$_currentPage, totalPages=$_totalPages');
+    if (_currentPage < _totalPages - 1 && !_isNavigating) {
+      _isNavigating = true;
+      try {
+        final oldPage = _currentPage;
+        final newPage = _currentPage + 1;
+        
+        // Load the new page image FIRST
+        debugPrint('_nextPage: Loading image for page $newPage');
+        final pageImage = await _converter.renderPage(newPage);
+        
+        if (pageImage != null && mounted && !_isDisposed) {
+          // Update both page number and image in single setState
+          setState(() {
+            _currentPage = newPage;
+            _currentPageImage = pageImage;
+          });
+          debugPrint('_nextPage: changed from page $oldPage to $_currentPage with new image');
+        }
+      } finally {
+        _isNavigating = false;
+      }
+    } else {
+      debugPrint('_nextPage: navigation blocked (currentPage=$_currentPage, totalPages=$_totalPages, isNavigating=$_isNavigating)');
     }
   }
 
   /// Navigate to previous page
   Future<void> _previousPage() async {
-    if (_currentPage > 0) {
-      await _saveDrawingData(); // Save current page drawings
-      await _saveLabels(); // Save current page labels
-      _currentPage--;
-      await _loadCurrentPageImage();
-      await _loadDrawingDataForCurrentPage();
-      await _loadLabels();
-      setState(() {});
-    }
-  }
-
-
-  /// Save drawing data for current page
-  Future<void> _saveDrawingData() async {
-    if (!mounted || _pdfPath == null || !_isReady || _currentPageImage == null) return;
-    
-    try {
-      // Safety check to prevent usage after disposal
-      if (_isDisposed) return;
-      
-      // Save PaintInfo data using LocalStorageService
-      final safeFilename = _getSafeFilename(widget.songAssetPath);
-      await LocalStorageService.savePDFDrawingsForSongPage(
-        safeFilename,
-        _currentPage,
-        _imagePainterController.paintHistory,
-      );
-      debugPrint('PDF Drawing: Saved paint history for page $_currentPage');
-    } catch (e) {
-      debugPrint('Error saving drawing data: $e');
-    }
-  }
-
-  /// Load drawing data for current page
-  Future<void> _loadDrawingDataForCurrentPage() async {
-    if (!mounted || _pdfPath == null || !_isReady) return;
-    
-    try {
-      // Safety check to prevent usage after disposal
-      if (_isDisposed) return;
-      
-      // Load PaintInfo data using LocalStorageService
-      final safeFilename = _getSafeFilename(widget.songAssetPath);
-      final paintHistory = await LocalStorageService.loadPDFDrawingsForSongPage(
-        safeFilename,
-        _currentPage,
-      );
-      
-      if (paintHistory.isNotEmpty && mounted && !_isDisposed) {
-        // Clear existing history and add loaded drawings
-        _imagePainterController.clear();
-        for (final paintInfo in paintHistory) {
-          _imagePainterController.addPaintInfo(paintInfo);
-        }
-        debugPrint('PDF Drawing: Loaded ${paintHistory.length} drawings for page $_currentPage');
-      }
-    } catch (e) {
-      debugPrint('Error loading drawing data: $e');
-    }
-  }
-
-  /// Save labels for current page
-  Future<void> _saveLabels() async {
-    if (_pdfPath == null || !_isReady) return;
-    
-    try {
-      await LocalStorageService.saveLabelsForPage(
-        widget.songAssetPath,
-        _currentPage,
-        _imagePainterController.labels,
-      );
-      debugPrint('Labels: Saved ${_imagePainterController.labels.length} labels for page $_currentPage');
-    } catch (e) {
-      debugPrint('Error saving labels: $e');
-    }
-  }
-
-  /// Load labels for current page
-  Future<void> _loadLabels() async {
-    if (_pdfPath == null || !_isReady) return;
-    
-    try {
-      final labelsData = await LocalStorageService.loadLabelsForPage(
-        widget.songAssetPath,
-        _currentPage,
-      );
-      
-      final extensionLabels = <ExtensionLabel>[];
-      final romanLabels = <RomanNumeralLabel>[];
-      
-      for (final labelData in labelsData) {
-        final Map<String, dynamic> data = labelData as Map<String, dynamic>;
-        final labelType = data['labelType'] as String;
+    debugPrint('_previousPage called: currentPage=$_currentPage, totalPages=$_totalPages');
+    if (_currentPage > 0 && !_isNavigating) {
+      _isNavigating = true;
+      try {
+        final oldPage = _currentPage;
+        final newPage = _currentPage - 1;
         
-        if (labelType == 'extension') {
-          extensionLabels.add(ExtensionLabel.fromJson(data));
-        } else if (labelType == 'romanNumeral') {
-          romanLabels.add(RomanNumeralLabel.fromJson(data));
+        // Load the new page image FIRST
+        debugPrint('_previousPage: Loading image for page $newPage');
+        final pageImage = await _converter.renderPage(newPage);
+        
+        if (pageImage != null && mounted && !_isDisposed) {
+          // Update both page number and image in single setState
+          setState(() {
+            _currentPage = newPage;
+            _currentPageImage = pageImage;
+          });
+          debugPrint('_previousPage: changed from page $oldPage to $_currentPage with new image');
         }
+      } finally {
+        _isNavigating = false;
       }
-      
-      // Clear existing labels
-      _imagePainterController.clearExtensionLabels();
-      
-      // Add loaded labels
-      final allLabels = <Label>[];
-      allLabels.addAll(extensionLabels);
-      allLabels.addAll(romanLabels);
-      for (final label in allLabels) {
-        _imagePainterController.labels.add(label);
-      }
-      debugPrint('Labels: Loaded ${allLabels.length} labels for page $_currentPage');
-    } catch (e) {
-      debugPrint('Error loading labels: $e');
-      _imagePainterController.clearExtensionLabels();
+    } else {
+      debugPrint('_previousPage: navigation blocked (currentPage=$_currentPage, totalPages=$_totalPages, isNavigating=$_isNavigating)');
     }
   }
+
+
+
+
+
 
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('BUILD: currentPage=$_currentPage, totalPages=$_totalPages, displaying: ${_currentPage + 1}/$_totalPages');
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -540,39 +373,26 @@ class _PDFViewerState extends State<PDFViewer>
 
   /// Build PDF with drawing capability
   Widget _buildPDFWithDrawing() {
-    return Stack(
-      children: [
-        // Main PDF + Drawing Area (now handled by image_painter)
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: _currentPageImage == null
-                ? const Center(child: CircularProgressIndicator())
-                : ImagePainter.memory(
-                    _currentPageImage!,
-                    controller: _imagePainterController,
-                    scalable: true,
-                    textDelegate: TextDelegate(),
-                    controlsAtTop: false,
-                    showControls: true,
-                    controlsBackgroundColor: Colors.transparent,
-                    selectedColor: Theme.of(context).colorScheme.primary,
-                    unselectedColor: Theme.of(context).colorScheme.onSurface,
-                    optionColor: Theme.of(context).colorScheme.onSurface,
-                    romanNumeralControlsWidget: RomanNumeralLabelControls(
-                      controller: _imagePainterController,
-                    ),
-                    extensionLabelControlsWidget: ExtensionLabelControls(
-                      controller: _imagePainterController,
-                    ),
-                  ),
-          ),
-        ),
-
-        // Page navigation controls
-        _buildPageNavigator(),
-      ],
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: _currentPageImage == null
+            ? const Center(child: CircularProgressIndicator())
+            : ImagePainter.memory(
+                _currentPageImage!,
+                key: ValueKey('page_$_currentPage'), // Force rebuild on page change
+                controller: ImagePainterController(), // Each page gets its own controller
+                scalable: true,
+                textDelegate: TextDelegate(),
+                controlsAtTop: false,
+                showControls: true,
+                controlsBackgroundColor: Colors.transparent,
+                selectedColor: Theme.of(context).colorScheme.primary,
+                unselectedColor: Theme.of(context).colorScheme.onSurface,
+                optionColor: Theme.of(context).colorScheme.onSurface,
+              ),
+      ),
     );
   }
 
@@ -580,37 +400,33 @@ class _PDFViewerState extends State<PDFViewer>
   Widget _buildPageNavigator() {
     if (_totalPages < 2) return const SizedBox.shrink();
 
-    return Positioned(
-      bottom: 16,
-      left: 16,
-      right: 16,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            IconButton(
-              onPressed: _currentPage > 0 ? _previousPage : null,
-              icon: const Icon(Icons.chevron_left),
-            ),
-            Text('${_currentPage + 1} / $_totalPages'),
-            IconButton(
-              onPressed: _currentPage < _totalPages - 1 ? _nextPage : null,
-              icon: const Icon(Icons.chevron_right),
-            ),
-          ],
-        ),
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          IconButton(
+            onPressed: _currentPage > 0 ? _previousPage : null,
+            icon: const Icon(Icons.chevron_left),
+          ),
+          Text('${_currentPage + 1} / $_totalPages'),
+          IconButton(
+            onPressed: _currentPage < _totalPages - 1 ? _nextPage : null,
+            icon: const Icon(Icons.chevron_right),
+          ),
+        ],
       ),
     );
   }
@@ -798,11 +614,6 @@ class _PDFViewerState extends State<PDFViewer>
     // Mark as disposed to prevent further usage
     _isDisposed = true;
     
-    // Immediately remove listeners and dispose controller synchronously
-    _imagePainterController.removeListener(_onDrawingChanged);
-    _imagePainterController.removeListener(_onLabelChanged);
-    _imagePainterController.dispose();
-    
     // Close PDF converter if open
     if (_converter.isOpen) {
       _converter.closePdf().catchError((e) {
@@ -814,13 +625,6 @@ class _PDFViewerState extends State<PDFViewer>
     super.dispose();
   }
 
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    super.didChangeAppLifecycleState(state);
-    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
-      _saveDrawingData();
-    }
-  }
 
   /// Get file for storing PDF path
   Future<File> _getPDFPathFile() async {
@@ -884,37 +688,6 @@ class _PDFViewerState extends State<PDFViewer>
     }
   }
 
-  /// Called when drawing changes to auto-save
-  void _onDrawingChanged() {
-    // Safety check to prevent usage after disposal
-    if (!mounted || _isDisposed) return;
-    
-    // Debounce auto-save to avoid excessive saves
-    if (_isReady && _pdfPath != null) {
-      // Use a small delay to batch rapid changes
-      Future.delayed(const Duration(milliseconds: 500), () {
-        if (mounted && _isReady && _pdfPath != null) {
-          _saveDrawingData();
-        }
-      });
-    }
-  }
-
-  /// Called when labels change to auto-save
-  void _onLabelChanged() {
-    // Safety check to prevent usage after disposal
-    if (!mounted || _isDisposed) return;
-    
-    // Debounce auto-save to avoid excessive saves
-    if (_isReady && _pdfPath != null) {
-      // Use a small delay to batch rapid changes
-      Future.delayed(const Duration(milliseconds: 500), () {
-        if (mounted && _isReady && _pdfPath != null) {
-          _saveLabels();
-        }
-      });
-    }
-  }
 
   /// Show dialog to select from registered books or register a new book
   void _showBooksDialog() {
@@ -1323,11 +1096,7 @@ class _PDFViewerState extends State<PDFViewer>
     try {
       setState(() {
         _isLoading = true;
-        _isReady = false;
       });
-
-      // Reinitialize the ImagePainterController for the new PDF
-      _reinitializeController();
 
       // Close current PDF if open - with better error handling
       if (_converter.isOpen) {
@@ -1355,13 +1124,10 @@ class _PDFViewerState extends State<PDFViewer>
       
       setState(() {
         _pdfPath = bookPath;
-        _isReady = true;
         _isLoading = false;
       });
       
-      // Load drawings for current page
-      await _loadDrawingDataForCurrentPage();
-      await _loadLabels();
+      // Note: Drawing and label persistence removed for now to fix controller lifecycle issues
       
     } catch (e) {
       debugPrint('Error loading book page: $e');
