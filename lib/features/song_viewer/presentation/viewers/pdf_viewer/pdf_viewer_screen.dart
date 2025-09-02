@@ -55,6 +55,7 @@ class _PDFViewerState extends State<PDFViewer>
   int _totalPages = 0;
   String? _pdfPath;
   bool _isDisposed = false;
+  bool _isFullscreen = false; // Track fullscreen state
   
 
   @override
@@ -252,6 +253,12 @@ class _PDFViewerState extends State<PDFViewer>
   /// Navigate to next page
   Future<void> _nextPage() async {
     if (_currentPage < _totalPages - 1) {
+      // Close fullscreen overlay if active
+      if (_isFullscreen && mounted) {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+        _isFullscreen = false;
+      }
+      
       await _saveDrawingData(); // Save current page drawings
       await _saveLabels(); // Save current page labels
       _currentPage++;
@@ -267,6 +274,12 @@ class _PDFViewerState extends State<PDFViewer>
   /// Navigate to previous page
   Future<void> _previousPage() async {
     if (_currentPage > 0) {
+      // Close fullscreen overlay if active
+      if (_isFullscreen && mounted) {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+        _isFullscreen = false;
+      }
+      
       await _saveDrawingData(); // Save current page drawings
       await _saveLabels(); // Save current page labels
       _currentPage--;
@@ -567,6 +580,13 @@ class _PDFViewerState extends State<PDFViewer>
                 extensionLabelControlsWidget: ExtensionLabelControls(
                   controller: _imagePainterController,
                 ),
+                enableFullscreen: true,
+                fullscreenNavigationWidget: _buildFullscreenPageNavigator(),
+                onFullscreenChanged: (isFullscreen) {
+                  setState(() {
+                    _isFullscreen = isFullscreen;
+                  });
+                },
               ),
       ),
     );
@@ -603,6 +623,70 @@ class _PDFViewerState extends State<PDFViewer>
             icon: const Icon(Icons.chevron_right),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Build fullscreen page navigation controls
+  Widget _buildFullscreenPageNavigator() {
+    if (_totalPages < 2) return const SizedBox.shrink();
+
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 20),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.8),
+          borderRadius: BorderRadius.circular(25),
+          border: Border.all(color: Colors.white.withOpacity(0.3)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.5),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              onPressed: _currentPage > 0 ? _previousPage : null,
+              icon: Icon(
+                Icons.chevron_left, 
+                color: _currentPage > 0 ? Colors.white : Colors.white.withOpacity(0.5),
+                size: 28,
+              ),
+              padding: const EdgeInsets.all(8),
+              constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: Text(
+                '${_currentPage + 1} / $_totalPages',
+                style: const TextStyle(
+                  color: Colors.white, 
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+            IconButton(
+              onPressed: _currentPage < _totalPages - 1 ? _nextPage : null,
+              icon: Icon(
+                Icons.chevron_right, 
+                color: _currentPage < _totalPages - 1 ? Colors.white : Colors.white.withOpacity(0.5),
+                size: 28,
+              ),
+              padding: const EdgeInsets.all(8),
+              constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+            ),
+          ],
+        ),
       ),
     );
   }

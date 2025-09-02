@@ -76,6 +76,9 @@ class ImagePainter extends StatefulWidget {
     this.customMenuButtons,
     this.romanNumeralControlsWidget,
     this.extensionLabelControlsWidget,
+    this.enableFullscreen = true,
+    this.fullscreenNavigationWidget,
+    this.onFullscreenChanged,
   }) : super(key: key);
 
   ///Constructor for loading image from network url.
@@ -107,6 +110,9 @@ class ImagePainter extends StatefulWidget {
     List<MenuButton>? customMenuButtons,
     Widget? romanNumeralControlsWidget,
     Widget? extensionLabelControlsWidget,
+    bool? enableFullscreen,
+    Widget? fullscreenNavigationWidget,
+    ValueChanged<bool>? onFullscreenChanged,
   }) {
     return ImagePainter._(
       key: key,
@@ -136,6 +142,9 @@ class ImagePainter extends StatefulWidget {
       customMenuButtons: customMenuButtons,
       romanNumeralControlsWidget: romanNumeralControlsWidget,
       extensionLabelControlsWidget: extensionLabelControlsWidget,
+      enableFullscreen: enableFullscreen ?? true,
+      fullscreenNavigationWidget: fullscreenNavigationWidget,
+      onFullscreenChanged: onFullscreenChanged,
     );
   }
 
@@ -168,6 +177,9 @@ class ImagePainter extends StatefulWidget {
     List<MenuButton>? customMenuButtons,
     Widget? romanNumeralControlsWidget,
     Widget? extensionLabelControlsWidget,
+    bool? enableFullscreen,
+    Widget? fullscreenNavigationWidget,
+    ValueChanged<bool>? onFullscreenChanged,
   }) {
     return ImagePainter._(
       controller: controller,
@@ -197,6 +209,9 @@ class ImagePainter extends StatefulWidget {
       customMenuButtons: customMenuButtons,
       romanNumeralControlsWidget: romanNumeralControlsWidget,
       extensionLabelControlsWidget: extensionLabelControlsWidget,
+      enableFullscreen: enableFullscreen ?? true,
+      fullscreenNavigationWidget: fullscreenNavigationWidget,
+      onFullscreenChanged: onFullscreenChanged,
     );
   }
 
@@ -229,6 +244,9 @@ class ImagePainter extends StatefulWidget {
     List<MenuButton>? customMenuButtons,
     Widget? romanNumeralControlsWidget,
     Widget? extensionLabelControlsWidget,
+    bool? enableFullscreen,
+    Widget? fullscreenNavigationWidget,
+    ValueChanged<bool>? onFullscreenChanged,
   }) {
     return ImagePainter._(
       controller: controller,
@@ -258,6 +276,9 @@ class ImagePainter extends StatefulWidget {
       customMenuButtons: customMenuButtons,
       romanNumeralControlsWidget: romanNumeralControlsWidget,
       extensionLabelControlsWidget: extensionLabelControlsWidget,
+      enableFullscreen: enableFullscreen ?? true,
+      fullscreenNavigationWidget: fullscreenNavigationWidget,
+      onFullscreenChanged: onFullscreenChanged,
     );
   }
 
@@ -290,6 +311,9 @@ class ImagePainter extends StatefulWidget {
     List<MenuButton>? customMenuButtons,
     Widget? romanNumeralControlsWidget,
     Widget? extensionLabelControlsWidget,
+    bool? enableFullscreen,
+    Widget? fullscreenNavigationWidget,
+    ValueChanged<bool>? onFullscreenChanged,
   }) {
     return ImagePainter._(
       controller: controller,
@@ -319,6 +343,9 @@ class ImagePainter extends StatefulWidget {
       customMenuButtons: customMenuButtons,
       romanNumeralControlsWidget: romanNumeralControlsWidget,
       extensionLabelControlsWidget: extensionLabelControlsWidget,
+      enableFullscreen: enableFullscreen ?? true,
+      fullscreenNavigationWidget: fullscreenNavigationWidget,
+      onFullscreenChanged: onFullscreenChanged,
     );
   }
 
@@ -349,6 +376,9 @@ class ImagePainter extends StatefulWidget {
     List<MenuButton>? customMenuButtons,
     Widget? romanNumeralControlsWidget,
     Widget? extensionLabelControlsWidget,
+    bool? enableFullscreen,
+    Widget? fullscreenNavigationWidget,
+    ValueChanged<bool>? onFullscreenChanged,
   }) {
     return ImagePainter._(
       controller: controller,
@@ -378,6 +408,9 @@ class ImagePainter extends StatefulWidget {
       customMenuButtons: customMenuButtons,
       romanNumeralControlsWidget: romanNumeralControlsWidget,
       extensionLabelControlsWidget: extensionLabelControlsWidget,
+      enableFullscreen: enableFullscreen ?? false,
+      fullscreenNavigationWidget: fullscreenNavigationWidget,
+      onFullscreenChanged: onFullscreenChanged,
     );
   }
 
@@ -466,6 +499,15 @@ class ImagePainter extends StatefulWidget {
   ///Custom widget for extension label controls  
   final Widget? extensionLabelControlsWidget;
 
+  ///Enables fullscreen toggle functionality
+  final bool enableFullscreen;
+
+  ///Widget to be shown in fullscreen mode (e.g., page navigation)
+  final Widget? fullscreenNavigationWidget;
+
+  ///Callback when fullscreen state changes
+  final ValueChanged<bool>? onFullscreenChanged;
+
   @override
   ImagePainterState createState() => ImagePainterState();
 }
@@ -487,6 +529,9 @@ class ImagePainterState extends State<ImagePainter> {
   Label? _draggedLabel;
   bool _showAllColors = false;
   int _currentPointerCount = 0;
+  
+  // Fullscreen state (not used locally anymore)
+  final bool _isFullscreen = false;
   @override
   void initState() {
     super.initState();
@@ -594,6 +639,56 @@ class ImagePainterState extends State<ImagePainter> {
     return imageInfo.image;
   }
 
+  void _toggleFullscreen() {
+    if (_isFullscreen) {
+      // Exit fullscreen - this will be called from fullscreen overlay
+      Navigator.of(context).pop();
+      return;
+    } else {
+      // Enter fullscreen
+      widget.onFullscreenChanged?.call(true);
+      
+      // Navigate to fullscreen overlay with a separate widget
+      Navigator.of(context).push(
+        PageRouteBuilder(
+          opaque: false,
+          barrierColor: Colors.black,
+          pageBuilder: (context, animation, secondaryAnimation) => FullscreenImagePainter(
+            controller: widget.controller,
+            image: _image!,
+            isScalable: widget.isScalable!,
+            showControls: widget.showControls,
+            fullscreenNavigationWidget: widget.fullscreenNavigationWidget,
+            textDelegate: textDelegate,
+            colors: widget.colors,
+            extensionLabelControlsWidget: widget.extensionLabelControlsWidget,
+            romanNumeralControlsWidget: widget.romanNumeralControlsWidget,
+            customMenuButtons: widget.customMenuButtons,
+            optionColor: widget.optionColor,
+            optionUnselectedColor: widget.optionUnselectedColor,
+            onUndo: widget.onUndo,
+            onClear: widget.onClear,
+            onExit: () {
+              Navigator.of(context).pop();
+              widget.onFullscreenChanged?.call(false);
+            },
+          ),
+          transitionDuration: const Duration(milliseconds: 300),
+          reverseTransitionDuration: const Duration(milliseconds: 300),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(
+              opacity: animation,
+              child: child,
+            );
+          },
+        ),
+      ).then((_) {
+        // Reset fullscreen state when overlay is dismissed
+        widget.onFullscreenChanged?.call(false);
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<bool>(
@@ -613,6 +708,7 @@ class ImagePainterState extends State<ImagePainter> {
       },
     );
   }
+
 
   ///paints image on given constrains for drawing if image is not null.
   Widget _paintImage() {
@@ -649,6 +745,7 @@ class ImagePainterState extends State<ImagePainter> {
                               isComplex: true,
                               painter: DrawImage(
                                 controller: _controller,
+                                labelScaleFactor: 1.0,
                               ),
                             ),
                           ),
@@ -749,11 +846,11 @@ class ImagePainterState extends State<ImagePainter> {
         // Check if tapping on existing extension label first
         ExtensionLabel? tappedLabel;
         for (final label in _controller.extensionLabels) {
-          // Check if tap is within square label bounds
+          // Use reasonable touch area for label interaction
           final labelBounds = Rect.fromCenter(
             center: label.position,
-            width: label.size,
-            height: label.size,
+            width: 40.0, // Fixed reasonable size
+            height: 40.0,
           );
           if (labelBounds.contains(_imageOffset)) {
             tappedLabel = label;
@@ -771,12 +868,13 @@ class ImagePainterState extends State<ImagePainter> {
         }
       } else if (_controller.isLabelMode && _currentMenuLevel.value == 'roman_labels') {
         // Handle Roman numeral label tapping/creation
-        Label? tappedLabel;
-        for (final label in _controller.labels) {
+        RomanNumeralLabel? tappedLabel;
+        for (final label in _controller.romanNumeralLabels) {
+          // Use reasonable touch area for label interaction
           final labelBounds = Rect.fromCenter(
             center: label.position,
-            width: label.size,
-            height: label.size,
+            width: 40.0, // Fixed reasonable size
+            height: 40.0,
           );
           if (labelBounds.contains(_imageOffset)) {
             tappedLabel = label;
@@ -794,11 +892,11 @@ class ImagePainterState extends State<ImagePainter> {
         }
       } else if (_currentMenuLevel.value == 'drawing') {
         // Check if tapping on label in drawing mode (to prevent drawing on labels)
-        for (final label in _controller.extensionLabels) {
+        for (final label in _controller.labels) {
           final labelBounds = Rect.fromCenter(
             center: label.position,
-            width: label.size,
-            height: label.size,
+            width: 40.0,
+            height: 40.0,
           );
           if (labelBounds.contains(_imageOffset)) {
             return; // Don't start drawing if tapping on a label
@@ -840,11 +938,11 @@ class ImagePainterState extends State<ImagePainter> {
     } else if (_currentMenuLevel.value == 'drawing') {
       // Check if dragging on any label (to prevent drawing on labels)
       bool isDraggingOnLabel = false;
-      for (final label in _controller.extensionLabels) {
+      for (final label in _controller.labels) {
         final labelBounds = Rect.fromCenter(
           center: label.position,
-          width: label.size,
-          height: label.size,
+          width: 40.0,
+          height: 40.0,
         );
         if (labelBounds.contains(_imageOffset)) {
           isDraggingOnLabel = true;
@@ -1143,7 +1241,6 @@ class ImagePainterState extends State<ImagePainter> {
 
   late ValueNotifier<bool> _isMenuOpen;
   late ValueNotifier<String> _currentMenuLevel; // 'closed', 'main', 'drawing', 'custom_X'
-  String? _currentCustomButtonIndex;
 
   Widget _buildVerticalMenu() {
     return ValueListenableBuilder<String>(
@@ -1218,6 +1315,16 @@ class ImagePainterState extends State<ImagePainter> {
           tooltip: 'Labels',
         ),
       ),
+      // Fullscreen button (only if enabled)
+      if (widget.enableFullscreen)
+        Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          child: _buildClayButton(
+            icon: const Icon(Icons.fullscreen),
+            onPressed: _toggleFullscreen,
+            tooltip: 'Fullscreen',
+          ),
+        ),
     ];
 
     // Add custom menu buttons
@@ -1230,7 +1337,6 @@ class ImagePainterState extends State<ImagePainter> {
             child: _buildClayButton(
               icon: Icon(customButton.icon),
               onPressed: () {
-                _currentCustomButtonIndex = i.toString();
                 _currentMenuLevel.value = 'custom_$i';
               },
               tooltip: customButton.tooltip,
@@ -1804,10 +1910,17 @@ class ImagePainterState extends State<ImagePainter> {
     }
   }
 
-  /// Convert widget coordinates to image coordinates accounting for AspectRatio scaling
+  /// Convert widget coordinates to canvas coordinates for painting
   Offset _convertToImageCoordinates(Offset widgetOffset) {
-    // The AspectRatio widget scales the CustomPaint to fit within the available space
-    // We need to map the widget coordinates back to the original image coordinates
+    if (widget.controller.image == null) return widgetOffset;
+    
+    // Get widget size from render box
+    final renderBox = context.findRenderObject() as RenderBox?;
+    if (renderBox == null) return widgetOffset;
+    
+    // Since paintImage() stretches the image to fill the entire canvas,
+    // we need to map widget coordinates directly to canvas coordinates
+    // The canvas size matches the widget size, so coordinates are 1:1
     return Offset(
       widgetOffset.dx,
       widgetOffset.dy,
@@ -2072,5 +2185,718 @@ class ImagePainterState extends State<ImagePainter> {
     if (chord.contains('°')) return 'o';
     if (chord == chord.toLowerCase() && chord.isNotEmpty) return 'Min';
     return 'Maj';
+  }
+}
+
+/// Separate fullscreen widget to avoid lifecycle issues
+class FullscreenImagePainter extends StatefulWidget {
+  final ImagePainterController controller;
+  final ui.Image image;
+  final bool isScalable;
+  final bool showControls;
+  final Widget? fullscreenNavigationWidget;
+  final TextDelegate textDelegate;
+  final VoidCallback onExit;
+  final List<Color>? colors;
+  final Widget? extensionLabelControlsWidget;
+  final Widget? romanNumeralControlsWidget;
+  final List<MenuButton>? customMenuButtons;
+  final Color? optionColor;
+  final Color? optionUnselectedColor;
+  final VoidCallback? onUndo;
+  final VoidCallback? onClear;
+
+  const FullscreenImagePainter({
+    Key? key,
+    required this.controller,
+    required this.image,
+    required this.isScalable,
+    required this.showControls,
+    required this.textDelegate,
+    required this.onExit,
+    this.fullscreenNavigationWidget,
+    this.colors,
+    this.extensionLabelControlsWidget,
+    this.romanNumeralControlsWidget,
+    this.customMenuButtons,
+    this.optionColor,
+    this.optionUnselectedColor,
+    this.onUndo,
+    this.onClear,
+  }) : super(key: key);
+
+  @override
+  State<FullscreenImagePainter> createState() => _FullscreenImagePainterState();
+}
+
+class _FullscreenImagePainterState extends State<FullscreenImagePainter> {
+  late TransformationController _transformationController;
+  late ValueNotifier<bool> _isMenuOpen;
+  late ValueNotifier<String> _currentMenuLevel;
+  
+  // Label interaction state
+  final bool _isDraggingLabel = false;
+  int _currentPointerCount = 0;
+
+  Size get imageSize => Size(widget.image.width.toDouble(), widget.image.height.toDouble());
+
+
+  @override
+  void initState() {
+    super.initState();
+    _transformationController = TransformationController();
+    _isMenuOpen = ValueNotifier<bool>(false);
+    _currentMenuLevel = ValueNotifier<String>('closed');
+  }
+
+  @override
+  void dispose() {
+    _transformationController.dispose();
+    _isMenuOpen.dispose();
+    _currentMenuLevel.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, result) {
+          if (!didPop) {
+            widget.onExit();
+          }
+        },
+        child: Stack(
+          children: [
+            // Main image area - fill the entire screen
+            AnimatedBuilder(
+              animation: widget.controller,
+              builder: (context, child) {
+                return InteractiveViewer(
+                  transformationController: _transformationController,
+                  maxScale: 10.0,
+                  minScale: 0.3,
+                  panEnabled: (_currentMenuLevel.value == 'closed' || _currentMenuLevel.value == 'main' || _currentPointerCount > 1) && !_isDraggingLabel,
+                  scaleEnabled: widget.isScalable,
+                  boundaryMargin: const EdgeInsets.all(0),
+                  onInteractionStart: _scaleStartGesture,
+                  onInteractionUpdate: _scaleUpdateGesture,
+                  onInteractionEnd: _scaleEndGesture,
+                  child: Container(
+                    width: MediaQuery.of(context).size.width,
+                    height: MediaQuery.of(context).size.height,
+                    child: FittedBox(
+                      fit: BoxFit.contain,
+                      child: CustomPaint(
+                        size: imageSize,
+                        willChange: true,
+                        isComplex: true,
+                        painter: DrawImage(
+                          controller: widget.controller,
+                          labelScaleFactor: 2.0, // Use fixed larger scale for fullscreen
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+            // Controls overlay
+            if (widget.showControls) _buildFullscreenControls(),
+            // Custom navigation widget (for page controls, etc.)
+            if (widget.fullscreenNavigationWidget != null)
+              Positioned(
+                top: MediaQuery.of(context).padding.top + 50,
+                left: 0,
+                right: 0,
+                child: widget.fullscreenNavigationWidget!,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  ///builds fullscreen controls
+  Widget _buildFullscreenControls() {
+    return Stack(
+      children: [
+        // Exit fullscreen button (top-right)
+        Positioned(
+          top: MediaQuery.of(context).padding.top + 10,
+          right: 16,
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.7),
+              borderRadius: BorderRadius.circular(25),
+            ),
+            child: _buildClayButton(
+              icon: const Icon(Icons.fullscreen_exit, color: Colors.white),
+              onPressed: widget.onExit,
+              tooltip: 'Exit Fullscreen',
+            ),
+          ),
+        ),
+        // Drawing controls (bottom-left)
+        Positioned(
+          bottom: MediaQuery.of(context).padding.bottom + 20,
+          left: 16,
+          child: _buildVerticalMenu(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildClayButton({
+    required Widget icon,
+    required VoidCallback onPressed,
+    String? tooltip,
+  }) {
+    return FloatingActionButton(
+      mini: true,
+      onPressed: onPressed,
+      backgroundColor: Colors.white,
+      foregroundColor: Colors.black87,
+      elevation: 8,
+      tooltip: tooltip,
+      child: icon,
+    );
+  }
+
+  Widget _buildVerticalMenu() {
+    return ValueListenableBuilder<String>(
+      valueListenable: _currentMenuLevel,
+      builder: (context, menuLevel, child) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Show different menu levels
+            if (menuLevel == 'main') ...[
+              // Main menu level - show main category buttons
+              ..._buildMainMenuButtons(),
+            ] else if (menuLevel == 'drawing') ...[
+              // Drawing controls level
+              ..._buildDrawingControlButtons(),
+            ] else if (menuLevel == 'label_types') ...[
+              // Label type selection level
+              ..._buildLabelTypeButtons(),
+            ] else if (menuLevel == 'extension_labels') ...[
+              // Extension label controls level - use custom widget if provided
+              if (widget.extensionLabelControlsWidget != null) 
+                widget.extensionLabelControlsWidget!
+              else 
+                ..._buildLabelControlButtons(),
+            ] else if (menuLevel == 'roman_labels') ...[
+              // Roman numeral label controls level - use custom widget if provided
+              if (widget.romanNumeralControlsWidget != null) 
+                widget.romanNumeralControlsWidget!
+              else 
+                ..._buildRomanNumeralControlButtons(),
+            ] else if (menuLevel.startsWith('custom_')) ...[
+              // Custom button sub-menu
+              ..._buildCustomButtonSubMenu(menuLevel),
+            ],
+            
+            // Main menu toggle button (circle)
+            _buildClayButton(
+              icon: Icon(_getMainButtonIcon(menuLevel)),
+              onPressed: () => _handleMainButtonPress(menuLevel),
+              tooltip: _getMainButtonTooltip(menuLevel),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Simplified menu methods (just the essential ones for fullscreen)
+  List<Widget> _buildMainMenuButtons() {
+    List<Widget> buttons = [
+      // Drawing button
+      Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        child: _buildClayButton(
+          icon: const Icon(Icons.edit),
+          onPressed: () {
+            _currentMenuLevel.value = 'drawing';
+            widget.controller.setMode(PaintMode.freeStyle);
+          },
+          tooltip: 'Drawing Tools',
+        ),
+      ),
+      // Labels button
+      Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        child: _buildClayButton(
+          icon: const Icon(Icons.label),
+          onPressed: () {
+            _currentMenuLevel.value = 'label_types';
+          },
+          tooltip: 'Labels',
+        ),
+      ),
+    ];
+    
+    // Add custom menu buttons
+    if (widget.customMenuButtons != null) {
+      for (int i = 0; i < widget.customMenuButtons!.length; i++) {
+        final customButton = widget.customMenuButtons![i];
+        buttons.add(
+          Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            child: _buildClayButton(
+              icon: Icon(customButton.icon),
+              onPressed: () {
+                _currentMenuLevel.value = 'custom_$i';
+              },
+              tooltip: customButton.tooltip,
+            ),
+          ),
+        );
+      }
+    }
+    
+    return buttons;
+  }
+
+  List<Widget> _buildCustomButtonSubMenu(String menuLevel) {
+    final index = int.parse(menuLevel.replaceFirst('custom_', ''));
+    if (widget.customMenuButtons == null || index >= widget.customMenuButtons!.length) {
+      return [];
+    }
+
+    final customButton = widget.customMenuButtons![index];
+    return customButton.subButtons.map((subButton) => 
+      Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        child: _buildClayButton(
+          icon: Icon(subButton.icon),
+          onPressed: subButton.onPressed,
+          tooltip: subButton.tooltip,
+        ),
+      ),
+    ).toList();
+  }
+
+  List<Widget> _buildDrawingControlButtons() {
+    return [
+      // Free style drawing button
+      Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        child: _buildClayButton(
+          icon: const Icon(Icons.brush),
+          onPressed: () => widget.controller.setMode(PaintMode.freeStyle),
+          tooltip: 'Free Draw',
+        ),
+      ),
+      // Line drawing button
+      Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        child: _buildClayButton(
+          icon: const Icon(Icons.remove),
+          onPressed: () => widget.controller.setMode(PaintMode.line),
+          tooltip: 'Draw Line',
+        ),
+      ),
+      // Rectangle button
+      Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        child: _buildClayButton(
+          icon: const Icon(Icons.crop_square),
+          onPressed: () => widget.controller.setMode(PaintMode.rect),
+          tooltip: 'Rectangle',
+        ),
+      ),
+      // Circle button
+      Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        child: _buildClayButton(
+          icon: const Icon(Icons.radio_button_unchecked),
+          onPressed: () => widget.controller.setMode(PaintMode.circle),
+          tooltip: 'Circle',
+        ),
+      ),
+      // Color picker
+      if (widget.colors != null && widget.colors!.isNotEmpty)
+        Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          child: _buildColorPicker(),
+        ),
+      // Undo button
+      Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        child: _buildClayButton(
+          icon: const Icon(Icons.undo),
+          onPressed: () {
+            try {
+              widget.controller.undo();
+            } on Exception catch (e) {
+              debugPrint('Error undoing: $e');
+            }
+          },
+          tooltip: 'Undo',
+        ),
+      ),
+      // Clear all button
+      Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        child: _buildClayButton(
+          icon: const Icon(Icons.clear),
+          onPressed: () {
+            try {
+              widget.controller.clear();
+            } on Exception catch (e) {
+              debugPrint('Error clearing canvas: $e');
+            }
+          },
+          tooltip: 'Clear All',
+        ),
+      ),
+    ];
+  }
+
+  Widget _buildColorPicker() {
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: widget.controller.color,
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 2),
+      ),
+      child: PopupMenuButton<Color>(
+        onSelected: (color) => widget.controller.setColor(color),
+        itemBuilder: (context) => widget.colors!.map((color) {
+          return PopupMenuItem<Color>(
+            value: color,
+            child: Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                color: color,
+                shape: BoxShape.circle,
+              ),
+            ),
+          );
+        }).toList(),
+        child: const Icon(Icons.palette, color: Colors.transparent),
+      ),
+    );
+  }
+
+  List<Widget> _buildLabelTypeButtons() {
+    return [
+      // Extension Labels button
+      Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        child: _buildClayButton(
+          icon: const Icon(Icons.numbers),
+          onPressed: () {
+            _currentMenuLevel.value = 'extension_labels';
+            widget.controller.setLabelMode(true);
+          },
+          tooltip: 'Extension Labels',
+        ),
+      ),
+      // Roman Numeral Labels button
+      Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        child: _buildClayButton(
+          icon: const Icon(Icons.format_list_numbered_rtl),
+          onPressed: () {
+            _currentMenuLevel.value = 'roman_labels';
+            widget.controller.setLabelMode(true);
+          },
+          tooltip: 'Roman Numerals',
+        ),
+      ),
+    ];
+  }
+
+  List<Widget> _buildLabelControlButtons() {
+    return [
+      Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        child: _buildClayButton(
+          icon: const Icon(Icons.add_circle),
+          onPressed: () {
+            try {
+              // Add extension label at center of screen
+              final screenCenter = Offset(
+                MediaQuery.of(context).size.width / 2,
+                MediaQuery.of(context).size.height / 2,
+              );
+              final imageCenter = _convertToImageCoordinates(screenCenter);
+              
+              widget.controller.addExtensionLabel(imageCenter);
+            } on Exception catch (e) {
+              debugPrint('Error adding extension label: $e');
+            }
+          },
+          tooltip: 'Add Extension Label',
+        ),
+      ),
+    ];
+  }
+
+  List<Widget> _buildRomanNumeralControlButtons() {
+    return [
+      Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        child: _buildClayButton(
+          icon: const Icon(Icons.add_circle),
+          onPressed: () {
+            try {
+              // Add roman numeral label at center of screen
+              final screenCenter = Offset(
+                MediaQuery.of(context).size.width / 2,
+                MediaQuery.of(context).size.height / 2,
+              );
+              final imageCenter = _convertToImageCoordinates(screenCenter);
+              
+              widget.controller.addRomanNumeralLabel(imageCenter);
+            } on Exception catch (e) {
+              debugPrint('Error adding roman numeral label: $e');
+            }
+          },
+          tooltip: 'Add Roman Numeral',
+        ),
+      ),
+    ];
+  }
+
+  IconData _getMainButtonIcon(String menuLevel) {
+    if (menuLevel.startsWith('custom_')) {
+      return Icons.arrow_back;
+    }
+    switch (menuLevel) {
+      case 'main':
+        return Icons.close;
+      case 'drawing':
+      case 'label_types':
+      case 'extension_labels':
+      case 'roman_labels':
+        return Icons.arrow_back;
+      case 'closed':
+      default:
+        return Icons.add;
+    }
+  }
+
+  String _getMainButtonTooltip(String menuLevel) {
+    if (menuLevel.startsWith('custom_')) {
+      return 'Back to Main Menu';
+    }
+    switch (menuLevel) {
+      case 'main':
+        return 'Close Menu';
+      case 'drawing':
+      case 'label_types':
+      case 'extension_labels':
+      case 'roman_labels':
+        return 'Back to Main Menu';
+      case 'closed':
+      default:
+        return 'Open Menu';
+    }
+  }
+
+  void _handleMainButtonPress(String menuLevel) {
+    if (menuLevel.startsWith('custom_')) {
+      _currentMenuLevel.value = 'main';
+      return;
+    }
+    
+    switch (menuLevel) {
+      case 'closed':
+        _currentMenuLevel.value = 'main';
+        break;
+      case 'main':
+        _currentMenuLevel.value = 'closed';
+        break;
+      case 'drawing':
+        _currentMenuLevel.value = 'main';
+        widget.controller.setMode(PaintMode.none);
+        break;
+      case 'label_types':
+      case 'extension_labels':
+      case 'roman_labels':
+        if (menuLevel == 'label_types') {
+          _currentMenuLevel.value = 'main';
+        } else {
+          _currentMenuLevel.value = 'label_types';
+          widget.controller.setLabelMode(false);
+        }
+        break;
+    }
+  }
+
+  // Gesture handlers - improved versions with controller safety
+  void _scaleStartGesture(ScaleStartDetails onStart) {
+    if (!mounted) return;
+    
+    setState(() {
+      _currentPointerCount = onStart.pointerCount;
+    });
+
+    // Handle different interaction modes
+    if (onStart.pointerCount > 1) {
+      return; // Multi-touch - let InteractiveViewer handle zoom/pan
+    }
+
+    try {
+      // Additional safety check for controller
+      if (widget.controller.runtimeType.toString().contains('_Disposed')) {
+        debugPrint('Controller is disposed, ignoring gesture');
+        return;
+      }
+
+      final _zoomAdjustedOffset = _transformationController.toScene(onStart.localFocalPoint);
+      final _imageOffset = _convertToImageCoordinates(_zoomAdjustedOffset);
+
+      if (_currentMenuLevel.value == 'drawing') {
+        // Drawing mode
+        widget.controller.setStart(_imageOffset);
+        if (widget.controller.mode == PaintMode.freeStyle) {
+          widget.controller.addOffsets(_imageOffset);
+        }
+      } else if (_currentMenuLevel.value == 'extension_labels') {
+        // Extension label mode - add label on tap
+        widget.controller.addExtensionLabel(_imageOffset);
+      } else if (_currentMenuLevel.value == 'roman_labels') {
+        // Roman numeral mode - add label on tap
+        widget.controller.addRomanNumeralLabel(_imageOffset);
+      }
+    } on Exception catch (e) {
+      debugPrint('Error in _scaleStartGesture: $e');
+      // If there's a controller issue, try to reset the mode
+      try {
+        widget.controller.setMode(PaintMode.freeStyle);
+      } on Exception catch (resetError) {
+        debugPrint('Error resetting controller mode: $resetError');
+      }
+    }
+  }
+
+  void _scaleUpdateGesture(ScaleUpdateDetails onUpdate) {
+    if (!mounted || _currentPointerCount > 1 || _currentMenuLevel.value != 'drawing') {
+      return;
+    }
+
+    try {
+      // Additional safety check for controller
+      if (widget.controller.runtimeType.toString().contains('_Disposed')) {
+        debugPrint('Controller is disposed, ignoring update gesture');
+        return;
+      }
+
+      final _zoomAdjustedOffset = _transformationController.toScene(onUpdate.localFocalPoint);
+      final _imageOffset = _convertToImageCoordinates(_zoomAdjustedOffset);
+
+      widget.controller.setInProgress(true);
+      if (widget.controller.start == null) {
+        widget.controller.setStart(_imageOffset);
+      }
+      widget.controller.setEnd(_imageOffset);
+      if (widget.controller.mode == PaintMode.freeStyle) {
+        widget.controller.addOffsets(_imageOffset);
+      }
+    } on Exception catch (e) {
+      debugPrint('Error in _scaleUpdateGesture: $e');
+    }
+  }
+
+  void _scaleEndGesture(ScaleEndDetails onEnd) {
+    if (!mounted) return;
+    
+    setState(() {
+      _currentPointerCount = 0;
+    });
+
+    try {
+      // Additional safety check for controller
+      if (widget.controller.runtimeType.toString().contains('_Disposed')) {
+        debugPrint('Controller is disposed, ignoring end gesture');
+        return;
+      }
+
+      widget.controller.setInProgress(false);
+      if (widget.controller.start != null &&
+          widget.controller.end != null) {
+        if (widget.controller.mode == PaintMode.freeStyle) {
+          widget.controller.addOffsets(null);
+          _addFreeStylePoints();
+          widget.controller.offsets.clear();
+        } else {
+          // For other modes (line, rect, circle), add the shape
+          _addShapePoints();
+        }
+      }
+      widget.controller.resetStartAndEnd();
+    } on Exception catch (e) {
+      debugPrint('Error in _scaleEndGesture: $e');
+    }
+  }
+
+  void _addFreeStylePoints() {
+    try {
+      final paintInfo = PaintInfo(
+        offsets: <Offset?>[...widget.controller.offsets],
+        mode: PaintMode.freeStyle,
+        color: widget.controller.color,
+        strokeWidth: widget.controller.scaledStrokeWidth,
+      );
+      widget.controller.addPaintInfo(paintInfo);
+    } on Exception catch (e) {
+      debugPrint('Error in _addFreeStylePoints: $e');
+    }
+  }
+
+  void _addShapePoints() {
+    try {
+      final paintInfo = PaintInfo(
+        offsets: <Offset?>[widget.controller.start, widget.controller.end],
+        mode: widget.controller.mode,
+        color: widget.controller.color,
+        strokeWidth: widget.controller.scaledStrokeWidth,
+      );
+      widget.controller.addPaintInfo(paintInfo);
+    } on Exception catch (e) {
+      debugPrint('Error in _addShapePoints: $e');
+    }
+  }
+
+  Offset _convertToImageCoordinates(Offset widgetOffset) {
+    // Get the render box of the custom paint widget to calculate proper coordinates
+    final screenSize = MediaQuery.of(context).size;
+    final imageAspectRatio = imageSize.width / imageSize.height;
+    final screenAspectRatio = screenSize.width / screenSize.height;
+    
+    double renderWidth, renderHeight, offsetX, offsetY;
+    
+    if (screenAspectRatio > imageAspectRatio) {
+      // Screen is wider than image - image fills height, centered horizontally
+      renderHeight = screenSize.height;
+      renderWidth = renderHeight * imageAspectRatio;
+      offsetX = (screenSize.width - renderWidth) / 2;
+      offsetY = 0;
+    } else {
+      // Screen is taller than image - image fills width, centered vertically
+      renderWidth = screenSize.width;
+      renderHeight = renderWidth / imageAspectRatio;
+      offsetX = 0;
+      offsetY = (screenSize.height - renderHeight) / 2;
+    }
+    
+    // Convert widget coordinates to image coordinates
+    final relativeX = (widgetOffset.dx - offsetX) / renderWidth;
+    final relativeY = (widgetOffset.dy - offsetY) / renderHeight;
+    
+    return Offset(
+      relativeX * imageSize.width,
+      relativeY * imageSize.height,
+    );
   }
 }

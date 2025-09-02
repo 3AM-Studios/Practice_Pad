@@ -1,7 +1,8 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart' hide Image;
-import 'package:flutter/rendering.dart';
+
+import 'package:google_fonts/google_fonts.dart';
 
 import 'controller.dart';
 
@@ -9,6 +10,9 @@ import 'controller.dart';
 class DrawImage extends CustomPainter {
   ///The background for signature painting.
   final Color? backgroundColor;
+  
+  ///Scale factor for labels (for fullscreen mode scaling)
+  final double labelScaleFactor;
 
   //Controller is a listenable with all of the paint details.
   late ImagePainterController _controller;
@@ -17,6 +21,7 @@ class DrawImage extends CustomPainter {
   DrawImage({
     required ImagePainterController controller,
     this.backgroundColor,
+    this.labelScaleFactor = 1.0,
   }) : super(repaint: controller) {
     _controller = controller;
   }
@@ -177,79 +182,56 @@ class DrawImage extends CustomPainter {
 
   ///Draws any label on the canvas.
   void _drawLabel(Canvas canvas, Label label) {
-    final size = label.size;
-    
-    // Create rectangle centered on label position with extra width for roman numerals
-    final width = label is RomanNumeralLabel ? size * 1.4 : size;
-    final labelRect = Rect.fromCenter(
-      center: label.position,
-      width: width,
-      height: size,
-    );
-    
-    // Draw shadow first (behind the square)
-    if (!label.isSelected) {
-      final shadowRect = Rect.fromCenter(
-        center: Offset(label.position.dx + 2, label.position.dy + 2),
-        width: size,
-        height: size,
-      );
-      final shadowPaint = Paint()
-        ..color = const Color(0xFF000000).withOpacity(0.2)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0);
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(shadowRect, const Radius.circular(4.0)),
-        shadowPaint,
-      );
-    }
-    
-    // Draw label background square
-    final backgroundPaint = Paint()
-      ..color = label.color.withOpacity(label.color.opacity == 0 ? 0.0 : 0.9) // Use label color always, respect transparency
-      ..style = PaintingStyle.fill;
-    
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(labelRect, const Radius.circular(4.0)),
-      backgroundPaint,
-    );
-    
-    // Draw label border
-    final borderWidth = label.isSelected ? (size * 0.08).clamp(0.3, 2.0) : (size * 0.06).clamp(0.3, 1.5);
-    final borderPaint = Paint()
-      ..color = label.isSelected 
-          ? const Color(0xFF000000) // Black border when selected for visibility
-          : (label.color.opacity == 0 
-              ? const Color(0xFF757575) // Grey border for transparent labels
-              : label.color) // Use label color border when not selected
-      ..strokeWidth = borderWidth
-      ..style = PaintingStyle.stroke;
-    
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(labelRect, const Radius.circular(4.0)),
-      borderPaint,
-    );
-    
-    // Draw label text with superscript support for roman numerals
-    final isTransparent = label.color.opacity == 0;
-    final textColor = label.isSelected 
-        ? const Color(0xFFFFFFFF) // White text when selected
-        : (isTransparent 
-            ? const Color(0xFF212121) // Dark text for transparent labels
-            : const Color(0xFFFFFFFF)); // White text for colored labels
-    
-    final fontSize = (size * 0.45).clamp(2.0, 16.0); // Scale font with label size, smaller overall
+    // Use larger base font size and scale appropriately
+    final fontSize = (label.size * labelScaleFactor * 0.8);
     
     // Check if this is a roman numeral that needs superscript formatting
     if (label is RomanNumeralLabel) {
-      _drawRomanNumeralWithSuperscript(canvas, label, textColor, fontSize, size);
+      // For roman numerals, draw selection background if selected
+      if (label.isSelected) {
+        final textSpan = TextSpan(
+          text: label.displayValue,
+          style: GoogleFonts.sourceSerif4(
+            color: Colors.white,
+            fontSize: fontSize,
+            fontWeight: FontWeight.bold,
+          ),
+        );
+        final tempPainter = TextPainter(
+          text: textSpan,
+          textAlign: TextAlign.center,
+          textDirection: TextDirection.ltr,
+        );
+        tempPainter.layout();
+        
+        final selectionPadding = 6.0 * labelScaleFactor;
+        final selectionRect = Rect.fromCenter(
+          center: label.position,
+          width: tempPainter.width + selectionPadding * 2,
+          height: tempPainter.height + selectionPadding * 2,
+        );
+        
+        final selectionPaint = Paint()
+          ..color = label.color.withOpacity(0.8)
+          ..style = PaintingStyle.fill;
+        
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(selectionRect, const Radius.circular(4.0)),
+          selectionPaint,
+        );
+      }
+      
+      final textColor = label.isSelected ? Colors.white : label.color;
+      _drawRomanNumeralWithSuperscript(canvas, label, textColor, fontSize, label.size * labelScaleFactor);
     } else {
-      // Regular text rendering for extension labels
+      // Extension labels - draw with background box
+      final textColor = label.isSelected ? Colors.white : label.color;
       final textSpan = TextSpan(
         text: label.displayValue,
         style: TextStyle(
           color: textColor,
           fontSize: fontSize,
-          fontWeight: FontWeight.bold,
+          fontWeight: FontWeight.w900, // Extra bold for visibility
         ),
       );
       
@@ -259,7 +241,35 @@ class DrawImage extends CustomPainter {
         textDirection: TextDirection.ltr,
       );
       
-      textPainter.layout(minWidth: 1, maxWidth: size);
+      textPainter.layout(minWidth: 0, maxWidth: double.infinity);
+      
+      // Draw background box for extension labels - padding scales with font size
+      final boxPadding = (fontSize * 0.15).clamp(2.0, 6.0);
+      final boxRect = Rect.fromCenter(
+        center: label.position,
+        width: textPainter.width + boxPadding * 2,
+        height: textPainter.height + boxPadding * 2,
+      );
+      
+      final boxPaint = Paint()
+        ..color = label.isSelected 
+            ? label.color.withOpacity(0.8) // Colored background when selected
+            : Colors.white.withOpacity(0.9) // White background when not selected
+        ..style = PaintingStyle.fill;
+      
+      final borderPaint = Paint()
+        ..color = label.color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.0;
+      
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(boxRect, const Radius.circular(4.0)),
+        boxPaint,
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(boxRect, const Radius.circular(4.0)),
+        borderPaint,
+      );
       
       final textOffset = Offset(
         label.position.dx - textPainter.width / 2,
@@ -291,21 +301,21 @@ class DrawImage extends CustomPainter {
       quality = '';
     }
     
-    // Create text painters
+    // Create text painters with serif font
     final baseTextPainter = TextPainter(
       text: TextSpan(
         text: baseNumeral,
-        style: TextStyle(
-          color: textColor,
-          fontSize: fontSize,
-          fontWeight: FontWeight.bold,
+        style: GoogleFonts.sourceSerif4(
+          color: textColor, 
+          fontWeight: FontWeight.w600, 
+          fontSize: fontSize
         ),
       ),
       textAlign: TextAlign.center,
       textDirection: TextDirection.ltr,
     );
     
-    baseTextPainter.layout(minWidth: 0, maxWidth: labelSize);
+    baseTextPainter.layout(minWidth: 0, maxWidth: double.infinity);
     
     if (quality.isEmpty) {
       // No quality, just draw the base
@@ -316,21 +326,21 @@ class DrawImage extends CustomPainter {
       baseTextPainter.paint(canvas, textOffset);
     } else {
       // Draw base and superscript quality
-      final superscriptFontSize = fontSize * 0.65;
+      final superscriptFontSize = fontSize * 0.5; // Made smaller
       final qualityTextPainter = TextPainter(
         text: TextSpan(
           text: quality,
-          style: TextStyle(
-            color: textColor,
-            fontSize: superscriptFontSize,
-            fontWeight: FontWeight.bold,
+          style: GoogleFonts.sourceSerif4(
+            color: textColor, 
+            fontWeight: FontWeight.w600, 
+            fontSize: superscriptFontSize
           ),
         ),
         textAlign: TextAlign.center,
         textDirection: TextDirection.ltr,
       );
       
-      qualityTextPainter.layout(minWidth: 0, maxWidth: labelSize);
+      qualityTextPainter.layout(minWidth: 0, maxWidth: double.infinity);
       
       // Calculate total width and positioning
       final totalWidth = baseTextPainter.width + qualityTextPainter.width;
@@ -343,7 +353,7 @@ class DrawImage extends CustomPainter {
       );
       baseTextPainter.paint(canvas, baseOffset);
       
-      // Draw superscript quality (offset up and to the right)
+      // Draw superscript quality (offset up and to the right) - made higher
       final qualityOffset = Offset(
         startX + baseTextPainter.width,
         label.position.dy - baseTextPainter.height / 2 - superscriptFontSize * 0.3,

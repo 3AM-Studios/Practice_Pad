@@ -68,6 +68,30 @@ class _RomanNumeralLabelControlsState extends State<RomanNumeralLabelControls> {
         crossAxisAlignment: CrossAxisAlignment.center,
         mainAxisSize: MainAxisSize.min,
         children: [
+        // Delete button section (appears when roman numeral is selected)
+        Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          child: Center(
+            child: AnimatedBuilder(
+              animation: widget.controller,
+              builder: (_, __) {
+                if (widget.controller.selectedLabel != null && 
+                    widget.controller.selectedLabel is RomanNumeralLabel) {
+                  return _buildClayButton(
+                    icon: const Icon(Icons.delete, color: Colors.red, size: 20),
+                    onPressed: () {
+                      widget.controller.deleteSelectedLabel();
+                    },
+                    tooltip: 'Delete Roman Numeral',
+                  );
+                } else {
+                  return const SizedBox.shrink();
+                }
+              },
+            ),
+          ),
+        ),
+        
         // Color and size controls (centered with input)
         Container(
           margin: const EdgeInsets.only(bottom: 16),
@@ -206,21 +230,6 @@ class _RomanNumeralLabelControlsState extends State<RomanNumeralLabelControls> {
                   String newChord = _applyQuality(baseNumeral, 'o', hasSeventh: _seventhToggled);
                   widget.controller.setCurrentChordText(newChord);
                 }),
-                const SizedBox(width: 12),
-                // Delete button
-                AnimatedBuilder(
-                  animation: widget.controller,
-                  builder: (_, __) {
-                    if (widget.controller.selectedLabel != null && widget.controller.selectedLabel is RomanNumeralLabel) {
-                      return _buildClayButton(
-                        icon: const Icon(Icons.delete, color: Colors.red, size: 18),
-                        onPressed: () => widget.controller.deleteSelectedLabel(),
-                        tooltip: 'Delete Label',
-                      );
-                    }
-                    return const SizedBox.shrink();
-                  },
-                ),
               ],
             ),
           ),
@@ -274,7 +283,7 @@ class _RomanNumeralLabelControlsState extends State<RomanNumeralLabelControls> {
         child: Text(
           accidental,
           style: const TextStyle(
-            fontSize: 14,
+            fontSize: 25,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -294,7 +303,7 @@ class _RomanNumeralLabelControlsState extends State<RomanNumeralLabelControls> {
         child: Text(
           label,
           style: const TextStyle(
-            fontSize: 9,
+            fontSize: 12,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -315,7 +324,7 @@ class _RomanNumeralLabelControlsState extends State<RomanNumeralLabelControls> {
         child: Text(
           label,
           style: const TextStyle(
-            fontSize: 9, // Reduced font size
+            fontSize: 12,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -348,7 +357,7 @@ class _RomanNumeralLabelControlsState extends State<RomanNumeralLabelControls> {
             child: Text(
               numeral,
               style: const TextStyle(
-                fontSize: 9, // Reduced font size
+                fontSize: 12,
                 fontWeight: FontWeight.bold,
               ),
             ),

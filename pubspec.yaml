@@ -73,6 +73,7 @@ dependencies:
     path: packages/image_painter
   youtube_player_flutter:
     path: packages/youtube_player_flutter
+  google_fonts: ^6.3.0
 
 dev_dependencies:
   flutter_test:
@@ -98,6 +99,8 @@ flutter:
   assets:
     - assets/songs/
     - assets/images/
+
+        # You can also add other weights like bold if you 
   # To add assets to your application, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg

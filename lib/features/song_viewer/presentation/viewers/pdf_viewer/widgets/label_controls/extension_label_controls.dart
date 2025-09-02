@@ -25,35 +25,33 @@ class _ExtensionLabelControlsState extends State<ExtensionLabelControls> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-        // TOP SECTION: Colors, Size and Delete button
+        // TOP SECTION: Delete button above everything
+        Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          child: Center(
+            child: AnimatedBuilder(
+              animation: widget.controller,
+              builder: (_, __) {
+                if (widget.controller.selectedLabel != null) {
+                  return _buildClayButton(
+                    icon: const Icon(Icons.delete, color: Colors.red, size: 20),
+                    onPressed: () {
+                      widget.controller.deleteSelectedLabel();
+                    },
+                    tooltip: 'Delete Label',
+                  );
+                } else {
+                  return const SizedBox.shrink();
+                }
+              },
+            ),
+          ),
+        ),
+        
+        // SECOND SECTION: Colors and Size controls
         Container(
           margin: const EdgeInsets.only(bottom: 16),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              // Base controls (color and size)
-              Expanded(
-                child: BaseControls(controller: widget.controller),
-              ),
-              // Delete button (if label selected)
-              AnimatedBuilder(
-                animation: widget.controller,
-                builder: (_, __) {
-                  if (widget.controller.selectedLabel != null) {
-                    return _buildClayButton(
-                      icon: const Icon(Icons.delete, color: Colors.red, size: 20),
-                      onPressed: () {
-                        widget.controller.deleteSelectedLabel();
-                      },
-                      tooltip: 'Delete Label',
-                    );
-                  } else {
-                    return const SizedBox(width: 40); // Placeholder to maintain layout
-                  }
-                },
-              ),
-            ],
-          ),
+          child: BaseControls(controller: widget.controller),
         ),
         
         // Accidental buttons row (♮, b, #)
@@ -77,9 +75,9 @@ class _ExtensionLabelControlsState extends State<ExtensionLabelControls> {
               // Numbers 1-9 in 3x3 grid
               for (int row = 0; row < 3; row++)
                 Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  padding: const EdgeInsets.symmetric(vertical: 1),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
                       for (int col = 0; col < 3; col++)
                         _buildNumberButton('${row * 3 + col + 1}'),
@@ -107,7 +105,7 @@ class _ExtensionLabelControlsState extends State<ExtensionLabelControls> {
             icon: Text(
               accidental,
               style: TextStyle(
-                fontSize: 16,
+                fontSize: 20,
                 fontWeight: FontWeight.bold,
                 color: isSelected 
                     ? Colors.blue
@@ -132,7 +130,7 @@ class _ExtensionLabelControlsState extends State<ExtensionLabelControls> {
         return Container(
           width: 40,
           height: 40,
-          margin: const EdgeInsets.all(2),
+          margin: const EdgeInsets.all(1),
           child: _buildClayButton(
             icon: Text(
               number,
