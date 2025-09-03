@@ -727,7 +727,7 @@ class ImagePainterState extends State<ImagePainter> with CoordinateTransformatio
                         maxScale: 5.0,
                         minScale: 0.8,
                         panEnabled: (_currentMenuLevel.value == 'closed' || _currentMenuLevel.value == 'main' || _currentPointerCount > 1) && !_isDraggingLabel,
-                        scaleEnabled: widget.isScalable!,
+                        scaleEnabled: true,
                         boundaryMargin: const EdgeInsets.all(20),
                         onInteractionStart: _scaleStartGesture,
                         onInteractionUpdate: _scaleUpdateGesture,
@@ -846,11 +846,12 @@ class ImagePainterState extends State<ImagePainter> with CoordinateTransformatio
         // Check if tapping on existing extension label first
         ExtensionLabel? tappedLabel;
         for (final label in _controller.extensionLabels) {
-          // Use reasonable touch area for label interaction
+          // Use reasonable touch area for label interaction (in relative coordinates)
+          // 0.05 = ~5% of image width/height, reasonable for touch interaction
           final labelBounds = Rect.fromCenter(
             center: label.position,
-            width: 40.0, // Fixed reasonable size
-            height: 40.0,
+            width: 0.05, // Relative coordinate touch area
+            height: 0.05,
           );
           if (labelBounds.contains(_imageOffset)) {
             tappedLabel = label;
@@ -870,11 +871,12 @@ class ImagePainterState extends State<ImagePainter> with CoordinateTransformatio
         // Handle Roman numeral label tapping/creation
         RomanNumeralLabel? tappedLabel;
         for (final label in _controller.romanNumeralLabels) {
-          // Use reasonable touch area for label interaction
+          // Use reasonable touch area for label interaction (in relative coordinates)
+          // 0.05 = ~5% of image width/height, reasonable for touch interaction
           final labelBounds = Rect.fromCenter(
             center: label.position,
-            width: 40.0, // Fixed reasonable size
-            height: 40.0,
+            width: 0.05, // Relative coordinate touch area
+            height: 0.05,
           );
           if (labelBounds.contains(_imageOffset)) {
             tappedLabel = label;
@@ -895,8 +897,8 @@ class ImagePainterState extends State<ImagePainter> with CoordinateTransformatio
         for (final label in _controller.labels) {
           final labelBounds = Rect.fromCenter(
             center: label.position,
-            width: 40.0,
-            height: 40.0,
+            width: 0.05, // Relative coordinate touch area
+            height: 0.05,
           );
           if (labelBounds.contains(_imageOffset)) {
             return; // Don't start drawing if tapping on a label
@@ -924,7 +926,8 @@ class ImagePainterState extends State<ImagePainter> with CoordinateTransformatio
       if (!_isDraggingLabel) {
         final startOffset = _draggedLabel!.position;
         final distance = (_imageOffset - startOffset).distance;
-        if (distance > 5.0) { // Threshold to distinguish tap from drag
+        // Use relative coordinate threshold (0.01 = ~1% of image size)
+        if (distance > 0.01) { // Threshold to distinguish tap from drag in relative coordinates
           setState(() {
             _isDraggingLabel = true;
           });
@@ -941,8 +944,8 @@ class ImagePainterState extends State<ImagePainter> with CoordinateTransformatio
       for (final label in _controller.labels) {
         final labelBounds = Rect.fromCenter(
           center: label.position,
-          width: 40.0,
-          height: 40.0,
+          width: 0.05, // Relative coordinate touch area
+          height: 0.05,
         );
         if (labelBounds.contains(_imageOffset)) {
           isDraggingOnLabel = true;

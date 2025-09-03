@@ -56,6 +56,15 @@ class _RomanNumeralLabelControlsState extends State<RomanNumeralLabelControls> {
     setState(() {
       _seventhToggled = chord.contains('7');
       _currentQuality = _getCurrentQuality(chord);
+      
+      // Parse accidental from current chord
+      if (chord.startsWith('♯')) {
+        _selectedAccidental = '♯';
+      } else if (chord.startsWith('♭')) {
+        _selectedAccidental = '♭';
+      } else {
+        _selectedAccidental = '♮'; // Default to natural
+      }
     });
   }
 
@@ -276,6 +285,20 @@ class _RomanNumeralLabelControlsState extends State<RomanNumeralLabelControls> {
           setState(() {
             _selectedAccidental = accidental;
           });
+          
+          // If there's a current chord, update it with the new accidental
+          final currentChord = widget.controller.currentChordText;
+          if (currentChord.isNotEmpty) {
+            // Remove any existing accidental from the beginning
+            String chordWithoutAccidental = currentChord;
+            if (currentChord.startsWith('♯') || currentChord.startsWith('♭') || currentChord.startsWith('♮')) {
+              chordWithoutAccidental = currentChord.substring(1);
+            }
+            
+            // Apply the new accidental
+            String newChord = accidental == '♮' ? chordWithoutAccidental : '$accidental$chordWithoutAccidental';
+            widget.controller.setCurrentChordText(newChord);
+          }
         },
         backgroundColor: isSelected ? Colors.blue[200] : Colors.grey[200],
         foregroundColor: isSelected ? Colors.blue[800] : Colors.grey[700],
@@ -336,7 +359,10 @@ class _RomanNumeralLabelControlsState extends State<RomanNumeralLabelControls> {
     return AnimatedBuilder(
       animation: widget.controller,
       builder: (_, __) {
-        final isCurrentBase = _getBaseNumeral(widget.controller.currentChordText).toUpperCase() == numeral;
+        final currentBase = _getBaseNumeral(widget.controller.currentChordText);
+        // Compare with accidental included - create expected full base for comparison
+        final expectedBase = _selectedAccidental == '♮' ? numeral : '$_selectedAccidental$numeral';
+        final isCurrentBase = currentBase == expectedBase;
         
         return SizedBox(
           width: 40,
@@ -402,14 +428,23 @@ class _RomanNumeralLabelControlsState extends State<RomanNumeralLabelControls> {
     text = text.replaceAll(RegExp(r'min', caseSensitive: false), ''); // Remove min
     text = text.replaceAll(RegExp(r'dom', caseSensitive: false), ''); // Remove dom
     
-    // Remove any accidentals at the start
-    text = text.replaceAll('♯', '');
-    text = text.replaceAll('♭', '');
-    text = text.replaceAll('♮', '');
+    // DON'T remove accidentals - preserve them for proper button highlighting
+    // The accidentals should be part of the base numeral for comparison
     
-    // Convert to uppercase to get base roman numeral
-    String base = text.toUpperCase().trim();
-    return base.isNotEmpty ? base : 'I';
+    // Convert roman numeral part to uppercase while preserving accidentals
+    String base = text.trim();
+    if (base.isEmpty) return 'I';
+    
+    // Extract accidental and roman numeral parts
+    String accidental = '';
+    String numeral = base;
+    
+    if (base.startsWith('♯') || base.startsWith('♭') || base.startsWith('♮')) {
+      accidental = base.substring(0, 1);
+      numeral = base.substring(1);
+    }
+    
+    return accidental + numeral.toUpperCase();
   }
 
   String _applyQuality(String base, String quality, {bool hasSeventh = false}) {

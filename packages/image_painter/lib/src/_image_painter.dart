@@ -66,6 +66,12 @@ class DrawImage extends CustomPainter {
     for (final item in _controller.paintHistory) {
       final _offset = item.offsets;
       final _painter = item.paint;
+      // Apply unified scaling to stroke width
+      // Assume stored strokeWidth is relative to a 1000px baseline image
+      if (coordinateTransformer != null) {
+        final relativeStrokeWidth = item.strokeWidth / 1000.0; // Convert stored value to relative
+        _painter.strokeWidth = coordinateTransformer!.scaleStroke(relativeStrokeWidth);
+      }
       switch (item.mode) {
         case PaintMode.rect:
           canvas.drawRect(Rect.fromPoints(_relativeToScreen(_offset[0]!), _relativeToScreen(_offset[1]!)), _painter);
@@ -144,38 +150,50 @@ class DrawImage extends CustomPainter {
       final _start = _controller.start;
       final _end = _controller.end;
       final _paint = _controller.brush;
+      // Apply unified scaling to live drawing stroke width  
+      // Assume current strokeWidth is relative to a 1000px baseline image
+      if (coordinateTransformer != null) {
+        final relativeStrokeWidth = _controller.strokeWidth / 1000.0; // Convert current value to relative
+        _paint.strokeWidth = coordinateTransformer!.scaleStroke(relativeStrokeWidth);
+      }
       switch (_controller.mode) {
         case PaintMode.rect:
-          canvas.drawRect(Rect.fromPoints(_start!, _end!), _paint);
+          canvas.drawRect(Rect.fromPoints(_relativeToScreen(_start!), _relativeToScreen(_end!)), _paint);
           break;
         case PaintMode.line:
-          canvas.drawLine(_start!, _end!, _paint);
+          canvas.drawLine(_relativeToScreen(_start!), _relativeToScreen(_end!), _paint);
           break;
         case PaintMode.circle:
+          final screenCenter = _relativeToScreen(_end!);
+          final screenStart = _relativeToScreen(_start!);
           final path = Path();
           path.addOval(Rect.fromCircle(
-              center: _end!, radius: (_end! - _start!).distance));
+              center: screenCenter, radius: (screenStart - screenCenter).distance));
           canvas.drawPath(path, _paint);
           break;
         case PaintMode.arrow:
-          drawArrow(canvas, _start!, _end!, _paint);
+          drawArrow(canvas, _relativeToScreen(_start!), _relativeToScreen(_end!), _paint);
           break;
         case PaintMode.dashLine:
+          final screenStart = _relativeToScreen(_start!);
+          final screenEnd = _relativeToScreen(_end!);
           final path = Path()
-            ..moveTo(_start!.dx, _start!.dy)
-            ..lineTo(_end!.dx, _end!.dy);
+            ..moveTo(screenStart.dx, screenStart.dy)
+            ..lineTo(screenEnd.dx, screenEnd.dy);
           canvas.drawPath(_dashPath(path, _paint.strokeWidth), _paint);
           break;
         case PaintMode.freeStyle:
           final points = _controller.offsets;
           for (int i = 0; i < _controller.offsets.length - 1; i++) {
             if (points[i] != null && points[i + 1] != null) {
+              final screenStart = _relativeToScreen(points[i]!);
+              final screenEnd = _relativeToScreen(points[i + 1]!);
               final _path = Path()
-                ..moveTo(points[i]!.dx, points[i]!.dy)
-                ..lineTo(points[i + 1]!.dx, points[i + 1]!.dy);
+                ..moveTo(screenStart.dx, screenStart.dy)
+                ..lineTo(screenEnd.dx, screenEnd.dy);
               canvas.drawPath(_path, _paint..strokeCap = StrokeCap.round);
             } else if (points[i] != null && points[i + 1] == null) {
-              canvas.drawPoints(PointMode.points, [points[i]!],
+              canvas.drawPoints(PointMode.points, [_relativeToScreen(points[i]!)],
                   _paint..strokeCap = StrokeCap.round);
             }
           }
@@ -217,8 +235,10 @@ class DrawImage extends CustomPainter {
     // Convert relative position to screen position
     final screenPosition = _relativeToScreen(label.position);
     
-    // Use font size without complex scaling
-    final fontSize = (label.size * labelScaleFactor * 0.8);
+    // Use unified scaling system for font size
+    // Convert label.size (stored as absolute) to relative then scale it
+    final relativeSize = label.size / 1000.0; // Assume 1000px as baseline reference
+    final fontSize = coordinateTransformer?.scaleFont(relativeSize * 0.8) ?? (label.size * labelScaleFactor * 0.8);
     
     // Check if this is a roman numeral that needs superscript formatting
     if (label is RomanNumeralLabel) {
@@ -257,14 +277,15 @@ class DrawImage extends CustomPainter {
       }
       
       final textColor = label.isSelected ? Colors.white : label.color;
-      _drawRomanNumeralWithSuperscript(canvas, label, screenPosition, textColor, fontSize, label.size * labelScaleFactor);
+      final relativeBaseLabelSize = label.size / 1000.0; // Convert to relative
+      final baseLabelSize = coordinateTransformer?.scaleFont(relativeBaseLabelSize) ?? (label.size * labelScaleFactor);
+      _drawRomanNumeralWithSuperscript(canvas, label, screenPosition, textColor, fontSize, baseLabelSize);
     } else {
-      // Extension labels - draw with background box
-      final textColor = label.isSelected ? Colors.white : label.color;
+      // Extension labels - draw with solid color background and white text
       final textSpan = TextSpan(
         text: label.displayValue,
         style: TextStyle(
-          color: textColor,
+          color: Colors.white, // Always white text
           fontSize: fontSize,
           fontWeight: FontWeight.w900, // Extra bold for visibility
         ),
@@ -277,9 +298,10 @@ class DrawImage extends CustomPainter {
       );
       
       textPainter.layout(minWidth: 0, maxWidth: double.infinity);
-      
-      // Draw background box for extension labels - padding scales with font size
-      final boxPadding = (fontSize * 0.15).clamp(2.0, 6.0);
+      final relativePadding = 0.003;
+      // Draw solid color background box - padding scales with font size
+      //final boxPadding = (fontSize * 0.15).clamp(1.5, 50.0);
+      final boxPadding = coordinateTransformer?.scaleFont(relativePadding) ?? (relativePadding * labelScaleFactor * 1000.0);
       final boxRect = Rect.fromCenter(
         center: screenPosition,
         width: textPainter.width + boxPadding * 2,
@@ -287,23 +309,12 @@ class DrawImage extends CustomPainter {
       );
       
       final boxPaint = Paint()
-        ..color = label.isSelected 
-            ? label.color.withOpacity(0.8) // Colored background when selected
-            : Colors.white.withOpacity(0.9) // White background when not selected
+        ..color = label.color // Always use label color as solid background
         ..style = PaintingStyle.fill;
-      
-      final borderPaint = Paint()
-        ..color = label.color
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.0;
       
       canvas.drawRRect(
         RRect.fromRectAndRadius(boxRect, const Radius.circular(4.0)),
         boxPaint,
-      );
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(boxRect, const Radius.circular(4.0)),
-        borderPaint,
       );
       
       final textOffset = Offset(
@@ -319,24 +330,51 @@ class DrawImage extends CustomPainter {
   void _drawRomanNumeralWithSuperscript(Canvas canvas, RomanNumeralLabel label, Offset position, Color textColor, double fontSize, double labelSize) {
     final chordText = label.displayValue;
     
-    // Parse roman numeral and quality
+    // Parse accidental, roman numeral, and quality separately
+    String accidental = '';
     String baseNumeral = '';
     String quality = '';
     
-    // Roman numeral patterns (I-VII in both cases)
-    final romanNumeralPattern = RegExp(r'^[#♯b♭]?(i{1,3}v?|iv|v|vi{0,2}|VII?)', caseSensitive: false);
-    final romanMatch = romanNumeralPattern.firstMatch(chordText);
+    String remainingText = chordText;
+    
+    // First, extract accidental if present
+    if (remainingText.startsWith('♯') || remainingText.startsWith('♭')) {
+      accidental = remainingText.substring(0, 1);
+      remainingText = remainingText.substring(1);
+    }
+    
+    // Then extract roman numeral and quality
+    final romanNumeralPattern = RegExp(r'^(i{1,3}v?|iv|v|vi{0,2}|VII?)', caseSensitive: false);
+    final romanMatch = romanNumeralPattern.firstMatch(remainingText);
     
     if (romanMatch != null) {
       baseNumeral = romanMatch.group(0)!;
-      quality = chordText.substring(romanMatch.end).trim();
+      quality = remainingText.substring(romanMatch.end).trim();
     } else {
-      // Fallback: treat entire string as base
-      baseNumeral = chordText;
+      // Fallback: treat entire remaining text as base
+      baseNumeral = remainingText;
       quality = '';
     }
     
-    // Create text painters with serif font
+    // Create separate text painters for each component
+    TextPainter? accidentalTextPainter;
+    if (accidental.isNotEmpty) {
+      final accidentalFontSize = fontSize * 0.7; // Smaller than main text
+      accidentalTextPainter = TextPainter(
+        text: TextSpan(
+          text: accidental,
+          style: GoogleFonts.sourceSerif4(
+            color: textColor, 
+            fontWeight: FontWeight.w600, 
+            fontSize: accidentalFontSize
+          ),
+        ),
+        textAlign: TextAlign.center,
+        textDirection: TextDirection.ltr,
+      );
+      accidentalTextPainter.layout(minWidth: 0, maxWidth: double.infinity);
+    }
+    
     final baseTextPainter = TextPainter(
       text: TextSpan(
         text: baseNumeral,
@@ -352,17 +390,10 @@ class DrawImage extends CustomPainter {
     
     baseTextPainter.layout(minWidth: 0, maxWidth: double.infinity);
     
-    if (quality.isEmpty) {
-      // No quality, just draw the base
-      final textOffset = Offset(
-        position.dx - baseTextPainter.width / 2,
-        position.dy - baseTextPainter.height / 2,
-      );
-      baseTextPainter.paint(canvas, textOffset);
-    } else {
-      // Draw base and superscript quality
+    TextPainter? qualityTextPainter;
+    if (quality.isNotEmpty) {
       final superscriptFontSize = fontSize * 0.5; // Made smaller
-      final qualityTextPainter = TextPainter(
+      qualityTextPainter = TextPainter(
         text: TextSpan(
           text: quality,
           style: GoogleFonts.sourceSerif4(
@@ -374,24 +405,40 @@ class DrawImage extends CustomPainter {
         textAlign: TextAlign.center,
         textDirection: TextDirection.ltr,
       );
-      
       qualityTextPainter.layout(minWidth: 0, maxWidth: double.infinity);
-      
-      // Calculate total width and positioning
-      final totalWidth = baseTextPainter.width + qualityTextPainter.width;
-      final startX = position.dx - totalWidth / 2;
-      
-      // Draw base numeral
-      final baseOffset = Offset(
-        startX,
-        position.dy - baseTextPainter.height / 2,
+    }
+    
+    // Calculate total width and positioning
+    final accidentalWidth = accidentalTextPainter?.width ?? 0;
+    final baseWidth = baseTextPainter.width;
+    final qualityWidth = qualityTextPainter?.width ?? 0;
+    final totalWidth = accidentalWidth + baseWidth + qualityWidth;
+    
+    double currentX = position.dx - totalWidth / 2;
+    
+    // Draw accidental (smaller and higher)
+    if (accidentalTextPainter != null) {
+      final accidentalOffset = Offset(
+        currentX,
+        position.dy - baseTextPainter.height / 2 - fontSize * 0.05, // Higher position
       );
-      baseTextPainter.paint(canvas, baseOffset);
-      
-      // Draw superscript quality (offset up and to the right) - made higher
+      accidentalTextPainter.paint(canvas, accidentalOffset);
+      currentX += accidentalWidth;
+    }
+    
+    // Draw base numeral
+    final baseOffset = Offset(
+      currentX,
+      position.dy - baseTextPainter.height / 2,
+    );
+    baseTextPainter.paint(canvas, baseOffset);
+    currentX += baseWidth;
+    
+    // Draw superscript quality (offset up and to the right)
+    if (qualityTextPainter != null) {
       final qualityOffset = Offset(
-        startX + baseTextPainter.width,
-        position.dy - baseTextPainter.height / 2 - superscriptFontSize * 0.3,
+        currentX,
+        position.dy - baseTextPainter.height / 2 - fontSize * 0.3, // Higher than base
       );
       qualityTextPainter.paint(canvas, qualityOffset);
     }

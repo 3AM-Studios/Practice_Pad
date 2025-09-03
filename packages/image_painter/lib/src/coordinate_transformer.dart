@@ -138,6 +138,32 @@ class CoordinateTransformer {
     if (imageBounds.height == 0) return screenLabelSize;
     return screenLabelSize / imageBounds.height;
   }
+  
+  /// Get the current display scale factor
+  /// This represents how much the image is scaled from its natural size
+  double getDisplayScale() {
+    // Use the smaller dimension to maintain aspect ratio consistency
+    // This ensures consistent scaling regardless of image orientation
+    return imageBounds.width.isFinite ? imageBounds.width : 1.0;
+  }
+  
+  /// Get the effective image width for scaling calculations
+  double get imageDisplayWidth => imageBounds.width;
+  
+  /// Get the effective image height for scaling calculations
+  double get imageDisplayHeight => imageBounds.height;
+  
+  /// Convert relative font size to actual pixels for current display
+  double scaleFont(double relativeFontSize) {
+    // Use height for font scaling to maintain readability regardless of aspect ratio
+    return relativeLabelSizeToScreen(relativeFontSize);
+  }
+  
+  /// Convert relative stroke width to actual pixels for current display
+  double scaleStroke(double relativeStrokeWidth) {
+    // Use width for stroke scaling for consistency with drawing gestures
+    return relativeStrokeToScreen(relativeStrokeWidth);
+  }
 }
 
 /// Extension to provide coordinate transformation capabilities to widgets
