@@ -7,14 +7,22 @@ import 'package:practice_pad/services/practice_session_manager.dart';
 import 'package:practice_pad/models/practice_item.dart';
 import 'package:practice_pad/models/statistics.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class TranscriptionViewer extends StatefulWidget {
-  final Song song;
+  final Song? song;
+  final Map<String, dynamic>? youtubeVideo;
+  final bool isSongMode;
 
   const TranscriptionViewer({
     super.key,
-    required this.song,
-  });
+    this.song,
+    this.youtubeVideo,
+    required this.isSongMode,
+  }) : assert(
+         (isSongMode && song != null) || (!isSongMode && youtubeVideo != null),
+         'Either song (for song mode) or youtubeVideo (for standalone mode) must be provided',
+       );
 
   @override
   State<TranscriptionViewer> createState() => _TranscriptionViewerState();
@@ -37,6 +45,39 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
   PracticeSessionManager? _sessionManager;
   int _elapsedSeconds = 0;
   bool _isTimerRunning = false;
+
+  // Helper methods for dual mode support
+  String _getStorageKey() {
+    if (widget.isSongMode) {
+      return widget.song!.path;
+    } else {
+      return widget.youtubeVideo!['id'];
+    }
+  }
+  
+  String _getDisplayTitle() {
+    if (widget.isSongMode) {
+      return widget.song!.title;
+    } else {
+      return widget.youtubeVideo!['title'] ?? 'Unknown Video';
+    }
+  }
+  
+  String _getPracticeItemId() {
+    if (widget.isSongMode) {
+      return 'transcription_${widget.song!.path}';
+    } else {
+      return 'transcription_${widget.youtubeVideo!['id']}';
+    }
+  }
+  
+  String _getPracticeItemName() {
+    if (widget.isSongMode) {
+      return 'Transcription - ${widget.song!.title}';
+    } else {
+      return 'Transcription - ${widget.youtubeVideo!['title'] ?? 'Unknown Video'}';
+    }
+  }
 
   @override
   void initState() {
@@ -72,7 +113,17 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
 
   Future<void> _loadYoutubeData() async {
     try {
-      final youtubeData = await LocalStorageService.loadYoutubeLinkForSong(widget.song.path);
+      // For standalone mode, check if video URL is provided directly
+      if (!widget.isSongMode && widget.youtubeVideo != null) {
+        final videoUrl = widget.youtubeVideo!['url'] as String?;
+        if (videoUrl != null && videoUrl.isNotEmpty) {
+          _urlController.text = videoUrl;
+          await _loadVideoFromUrl(videoUrl);
+        }
+      }
+      
+      // Load saved YouTube data for this storage key
+      final youtubeData = await LocalStorageService.loadYoutubeLinkForSong(_getStorageKey());
       if (youtubeData.isNotEmpty) {
         final url = youtubeData['url'] as String?;
         final loopStartTime = (youtubeData['loopStartTime'] as num?)?.toDouble() ?? 0.0;
@@ -103,7 +154,7 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
         'isAutoLoop': _isAutoLoop,
         'playbackSpeed': _playbackSpeed,
       };
-      await LocalStorageService.saveYoutubeLinkForSong(widget.song.path, youtubeData);
+      await LocalStorageService.saveYoutubeLinkForSong(_getStorageKey(), youtubeData);
     } catch (e) {
       debugPrint('Error saving YouTube data: $e');
     }
@@ -172,7 +223,7 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
 
   Future<void> _loadSavedLoops() async {
     try {
-      final loops = await LocalStorageService.loadSavedLoopsForSong(widget.song.path);
+      final loops = await LocalStorageService.loadSavedLoopsForSong(_getStorageKey());
       setState(() {
         _savedLoops = loops;
       });
@@ -183,7 +234,7 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
 
   Future<void> _saveSavedLoops() async {
     try {
-      await LocalStorageService.saveSavedLoopsForSong(widget.song.path, _savedLoops);
+      await LocalStorageService.saveSavedLoopsForSong(_getStorageKey(), _savedLoops);
     } catch (e) {
       debugPrint('Error saving loops: $e');
     }
@@ -291,9 +342,9 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
     
     // Create a dummy practice item for the song
     final practiceItem = PracticeItem(
-      id: 'transcription_${widget.song.path}',
-      name: 'Transcription - ${widget.song.title}',
-      description: 'Practice session for ${widget.song.title}',
+      id: _getPracticeItemId(),
+      name: _getPracticeItemName(),
+      description: 'Practice session for ${_getDisplayTitle()}',
     );
 
     if (!_sessionManager!.hasActiveSession) {
@@ -324,13 +375,13 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
     try {
       // Create and save the practice session as statistics
       final statistics = Statistics(
-        practiceItemId: 'transcription_${widget.song.path}',
+        practiceItemId: _getPracticeItemId(),
         timestamp: DateTime.now(),
         totalReps: 0,
         totalTime: Duration(seconds: _elapsedSeconds),
         metadata: {
           'time': _elapsedSeconds,
-          'songTitle': widget.song.title,
+          'songTitle': _getDisplayTitle(),
           'type': 'transcription',
         },
       );
@@ -585,7 +636,7 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
                           children: [
                             Expanded(
                               child: Text(
-                                'Transcription - ${widget.song.title}',
+                                'Transcription - ${_getDisplayTitle()}',
                                 style: const TextStyle(
                                   fontSize: 25,
                                   fontWeight: FontWeight.bold,
@@ -747,6 +798,42 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
                                     decoration: const InputDecoration(
                                       hintText: 'Paste YouTube URL here...',
                                       border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(17))),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                GestureDetector(
+                                  onTap: () async {
+                                    final Uri youtubeUrl = Uri.parse('https://youtube.com');
+                                    if (await canLaunchUrl(youtubeUrl)) {
+                                      await launchUrl(youtubeUrl);
+                                    }
+                                  },
+                                  child: ClayContainer(
+                                    color: Theme.of(context).colorScheme.surface,
+                                    depth: 15,
+                                    borderRadius: 8,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            Icons.open_in_browser,
+                                            color: Theme.of(context).colorScheme.primary,
+                                            size: 16,
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            'Browse YouTube',
+                                            style: TextStyle(
+                                              color: Theme.of(context).colorScheme.primary,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ),
                                 ),

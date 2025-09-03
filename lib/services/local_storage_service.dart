@@ -27,6 +27,7 @@ class LocalStorageService {
   static const String _savedLoopsFileName = 'saved_loops.json';
   static const String _booksFileName = 'books.json';
   static const String _customSongsFileName = 'custom_songs.json';
+  static const String _youtubeVideosFileName = 'youtube_videos.json';
 
   // iCloud Sync Integration
   static ICloudSyncService? _icloudSyncService;
@@ -1439,6 +1440,79 @@ class LocalStorageService {
         .last
         .replaceAll(RegExp(r'[^a-zA-Z0-9\-_.]'), '_')
         .replaceAll(RegExp(r'_{2,}'), '_');
+  }
+
+  // ===================== YouTube Videos Management =====================
+
+  /// Load list of YouTube videos
+  static Future<List<Map<String, dynamic>>> loadYoutubeVideosList() async {
+    try {
+      final directory = await getApplicationDocumentsDirectory();
+      final file = File('${directory.path}/$_youtubeVideosFileName');
+      
+      if (!await file.exists()) {
+        return [];
+      }
+      
+      final jsonString = await file.readAsString();
+      final jsonData = json.decode(jsonString);
+      
+      if (jsonData is List) {
+        return List<Map<String, dynamic>>.from(jsonData);
+      }
+      
+      return [];
+    } catch (e) {
+      debugPrint('Error loading YouTube videos list: $e');
+      return [];
+    }
+  }
+
+  /// Save list of YouTube videos
+  static Future<void> saveYoutubeVideosList(List<Map<String, dynamic>> videos) async {
+    return await _withSaveLock(() async {
+      try {
+        final directory = await getApplicationDocumentsDirectory();
+        final file = File('${directory.path}/$_youtubeVideosFileName');
+        
+        final jsonString = json.encode(videos);
+        await file.writeAsString(jsonString);
+        
+        developer.log('✅ SAVE: YouTube videos list saved successfully');
+        
+        // Sync to iCloud if enabled
+        if (_icloudSyncEnabled && _icloudSyncService != null) {
+          await _icloudSyncService!.syncJsonFile(_youtubeVideosFileName);
+        }
+      } catch (e) {
+        developer.log('❌ SAVE ERROR: Failed to save YouTube videos list: $e');
+        rethrow;
+      }
+    });
+  }
+
+  /// Add a YouTube video to the list
+  static Future<void> addYoutubeVideo(Map<String, dynamic> video) async {
+    final videos = await loadYoutubeVideosList();
+    videos.add(video);
+    await saveYoutubeVideosList(videos);
+  }
+
+  /// Delete a YouTube video from the list
+  static Future<void> deleteYoutubeVideo(String videoId) async {
+    final videos = await loadYoutubeVideosList();
+    videos.removeWhere((video) => video['id'] == videoId);
+    await saveYoutubeVideosList(videos);
+  }
+
+  /// Update a YouTube video in the list
+  static Future<void> updateYoutubeVideo(String videoId, Map<String, dynamic> updatedVideo) async {
+    final videos = await loadYoutubeVideosList();
+    final index = videos.indexWhere((video) => video['id'] == videoId);
+    if (index != -1) {
+      videos[index] = updatedVideo;
+      await saveYoutubeVideosList(videos);
+    }
   }
 
   /// Dispose iCloud sync service

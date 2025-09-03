@@ -14,6 +14,7 @@ import 'package:practice_pad/features/edit_items/presentation/viewmodels/edit_it
 import 'package:practice_pad/services/widget_integration.dart';
 import 'package:practice_pad/services/icloud_sync_service.dart';
 import 'package:practice_pad/services/local_storage_service.dart';
+import 'package:practice_pad/features/transcription/presentation/pages/youtube_videos_page.dart';
 import 'package:provider/provider.dart';
 
 class TodayScreen extends StatefulWidget {
@@ -71,6 +72,50 @@ class _TodayScreenState extends State<TodayScreen> {
     );
   }
 
+  Widget _buildTranscribeButton(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Center(
+        child: GestureDetector(
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => const YouTubeVideosPage(),
+              ),
+            );
+          },
+          child: ClayContainer(
+            color: Theme.of(context).colorScheme.surface,
+            depth: 15,
+            borderRadius: 16,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.hearing,
+                    color: Theme.of(context).colorScheme.primary,
+                    size: 24,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Transcribe',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.primary,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
 Widget _buildBody(BuildContext context, TodayViewModel viewModel) {
   final theme = Theme.of(context);
   final isTabletOrDesktop = deviceType == DeviceType.tablet || deviceType == DeviceType.macOS;
@@ -104,6 +149,9 @@ Widget _buildBody(BuildContext context, TodayViewModel viewModel) {
             ),
           ),
         ),
+        // Transcribe button  
+        _buildTranscribeButton(context),
+        const SizedBox(height: 16),
         _buildBottomSection(context, viewModel, widget.onStatsPressed, isTabletOrDesktop),
         SizedBox(height: MediaQuery.of(context).size.height * 0.003), //30% of overall height
       ],
@@ -130,6 +178,9 @@ Widget _buildBody(BuildContext context, TodayViewModel viewModel) {
           },
         ),
       ),
+      // Transcribe button
+      _buildTranscribeButton(context),
+      const SizedBox(height: 16),
       // Responsive bottom section
       _buildBottomSection(context, viewModel, widget.onStatsPressed, isTabletOrDesktop),
       const SizedBox(height: 30),

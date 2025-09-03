@@ -796,7 +796,10 @@ class _PDFViewerState extends State<PDFViewer>
 
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => TranscriptionViewer(song: song),
+        builder: (context) => TranscriptionViewer(
+          song: song,
+          isSongMode: true,
+        ),
       ),
     );
   }

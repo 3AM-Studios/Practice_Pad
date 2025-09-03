@@ -2049,7 +2049,10 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
 
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => TranscriptionViewer(song: song),
+        builder: (context) => TranscriptionViewer(
+          song: song,
+          isSongMode: true,
+        ),
       ),
     );
   }
