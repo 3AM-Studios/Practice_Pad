@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../image_painter.dart';
 import '_signature_painter.dart';
+import 'coordinate_transformer.dart';
 
 /// Base label class for PDF annotations
 abstract class Label {

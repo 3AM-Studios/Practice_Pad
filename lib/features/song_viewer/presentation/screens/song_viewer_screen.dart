@@ -33,6 +33,7 @@ class _SongViewerScreenState extends State<SongViewerScreen> {
   late SimpleSheetMusicViewer? _sheetMusicViewer;
   late PDFViewer _pdfViewer;
   late bool _isPdfOnly;
+  bool _isFullscreen = false; // Track fullscreen state
   
   // Keys to maintain state across mode switches
   final GlobalKey _sheetMusicKey = GlobalKey();
@@ -66,12 +67,17 @@ class _SongViewerScreenState extends State<SongViewerScreen> {
       _sheetMusicViewer = null;
     }
     
-    // Always initialize PDF viewer
+    // Always initialize PDF viewer with fullscreen callback
     _pdfViewer = PDFViewer(
       key: _pdfKey,
       songAssetPath: widget.songAssetPath,
       bpm: widget.bpm,
       practiceArea: widget.practiceArea,
+      onFullscreenChanged: (isFullscreen) {
+        setState(() {
+          _isFullscreen = isFullscreen;
+        });
+      },
     );
     
     // Ensure toolbar appears after initial build
@@ -218,6 +224,15 @@ class _SongViewerScreenState extends State<SongViewerScreen> {
     final onSurfaceColor = theme.colorScheme.onSurface;
     final surfaceColor = theme.colorScheme.surface;
 
+    // If in fullscreen mode, show only the content widget
+    if (_isFullscreen) {
+      return Scaffold(
+        backgroundColor: Colors.black,
+        body: _buildContent(),
+      );
+    }
+
+    // Normal mode - show full layout
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(

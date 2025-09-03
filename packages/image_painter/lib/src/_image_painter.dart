@@ -5,6 +5,7 @@ import 'package:flutter/material.dart' hide Image;
 import 'package:google_fonts/google_fonts.dart';
 
 import 'controller.dart';
+import 'coordinate_transformer.dart';
 
 ///Handles all the painting ongoing on the canvas.
 class DrawImage extends CustomPainter {
@@ -14,6 +15,9 @@ class DrawImage extends CustomPainter {
   ///Scale factor for labels (for fullscreen mode scaling)
   final double labelScaleFactor;
 
+  ///Coordinate transformer for converting relative to screen coordinates
+  final CoordinateTransformer? coordinateTransformer;
+
   //Controller is a listenable with all of the paint details.
   late ImagePainterController _controller;
 
@@ -22,12 +26,31 @@ class DrawImage extends CustomPainter {
     required ImagePainterController controller,
     this.backgroundColor,
     this.labelScaleFactor = 1.0,
+    this.coordinateTransformer,
   }) : super(repaint: controller) {
     _controller = controller;
   }
 
+  /// Convert relative coordinate to screen coordinate for rendering
+  Offset _relativeToScreen(Offset relativeOffset) {
+    if (coordinateTransformer == null) {
+      // Fallback: assume coordinates are already screen coordinates
+      return relativeOffset;
+    }
+    return coordinateTransformer!.relativeToScreen(relativeOffset);
+  }
+
+
   @override
   void paint(Canvas canvas, Size size) {
+    // Fill background with backgroundColor if provided
+    if (backgroundColor != null) {
+      canvas.drawRect(
+        Rect.fromLTWH(0, 0, size.width, size.height),
+        Paint()..color = backgroundColor!,
+      );
+    }
+
     ///paints [ui.Image] on the canvas for reference to draw over it.
     paintImage(
       canvas: canvas,
@@ -45,38 +68,44 @@ class DrawImage extends CustomPainter {
       final _painter = item.paint;
       switch (item.mode) {
         case PaintMode.rect:
-          canvas.drawRect(Rect.fromPoints(_offset[0]!, _offset[1]!), _painter);
+          canvas.drawRect(Rect.fromPoints(_relativeToScreen(_offset[0]!), _relativeToScreen(_offset[1]!)), _painter);
           break;
         case PaintMode.line:
-          canvas.drawLine(_offset[0]!, _offset[1]!, _painter);
+          canvas.drawLine(_relativeToScreen(_offset[0]!), _relativeToScreen(_offset[1]!), _painter);
           break;
         case PaintMode.circle:
+          final screenCenter = _relativeToScreen(_offset[1]!);
+          final screenStart = _relativeToScreen(_offset[0]!);
           final path = Path();
           path.addOval(
             Rect.fromCircle(
-                center: _offset[1]!,
-                radius: (_offset[0]! - _offset[1]!).distance),
+                center: screenCenter,
+                radius: (screenStart - screenCenter).distance),
           );
           canvas.drawPath(path, _painter);
           break;
         case PaintMode.arrow:
-          drawArrow(canvas, _offset[0]!, _offset[1]!, _painter);
+          drawArrow(canvas, _relativeToScreen(_offset[0]!), _relativeToScreen(_offset[1]!), _painter);
           break;
         case PaintMode.dashLine:
+          final screenStart = _relativeToScreen(_offset[0]!);
+          final screenEnd = _relativeToScreen(_offset[1]!);
           final path = Path()
-            ..moveTo(_offset[0]!.dx, _offset[0]!.dy)
-            ..lineTo(_offset[1]!.dx, _offset[1]!.dy);
+            ..moveTo(screenStart.dx, screenStart.dy)
+            ..lineTo(screenEnd.dx, screenEnd.dy);
           canvas.drawPath(_dashPath(path, _painter.strokeWidth), _painter);
           break;
         case PaintMode.freeStyle:
           for (int i = 0; i < _offset.length - 1; i++) {
             if (_offset[i] != null && _offset[i + 1] != null) {
+              final screenStart = _relativeToScreen(_offset[i]!);
+              final screenEnd = _relativeToScreen(_offset[i + 1]!);
               final _path = Path()
-                ..moveTo(_offset[i]!.dx, _offset[i]!.dy)
-                ..lineTo(_offset[i + 1]!.dx, _offset[i + 1]!.dy);
+                ..moveTo(screenStart.dx, screenStart.dy)
+                ..lineTo(screenEnd.dx, screenEnd.dy);
               canvas.drawPath(_path, _painter..strokeCap = StrokeCap.round);
             } else if (_offset[i] != null && _offset[i + 1] == null) {
-              canvas.drawPoints(PointMode.points, [_offset[i]!],
+              canvas.drawPoints(PointMode.points, [_relativeToScreen(_offset[i]!)],
                   _painter..strokeCap = StrokeCap.round);
             }
           }
@@ -99,8 +128,11 @@ class DrawImage extends CustomPainter {
           final textOffset = _offset.isEmpty
               ? Offset(size.width / 2 - textPainter.width / 2,
                   size.height / 2 - textPainter.height / 2)
-              : Offset(_offset[0]!.dx - textPainter.width / 2,
-                  _offset[0]!.dy - textPainter.height / 2);
+              : () {
+                  final screenPos = _relativeToScreen(_offset[0]!);
+                  return Offset(screenPos.dx - textPainter.width / 2,
+                      screenPos.dy - textPainter.height / 2);
+                }();
           textPainter.paint(canvas, textOffset);
           break;
         default:
@@ -122,7 +154,7 @@ class DrawImage extends CustomPainter {
         case PaintMode.circle:
           final path = Path();
           path.addOval(Rect.fromCircle(
-              center: _end!, radius: (_end - _start!).distance));
+              center: _end!, radius: (_end! - _start!).distance));
           canvas.drawPath(path, _paint);
           break;
         case PaintMode.arrow:
@@ -130,21 +162,21 @@ class DrawImage extends CustomPainter {
           break;
         case PaintMode.dashLine:
           final path = Path()
-            ..moveTo(_start!.dx, _start.dy)
-            ..lineTo(_end!.dx, _end.dy);
+            ..moveTo(_start!.dx, _start!.dy)
+            ..lineTo(_end!.dx, _end!.dy);
           canvas.drawPath(_dashPath(path, _paint.strokeWidth), _paint);
           break;
         case PaintMode.freeStyle:
           final points = _controller.offsets;
           for (int i = 0; i < _controller.offsets.length - 1; i++) {
             if (points[i] != null && points[i + 1] != null) {
-              canvas.drawLine(
-                  Offset(points[i]!.dx, points[i]!.dy),
-                  Offset(points[i + 1]!.dx, points[i + 1]!.dy),
-                  _paint..strokeCap = StrokeCap.round);
+              final _path = Path()
+                ..moveTo(points[i]!.dx, points[i]!.dy)
+                ..lineTo(points[i + 1]!.dx, points[i + 1]!.dy);
+              canvas.drawPath(_path, _paint..strokeCap = StrokeCap.round);
             } else if (points[i] != null && points[i + 1] == null) {
-              canvas.drawPoints(PointMode.points,
-                  [Offset(points[i]!.dx, points[i]!.dy)], _paint);
+              canvas.drawPoints(PointMode.points, [points[i]!],
+                  _paint..strokeCap = StrokeCap.round);
             }
           }
           break;
@@ -182,7 +214,10 @@ class DrawImage extends CustomPainter {
 
   ///Draws any label on the canvas.
   void _drawLabel(Canvas canvas, Label label) {
-    // Use larger base font size and scale appropriately
+    // Convert relative position to screen position
+    final screenPosition = _relativeToScreen(label.position);
+    
+    // Use font size without complex scaling
     final fontSize = (label.size * labelScaleFactor * 0.8);
     
     // Check if this is a roman numeral that needs superscript formatting
@@ -206,7 +241,7 @@ class DrawImage extends CustomPainter {
         
         final selectionPadding = 6.0 * labelScaleFactor;
         final selectionRect = Rect.fromCenter(
-          center: label.position,
+          center: screenPosition,
           width: tempPainter.width + selectionPadding * 2,
           height: tempPainter.height + selectionPadding * 2,
         );
@@ -222,7 +257,7 @@ class DrawImage extends CustomPainter {
       }
       
       final textColor = label.isSelected ? Colors.white : label.color;
-      _drawRomanNumeralWithSuperscript(canvas, label, textColor, fontSize, label.size * labelScaleFactor);
+      _drawRomanNumeralWithSuperscript(canvas, label, screenPosition, textColor, fontSize, label.size * labelScaleFactor);
     } else {
       // Extension labels - draw with background box
       final textColor = label.isSelected ? Colors.white : label.color;
@@ -246,7 +281,7 @@ class DrawImage extends CustomPainter {
       // Draw background box for extension labels - padding scales with font size
       final boxPadding = (fontSize * 0.15).clamp(2.0, 6.0);
       final boxRect = Rect.fromCenter(
-        center: label.position,
+        center: screenPosition,
         width: textPainter.width + boxPadding * 2,
         height: textPainter.height + boxPadding * 2,
       );
@@ -272,8 +307,8 @@ class DrawImage extends CustomPainter {
       );
       
       final textOffset = Offset(
-        label.position.dx - textPainter.width / 2,
-        label.position.dy - textPainter.height / 2,
+        screenPosition.dx - textPainter.width / 2,
+        screenPosition.dy - textPainter.height / 2,
       );
       
       textPainter.paint(canvas, textOffset);
@@ -281,7 +316,7 @@ class DrawImage extends CustomPainter {
   }
 
   ///Draws roman numeral text with superscript quality
-  void _drawRomanNumeralWithSuperscript(Canvas canvas, RomanNumeralLabel label, Color textColor, double fontSize, double labelSize) {
+  void _drawRomanNumeralWithSuperscript(Canvas canvas, RomanNumeralLabel label, Offset position, Color textColor, double fontSize, double labelSize) {
     final chordText = label.displayValue;
     
     // Parse roman numeral and quality
@@ -320,8 +355,8 @@ class DrawImage extends CustomPainter {
     if (quality.isEmpty) {
       // No quality, just draw the base
       final textOffset = Offset(
-        label.position.dx - baseTextPainter.width / 2,
-        label.position.dy - baseTextPainter.height / 2,
+        position.dx - baseTextPainter.width / 2,
+        position.dy - baseTextPainter.height / 2,
       );
       baseTextPainter.paint(canvas, textOffset);
     } else {
@@ -344,19 +379,19 @@ class DrawImage extends CustomPainter {
       
       // Calculate total width and positioning
       final totalWidth = baseTextPainter.width + qualityTextPainter.width;
-      final startX = label.position.dx - totalWidth / 2;
+      final startX = position.dx - totalWidth / 2;
       
       // Draw base numeral
       final baseOffset = Offset(
         startX,
-        label.position.dy - baseTextPainter.height / 2,
+        position.dy - baseTextPainter.height / 2,
       );
       baseTextPainter.paint(canvas, baseOffset);
       
       // Draw superscript quality (offset up and to the right) - made higher
       final qualityOffset = Offset(
         startX + baseTextPainter.width,
-        label.position.dy - baseTextPainter.height / 2 - superscriptFontSize * 0.3,
+        position.dy - baseTextPainter.height / 2 - superscriptFontSize * 0.3,
       );
       qualityTextPainter.paint(canvas, qualityOffset);
     }
