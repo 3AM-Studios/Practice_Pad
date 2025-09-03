@@ -8,6 +8,7 @@ import 'package:practice_pad/models/practice_item.dart';
 import 'package:practice_pad/models/statistics.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:practice_pad/services/device_type.dart';
 
 class TranscriptionViewer extends StatefulWidget {
   final Song? song;
@@ -551,6 +552,317 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
     );
   }
 
+  Widget _buildPracticeSessionControls() {
+    return ClayContainer(
+      color: const Color.fromARGB(255, 172, 139, 103),
+      depth: 15,
+      borderRadius: 12,
+      child: Container(
+        decoration: BoxDecoration(
+          image: const DecorationImage(
+            image: AssetImage('assets/images/wood_texture_rotated.jpg'),
+            fit: BoxFit.cover,
+          ),
+          border: Border.all(color: Theme.of(context).colorScheme.surface, width: 4),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Timer display
+            if (_sessionManager?.hasActiveSession == true)
+              ClayContainer(
+                spread: 1,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    _formatPracticeTime(_elapsedSeconds),
+                    style: const TextStyle(
+                      color: Colors.black,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            if (_sessionManager?.hasActiveSession == true)
+              const SizedBox(width: 6),
+            
+            // Start/Stop timer button
+            GestureDetector(
+              onTap: _isTimerRunning ? _stopPracticeTimer : _startPracticeTimer,
+              child: Container(                               
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: _isTimerRunning ? Colors.red.shade600 : Colors.green.shade600,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Icon(
+                  _isTimerRunning ? Icons.pause : Icons.play_arrow,
+                  color: Colors.white,
+                  size: 16,
+                ),
+              ),
+            ),
+            
+            // "Start practice session" text when no session is active
+            if (_sessionManager?.hasActiveSession != true)
+              const SizedBox(width: 8),
+            if (_sessionManager?.hasActiveSession != true)
+              const Text(
+                'Start practice session',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            
+            // Complete session button
+            if (_sessionManager?.hasActiveSession == true)
+              GestureDetector(
+                onTap: _completePracticeSession,
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade600,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Icon(
+                    Icons.check,
+                    color: Colors.white,
+                    size: 16,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUrlSection() {
+    return ClayContainer(
+      color: Theme.of(context).colorScheme.surface,
+      depth: 20,
+      borderRadius: 16,
+      child: Container(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: ClayContainer(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: 8,
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(50, 4, 50, 4),
+                  child: const Text(
+                    'YouTube Video URL',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _urlController,
+                    decoration: const InputDecoration(
+                      hintText: 'Paste YouTube URL here...',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(17))),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: () async {
+                    final Uri youtubeUrl = Uri.parse('https://youtube.com');
+                    if (await canLaunchUrl(youtubeUrl)) {
+                      await launchUrl(youtubeUrl);
+                    }
+                  },
+                  child: ClayContainer(
+                    color: Theme.of(context).colorScheme.surface,
+                    depth: 15,
+                    borderRadius: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.open_in_browser,
+                            color: Theme.of(context).colorScheme.primary,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Browse YouTube',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.primary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.surface,
+                  ),
+                  onPressed: () {
+                    if (_urlController.text.isNotEmpty) {
+                      _loadVideoFromUrl(_urlController.text);
+                    }
+                  },
+                  child: const Text('Load'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoopSection() {
+    return ClayContainer(
+      color: Theme.of(context).colorScheme.surface,
+      depth: 20,
+      borderRadius: 16,
+      child: Container(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            // Wooden header for Loop Section
+            ClayContainer(
+              color: Theme.of(context).colorScheme.surface,
+              depth: 15,
+              borderRadius: 12,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                decoration: BoxDecoration(
+                  image: const DecorationImage(
+                    image: AssetImage('assets/images/wood_texture_rotated.jpg'),
+                    fit: BoxFit.cover,
+                  ),
+                  border: Border.all(color: Theme.of(context).colorScheme.surface, width: 2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  'Loop Section',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    fontSize: 17,
+                  ),
+                ),
+              ),
+            ),
+            
+            const SizedBox(height: 12),
+            
+            // Start time, arrow, end time row
+            Row(
+              children: [
+                // Start time clay container
+                Expanded(
+                  child: ClayContainer(
+                    color: Theme.of(context).colorScheme.surface,
+                    depth: 10,
+                    borderRadius: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                      child: Column(
+                        children: [
+                          const Text(
+                            'Start',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _formatTime(_loopStartTime),
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                
+                // Arrow
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8),
+                  child: Icon(
+                    Icons.arrow_forward,
+                    size: 20,
+                    color: Colors.grey,
+                  ),
+                ),
+                
+                // End time clay container
+                Expanded(
+                  child: ClayContainer(
+                    color: Theme.of(context).colorScheme.surface,
+                    depth: 10,
+                    borderRadius: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                      child: Column(
+                        children: [
+                          const Text(
+                            'End',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _formatTime(_loopEndTime),
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildWebViewFallback() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -597,265 +909,139 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
 
   @override
   Widget build(BuildContext context) {
+    return FutureBuilder<DeviceType>(
+      future: getDeviceType(),
+      builder: (context, snapshot) {
+        final deviceType = snapshot.data ?? DeviceType.phone;
+        final isTabletOrDesktop = deviceType == DeviceType.tablet || deviceType == DeviceType.macOS;
+        
+        return _buildContent(context, isTabletOrDesktop);
+      },
+    );
+  }
+  
+  Widget _buildContent(BuildContext context, bool isTabletOrDesktop) {
+    
     return Scaffold(
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: SingleChildScrollView(
-            child: Column(
-              children: [
-              // Wooden Header
-              ClayContainer(
-                color: Theme.of(context).colorScheme.surface,
-                depth: 20,
-                borderRadius: 20,
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
-                  decoration: BoxDecoration(
-                    image: const DecorationImage(
-                      image: AssetImage('assets/images/wood_texture_rotated.jpg'),
-                      fit: BoxFit.cover,
-                    ),
-                    border: Border.all(color: Theme.of(context).colorScheme.surface, width: 4),
-                    borderRadius: BorderRadius.circular(20),
+        bottom: false,
+        top: false,
+        right: false,
+        left: false,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.only(bottom:0.0,top:0.0, right: 16.0, left: 16.0),
+          child: Column(
+            children: [
+            isTabletOrDesktop
+                ? const SizedBox(height: 17)
+                : const SizedBox(height: 60),
+            // Wooden Header
+            ClayContainer(
+              color: Theme.of(context).colorScheme.surface,
+              depth: 20,
+              borderRadius: 20,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
+                decoration: BoxDecoration(
+                  image: const DecorationImage(
+                    image: AssetImage('assets/images/wood_texture_rotated.jpg'),
+                    fit: BoxFit.cover,
                   ),
-                  child: Row(
-                    children: [
-                      GestureDetector(
-                        onTap: () => Navigator.of(context).pop(),
-                        child: const Icon(
-                          Icons.arrow_back,
-                          color: Colors.white,
-                          size: 24,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                'Transcription - ${_getDisplayTitle()}',
-                                style: const TextStyle(
-                                  fontSize: 25,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                  shadows: [
-                                    Shadow(
-                                      offset: Offset(1, 1),
-                                      blurRadius: 3,
-                                      color: Colors.black54,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            // Practice session controls - Wooden clay container
-                            ClayContainer(
-                              color: Color.fromARGB(255, 172, 139, 103),
-                              depth: 15,
-                              borderRadius: 12,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  image: const DecorationImage(
-                                    image: AssetImage('assets/images/wood_texture_rotated.jpg'),
-                                    fit: BoxFit.cover,
-                                  ),
-                                  border: Border.all(color: Theme.of(context).colorScheme.surface, width: 4),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    // Timer display
-                                    if (_sessionManager?.hasActiveSession == true)
-                                      ClayContainer(
-                                        spread: 1,
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                          decoration: BoxDecoration(
-                                            color: Theme.of(context).colorScheme.surface,
-                                            borderRadius: BorderRadius.circular(6),
-                                          ),
-                                          child: Text(
-                                            _formatPracticeTime(_elapsedSeconds),
-                                            style: const TextStyle(
-                                              color: Colors.black,
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    if (_sessionManager?.hasActiveSession == true)
-                                      const SizedBox(width: 6),
-                                    
-                                    // Start/Stop timer button
-                                    GestureDetector(
-                                      onTap: _isTimerRunning ? _stopPracticeTimer : _startPracticeTimer,
-                                      child: Container(                               
-                                        padding: const EdgeInsets.all(4),
-                                        decoration: BoxDecoration(
-                                          color: _isTimerRunning ? Colors.red.shade600 : Colors.green.shade600,
-                                          borderRadius: BorderRadius.circular(6),
-                                        ),
-                                        child: Icon(
-                                          _isTimerRunning ? Icons.pause : Icons.play_arrow,
-                                          color: Colors.white,
-                                          size: 16,
-                                        ),
-                                      ),
-                                    ),
-                                    
-                                    // "Start practice session" text when no session is active
-                                    if (_sessionManager?.hasActiveSession != true)
-                                      const SizedBox(width: 8),
-                                    if (_sessionManager?.hasActiveSession != true)
-                                      const Text(
-                                        'Start practice session',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                             
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    
-                                 
-                                    
-                                    // Complete session button
-                                    if (_sessionManager?.hasActiveSession == true)
-                                      GestureDetector(
-                                        onTap: _completePracticeSession,
-                                        child: Container(
-                                          padding: const EdgeInsets.all(6),
-                                          decoration: BoxDecoration(
-                                            color: Colors.blue.shade600,
-                                            borderRadius: BorderRadius.circular(6),
-                                          ),
-                                          child: const Icon(
-                                            Icons.check,
-                                            color: Colors.white,
-                                            size: 16,
-                                          ),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
+                  border: Border.all(color: Theme.of(context).colorScheme.surface, width: 4),
+                  borderRadius: BorderRadius.circular(20),
                 ),
+                child: isTabletOrDesktop
+                    ? Row(
+                        children: [
+                          GestureDetector(
+                            onTap: () => Navigator.of(context).pop(),
+                            child: const Icon(
+                              Icons.arrow_back,
+                              color: Colors.white,
+                              size: 24,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    'Transcription - ${_getDisplayTitle()}',
+                                    style: const TextStyle(
+                                      fontSize: 25,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                      shadows: [
+                                        Shadow(
+                                          offset: Offset(1, 1),
+                                          blurRadius: 3,
+                                          color: Colors.black54,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                // Practice session controls - Wooden clay container
+                                _buildPracticeSessionControls(),
+                              ],
+                            ),
+                          ),
+                        ],
+                      )
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              GestureDetector(
+                                onTap: () => Navigator.of(context).pop(),
+                                child: const Icon(
+                                  Icons.arrow_back,
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Text(
+                                  'Transcription - ${_getDisplayTitle()}',
+                                  style: const TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                    shadows: [
+                                      Shadow(
+                                        offset: Offset(1, 1),
+                                        blurRadius: 3,
+                                        color: Colors.black54,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          _buildPracticeSessionControls(),
+                        ],
+                      ),
               ),
-              
-              const SizedBox(height: 16),
-
-              // URL and Loop Section Row
+            ),
+            
+            const SizedBox(height: 16),
+        
+            // URL and Loop Section - Row for tablet/desktop, Column for iPhone
+            if (isTabletOrDesktop)
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   // YouTube URL section - 60% width
                   Expanded(
                     flex: 6,
-                    child: ClayContainer(
-                      color: Theme.of(context).colorScheme.surface,
-                      depth: 20,
-                      borderRadius: 16,
-                      child: Container(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Center(
-                              child: ClayContainer(
-                                color: Theme.of(context).colorScheme.surface,
-                                borderRadius: 8,
-                                child: Container(
-                                  padding: EdgeInsets.fromLTRB(50, 4, 50, 4),
-                                  child: const Text(
-                                    'YouTube Video URL',
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: TextField(
-                                    controller: _urlController,
-                                    decoration: const InputDecoration(
-                                      hintText: 'Paste YouTube URL here...',
-                                      border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(17))),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                GestureDetector(
-                                  onTap: () async {
-                                    final Uri youtubeUrl = Uri.parse('https://youtube.com');
-                                    if (await canLaunchUrl(youtubeUrl)) {
-                                      await launchUrl(youtubeUrl);
-                                    }
-                                  },
-                                  child: ClayContainer(
-                                    color: Theme.of(context).colorScheme.surface,
-                                    depth: 15,
-                                    borderRadius: 8,
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(
-                                            Icons.open_in_browser,
-                                            color: Theme.of(context).colorScheme.primary,
-                                            size: 16,
-                                          ),
-                                          const SizedBox(width: 6),
-                                          Text(
-                                            'Browse YouTube',
-                                            style: TextStyle(
-                                              color: Theme.of(context).colorScheme.primary,
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                ElevatedButton(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Theme.of(context).colorScheme.surface,
-                                    
-                                  ),
-                                  onPressed: () {
-                                    if (_urlController.text.isNotEmpty) {
-                                      _loadVideoFromUrl(_urlController.text);
-                                    }
-                                  },
-                                  child: const Text('Load'),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+                    child: _buildUrlSection(),
                   ),
                   
                   const SizedBox(width: 16),
@@ -864,674 +1050,614 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
                   if (_urlController.text.isNotEmpty)
                     Expanded(
                       flex: 2,
-                      child: ClayContainer(
-                        color: Theme.of(context).colorScheme.surface,
-                        depth: 20,
-                        borderRadius: 16,
-                        child: Container(
-                          padding: const EdgeInsets.all(16.0),
+                      child: _buildLoopSection(),
+                    ),
+                ],
+              )
+            else
+              Column(
+                children: [
+                  // YouTube URL section
+                  _buildUrlSection(),
+                  
+                  const SizedBox(height: 16),
+                  
+                  // Loop section - Only show if there's a video URL
+                  if (_urlController.text.isNotEmpty)
+                    _buildLoopSection(),
+                ],
+              ),
+          const SizedBox(height: 16),
+        
+          // Video player - Fixed height instead of Expanded
+          if (_isLoadingVideo)
+            SizedBox(
+              height: 250,
+              child: Card(
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 16),
+                      Text('Loading video...'),
+                    ],
+                  ),
+                ),
+              ),
+            )
+          else if (_videoError != null)
+            SizedBox(
+              height: 250,
+              child: Card(
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.error_outline,
+                        size: 48,
+                        color: Colors.red,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Video Load Error',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 8),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Text(
+                          _videoError!,
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: () {
+                          setState(() {
+                            _videoError = null;
+                          });
+                        },
+                        child: const Text('Try Again'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            )
+          else if (_controller != null)
+            SizedBox(
+              height: 250,
+              child: Card(
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: Builder(
+                        builder: (context) {
+                          try {
+                            return YoutubePlayerBuilder(
+                              onExitFullScreen: () {
+                                // Handle exit fullscreen if needed
+                              },
+                              player: YoutubePlayer(
+                                controller: _controller!,
+                                showVideoProgressIndicator: true,
+                                progressIndicatorColor: Colors.amber,
+                                progressColors: const ProgressBarColors(
+                                  playedColor: Colors.amber,
+                                  handleColor: Colors.amberAccent,
+                                ),
+                                bottomActions: [
+                                  const CurrentPosition(),
+                                  LoopProgressBar(
+                                    isExpanded: true,
+                                    loopStart: Duration(seconds: _loopStartTime.toInt()),
+                                    loopEnd: Duration(seconds: _loopEndTime.toInt()),
+                                    isLoopEnabled: _isAutoLoop,
+                                    onLoopUpdate: (start, end) {
+                                      debugPrint('PARENT: Received loop update start=${start.inSeconds}s, end=${end.inSeconds}s');
+                                      setState(() {
+                                        _loopStartTime = start.inSeconds.toDouble();
+                                        _loopEndTime = end.inSeconds.toDouble();
+                                        _hasLoopSection = true;
+                                      });
+                                      _saveYoutubeData();
+                                    },
+                                    onLoopPlay: _playFromLoopStart,
+                                    onLoopToggle: (enabled) {
+                                      setState(() {
+                                        _isAutoLoop = enabled;
+                                      });
+                                      _saveYoutubeData();
+                                    },
+                                    showControls: false, // Hide controls from video player
+                                  ),
+                                  const RemainingDuration(),
+                                  const FullScreenButton(),
+                                ],
+                              ),
+                              builder: (context, player) {
+                                return player;
+                              },
+                            );
+                          } catch (e) {
+                            debugPrint('Error creating YoutubePlayer: $e');
+                            return _buildWebViewFallback();
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        
+          const SizedBox(height: 16),
+        
+          // Loop Controls and Saved Loops Section - Only show if video is loaded
+          if (_controller != null)
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Main controls row
+                    Row(
+                      children: [
+                        // Play Loop Button
+                        Expanded(
+                          flex: 2,
+                          child: GestureDetector(
+                            onTap: _controller != null && _controller!.value.isReady ? () {
+                              _controller!.seekTo(Duration(seconds: _loopStartTime.toInt()));
+                              _controller!.play();
+                            } : null,
+                            child: ClayContainer(
+                              color: Theme.of(context).colorScheme.surface,
+                              depth: 20,
+                              borderRadius: 16,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.play_arrow,
+                                      color: Colors.blue.shade600,
+                                      size: 24,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Play Loop',
+                                      style: TextStyle(
+                                        color: Colors.blue.shade600,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        
+                        const SizedBox(width: 12),
+                        
+                        // Auto Loop Toggle
+                        Expanded(
+                          flex: 2,
+                          child: GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _isAutoLoop = !_isAutoLoop;
+                              });
+                              _saveYoutubeData();
+                            },
+                            child: ClayContainer(
+                              color: Theme.of(context).colorScheme.surface,
+                              depth: _isAutoLoop ? 15 : 20,
+                              borderRadius: 16,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      _isAutoLoop ? Icons.repeat : Icons.repeat_one,
+                                      color: _isAutoLoop ? Colors.green.shade600 : Colors.grey.shade600,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      _isAutoLoop ? 'Auto Loop ON' : 'Auto Loop OFF',
+                                      style: TextStyle(
+                                        color: _isAutoLoop ? Colors.green.shade600 : Colors.grey.shade600,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    
+                    const SizedBox(height: 12),
+                    
+                    // Fine-tune controls row with labels
+                    Row(
+                      children: [
+                        // Start controls
+                        Expanded(
+             
                           child: Column(
                             children: [
-                              // Wooden header for Loop Section
+                              Text(
+                                'Start',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey.shade700,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  _buildClayButton(
+                                    icon: Icons.remove,
+                                    color: Colors.red.shade600,
+                                    onTap: () {
+                                      setState(() {
+                                        _loopStartTime = (_loopStartTime - 1).clamp(0, _loopEndTime - 1);
+                                      });
+                                      _saveYoutubeData();
+                                    },
+                                  ),
+                                  const SizedBox(width: 12),
+                                  _buildClayButton(
+                                    icon: Icons.add,
+                                    color: Colors.green.shade600,
+                                    onTap: () {
+                                      setState(() {
+                                        _loopStartTime = (_loopStartTime + 1).clamp(0, _loopEndTime - 1);
+                                      });
+                                      _saveYoutubeData();
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        
+                        const SizedBox(width: 20),
+                        
+                        // Speed controls
+                        Expanded(
+     
+                          child: Column(
+                            children: [
+                              Text(
+                                'Speed',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey.shade700,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
                               ClayContainer(
                                 color: Theme.of(context).colorScheme.surface,
                                 depth: 15,
                                 borderRadius: 12,
                                 child: Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                                  decoration: BoxDecoration(
-                                    image: const DecorationImage(
-                                      image: AssetImage('assets/images/wood_texture_rotated.jpg'),
-                                      fit: BoxFit.cover,
-                                    ),
-                                    border: Border.all(color: Theme.of(context).colorScheme.surface, width: 2),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: const Text(
-                                    'Loop Section',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                      fontSize: 17,
-                                    ),
-                                  ),
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                  child: isTabletOrDesktop
+                                      ? Row(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            _buildSimpleButton(
+                                              label: '-',
+                                              color: Theme.of(context).colorScheme.surface,
+                                              onTap: () {
+                                                setState(() {
+                                                  _playbackSpeed = (_playbackSpeed - 0.25).clamp(0.25, 2.0);
+                                                });
+                                                _updatePlaybackSpeed();
+                                                _saveYoutubeData();
+                                              },
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              '${_playbackSpeed.toStringAsFixed(2)}x',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.w600,
+                                                color: Theme.of(context).colorScheme.onSurface,
+                                                fontSize: 14,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            _buildSimpleButton(
+                                              label: '+',
+                                              color: Theme.of(context).colorScheme.surface,
+                                              onTap: () {
+                                                setState(() {
+                                                  _playbackSpeed = (_playbackSpeed + 0.25).clamp(0.25, 2.0);
+                                                });
+                                                _updatePlaybackSpeed();
+                                                _saveYoutubeData();
+                                              },
+                                            ),
+                                          ],
+                                        )
+                                      : Column(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Row(
+                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                _buildSimpleButton(
+                                                  label: '-',
+                                                  color: Theme.of(context).colorScheme.surface,
+                                                  onTap: () {
+                                                    setState(() {
+                                                      _playbackSpeed = (_playbackSpeed - 0.25).clamp(0.25, 2.0);
+                                                    });
+                                                    _updatePlaybackSpeed();
+                                                    _saveYoutubeData();
+                                                  },
+                                                ),
+                                                const SizedBox(width: 12),
+                                                _buildSimpleButton(
+                                                  label: '+',
+                                                  color: Theme.of(context).colorScheme.surface,
+                                                  onTap: () {
+                                                    setState(() {
+                                                      _playbackSpeed = (_playbackSpeed + 0.25).clamp(0.25, 2.0);
+                                                    });
+                                                    _updatePlaybackSpeed();
+                                                    _saveYoutubeData();
+                                                  },
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 6),
+                                            Text(
+                                              '${_playbackSpeed.toStringAsFixed(2)}x',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.w600,
+                                                color: Theme.of(context).colorScheme.onSurface,
+                                                fontSize: 14,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                 ),
-                              ),
-                              
-                              const SizedBox(height: 12),
-                              
-                              // Start time, arrow, end time row
-                              Row(
-                                children: [
-                                  // Start time clay container
-                                  Expanded(
-                                    child: ClayContainer(
-                                      color: Theme.of(context).colorScheme.surface,
-                                      depth: 10,
-                                      borderRadius: 8,
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-                                        child: Column(
-                                          children: [
-                                            const Text(
-                                              'Start',
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w600,
-                                                color: Colors.grey,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              _formatTime(_loopStartTime),
-                                              style: const TextStyle(
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  
-                                  // Arrow
-                                  const Padding(
-                                    padding: EdgeInsets.symmetric(horizontal: 8),
-                                    child: Icon(
-                                      Icons.arrow_forward,
-                                      size: 20,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                  
-                                  // End time clay container
-                                  Expanded(
-                                    child: ClayContainer(
-                                      color: Theme.of(context).colorScheme.surface,
-                                      depth: 10,
-                                      borderRadius: 8,
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-                                        child: Column(
-                                          children: [
-                                            const Text(
-                                              'End',
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w600,
-                                                color: Colors.grey,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              _formatTime(_loopEndTime),
-                                              style: const TextStyle(
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
                               ),
                             ],
                           ),
                         ),
-                      ),
-                    ),
-                ],
-              ),
-            const SizedBox(height: 16),
-
-            // Video player - Fixed height instead of Expanded
-            if (_isLoadingVideo)
-              SizedBox(
-                height: 250,
-                child: Card(
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        CircularProgressIndicator(),
-                        SizedBox(height: 16),
-                        Text('Loading video...'),
-                      ],
-                    ),
-                  ),
-                ),
-              )
-            else if (_videoError != null)
-              SizedBox(
-                height: 250,
-                child: Card(
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(
-                          Icons.error_outline,
-                          size: 48,
-                          color: Colors.red,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Video Load Error',
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: 8),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: Text(
-                            _videoError!,
-                            textAlign: TextAlign.center,
-                            style: Theme.of(context).textTheme.bodyMedium,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: () {
-                            setState(() {
-                              _videoError = null;
-                            });
-                          },
-                          child: const Text('Try Again'),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              )
-            else if (_controller != null)
-              SizedBox(
-                height: 250,
-                child: Card(
-                  child: Column(
-                    children: [
-                      Expanded(
-                        child: Builder(
-                          builder: (context) {
-                            try {
-                              return YoutubePlayerBuilder(
-                                onExitFullScreen: () {
-                                  // Handle exit fullscreen if needed
-                                },
-                                player: YoutubePlayer(
-                                  controller: _controller!,
-                                  showVideoProgressIndicator: true,
-                                  progressIndicatorColor: Colors.amber,
-                                  progressColors: const ProgressBarColors(
-                                    playedColor: Colors.amber,
-                                    handleColor: Colors.amberAccent,
-                                  ),
-                                  bottomActions: [
-                                    const CurrentPosition(),
-                                    LoopProgressBar(
-                                      isExpanded: true,
-                                      loopStart: Duration(seconds: _loopStartTime.toInt()),
-                                      loopEnd: Duration(seconds: _loopEndTime.toInt()),
-                                      isLoopEnabled: _isAutoLoop,
-                                      onLoopUpdate: (start, end) {
-                                        debugPrint('PARENT: Received loop update start=${start.inSeconds}s, end=${end.inSeconds}s');
-                                        setState(() {
-                                          _loopStartTime = start.inSeconds.toDouble();
-                                          _loopEndTime = end.inSeconds.toDouble();
-                                          _hasLoopSection = true;
-                                        });
-                                        _saveYoutubeData();
-                                      },
-                                      onLoopPlay: _playFromLoopStart,
-                                      onLoopToggle: (enabled) {
-                                        setState(() {
-                                          _isAutoLoop = enabled;
-                                        });
-                                        _saveYoutubeData();
-                                      },
-                                      showControls: false, // Hide controls from video player
-                                    ),
-                                    const RemainingDuration(),
-                                    const FullScreenButton(),
-                                  ],
-                                ),
-                                builder: (context, player) {
-                                  return player;
-                                },
-                              );
-                            } catch (e) {
-                              debugPrint('Error creating YoutubePlayer: $e');
-                              return _buildWebViewFallback();
-                            }
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-            const SizedBox(height: 16),
-
-            // Loop Controls and Saved Loops Section - Only show if video is loaded
-            if (_controller != null)
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Main controls row
-                      Row(
-                        children: [
-                          // Play Loop Button
-                          Expanded(
-                            flex: 2,
-                            child: GestureDetector(
-                              onTap: _controller != null && _controller!.value.isReady ? () {
-                                _controller!.seekTo(Duration(seconds: _loopStartTime.toInt()));
-                                _controller!.play();
-                              } : null,
-                              child: ClayContainer(
-                                color: Theme.of(context).colorScheme.surface,
-                                depth: 20,
-                                borderRadius: 16,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.play_arrow,
-                                        color: Colors.blue.shade600,
-                                        size: 24,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        'Play Loop',
-                                        style: TextStyle(
-                                          color: Colors.blue.shade600,
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 16,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          
-                          const SizedBox(width: 12),
-                          
-                          // Auto Loop Toggle
-                          Expanded(
-                            flex: 2,
-                            child: GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  _isAutoLoop = !_isAutoLoop;
-                                });
-                                _saveYoutubeData();
-                              },
-                              child: ClayContainer(
-                                color: Theme.of(context).colorScheme.surface,
-                                depth: _isAutoLoop ? 15 : 20,
-                                borderRadius: 16,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        _isAutoLoop ? Icons.repeat : Icons.repeat_one,
-                                        color: _isAutoLoop ? Colors.green.shade600 : Colors.grey.shade600,
-                                        size: 20,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        _isAutoLoop ? 'Auto Loop ON' : 'Auto Loop OFF',
-                                        style: TextStyle(
-                                          color: _isAutoLoop ? Colors.green.shade600 : Colors.grey.shade600,
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 14,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      
-                      const SizedBox(height: 12),
-                      
-                      // Fine-tune controls row with labels
-                      Row(
-                        children: [
-                          // Start controls
-                          Expanded(
-                            child: Column(
-                              children: [
-                                Text(
-                                  'Start',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.grey.shade700,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    _buildClayButton(
-                                      icon: Icons.remove,
-                                      color: Colors.red.shade600,
-                                      onTap: () {
-                                        setState(() {
-                                          _loopStartTime = (_loopStartTime - 1).clamp(0, _loopEndTime - 1);
-                                        });
-                                        _saveYoutubeData();
-                                      },
-                                    ),
-                                    const SizedBox(width: 12),
-                                    _buildClayButton(
-                                      icon: Icons.add,
-                                      color: Colors.green.shade600,
-                                      onTap: () {
-                                        setState(() {
-                                          _loopStartTime = (_loopStartTime + 1).clamp(0, _loopEndTime - 1);
-                                        });
-                                        _saveYoutubeData();
-                                      },
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                          
-                          const SizedBox(width: 20),
-                          
-                          // Speed controls
-                          Expanded(
-                            child: Column(
-                              children: [
-                                Text(
-                                  'Speed',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.grey.shade700,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                ClayContainer(
-                                  color: Theme.of(context).colorScheme.surface,
-                                  depth: 15,
-                                  borderRadius: 12,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        _buildSimpleButton(
-                                          label: '-',
-                                          color: Theme.of(context).colorScheme.surface,
-                                          onTap: () {
-                                            setState(() {
-                                              _playbackSpeed = (_playbackSpeed - 0.25).clamp(0.25, 2.0);
-                                            });
-                                            _updatePlaybackSpeed();
-                                            _saveYoutubeData();
-                                          },
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          '${_playbackSpeed.toStringAsFixed(2)}x',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                            color: Theme.of(context).colorScheme.onSurface,
-                                            fontSize: 14,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        _buildSimpleButton(
-                                          label: '+',
-                                          color: Theme.of(context).colorScheme.surface,
-                                          onTap: () {
-                                            setState(() {
-                                              _playbackSpeed = (_playbackSpeed + 0.25).clamp(0.25, 2.0);
-                                            });
-                                            _updatePlaybackSpeed();
-                                            _saveYoutubeData();
-                                          },
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          
-                          const SizedBox(width: 20),
-                          
-                          // End controls
-                          Expanded(
-                            child: Column(
-                              children: [
-                                Text(
-                                  'End',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.grey.shade700,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    _buildClayButton(
-                                      icon: Icons.remove,
-                                      color: Colors.red.shade600,
-                                      onTap: () {
-                                        setState(() {
-                                          _loopEndTime = (_loopEndTime - 1).clamp(_loopStartTime + 1, double.infinity);
-                                        });
-                                        _saveYoutubeData();
-                                      },
-                                    ),
-                                    const SizedBox(width: 12),
-                                    _buildClayButton(
-                                      icon: Icons.add,
-                                      color: Colors.green.shade600,
-                                      onTap: () {
-                                        setState(() {
-                                          _loopEndTime = _loopEndTime + 1;
-                                        });
-                                        _saveYoutubeData();
-                                      },
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 16),
-
-                      // Saved Loops Section - Fixed height with scrollable content
-                      ClayContainer(
-                        color: Theme.of(context).colorScheme.surface,
-                        depth: 20,
-                        borderRadius: 16,
-                        child: Container(
-                          height: 250,
-                          padding: const EdgeInsets.all(16),
+                        
+                        const SizedBox(width: 20),
+                        
+                        // End controls
+                        Expanded(
+                        
                           child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Icon(Icons.bookmark, size: 16, color: Theme.of(context).colorScheme.primary),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        'Saved Loops',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold, 
-                                          fontSize: 14, 
-                                          color: Theme.of(context).colorScheme.onSurface
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  ElevatedButton.icon(
-                                    onPressed: _showSaveLoopDialog,
-                                    icon: const Icon(Icons.add, size: 16),
-                                    label: const Text('Save', style: TextStyle(fontSize: 12)),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.green.shade600,
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                      minimumSize: Size.zero,
-                                      alignment: Alignment.center,
-                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                    ),
-                                  ),
-                                ],
+                              Text(
+                                'End',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey.shade700,
+                                  fontSize: 14,
+                                ),
                               ),
                               const SizedBox(height: 8),
-                              Expanded(
-                                child: _savedLoops.isEmpty
-                                    ? Center(
-                                        child: Text(
-                                          'No saved loops yet. Tap "Save" to save the current loop.',
-                                          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                                          textAlign: TextAlign.center,
-                                        ),
-                                      )
-                                    : ListView.builder(
-                                        itemCount: _savedLoops.length,
-                                        itemBuilder: (context, index) {
-                                          final loop = _savedLoops[index];
-                                          return Padding(
-                                            padding: const EdgeInsets.only(bottom: 6),
-                                            child: Container(
-                                              padding: const EdgeInsets.all(4),
-                                              child: Row(
-                                                children: [
-                                                  Expanded(
-                                                    child: GestureDetector(
-                                                      onTap: () => _loadLoop(loop),
-                                                      child: ClayContainer(
-                                                        color: Theme.of(context).colorScheme.surfaceContainerHigh,
-                                                        depth: 15,
-                                                        borderRadius: 12,
-                                                        child: Container(
-                                                          padding: const EdgeInsets.all(12),
-                                                          child: Column(
-                                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                                            children: [
-                                                              Text(
-                                                                loop['title'] as String,
-                                                                style: const TextStyle(
-                                                                  fontWeight: FontWeight.w600,
-                                                                  fontSize: 12,
-                                                                ),
-                                                              ),
-                                                              Text(
-                                                                '${_formatTime((loop['startTime'] as num).toDouble())} → ${_formatTime((loop['endTime'] as num).toDouble())} (${((loop['speed'] as num?)?.toDouble() ?? 1.0).toStringAsFixed(2)}x)',
-                                                                style: TextStyle(
-                                                                  fontSize: 10,
-                                                                  color: Colors.grey.shade600,
-                                                                ),
-                                                              ),
-                                                            ],
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  const SizedBox(width: 15),
-                                                  GestureDetector(
-                                                    onTap: () => _deleteLoop(index),
-                                                    child: ClayContainer(
-                                                      color: Colors.red.shade100,
-                                                      depth: 10,
-                                                      spread: 2,
-                                                      borderRadius: 8,
-                                                      child: Container(
-                                                        padding: const EdgeInsets.all(6),
-                                                        child: Icon(
-                                                          Icons.delete_outline,
-                                                          size: 16,
-                                                          color: Colors.red.shade600,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          );
-                                        },
-                                      ),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  _buildClayButton(
+                                    icon: Icons.remove,
+                                    color: Colors.red.shade600,
+                                    onTap: () {
+                                      setState(() {
+                                        _loopEndTime = (_loopEndTime - 1).clamp(_loopStartTime + 1, double.infinity);
+                                      });
+                                      _saveYoutubeData();
+                                    },
+                                  ),
+                                  const SizedBox(width: 12),
+                                  _buildClayButton(
+                                    icon: Icons.add,
+                                    color: Colors.green.shade600,
+                                    onTap: () {
+                                      setState(() {
+                                        _loopEndTime = _loopEndTime + 1;
+                                      });
+                                      _saveYoutubeData();
+                                    },
+                                  ),
+                                ],
                               ),
                             ],
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-            // No video loaded message
-            if (_controller == null)
-              const SizedBox(
-                height: 250,
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.video_library,
-                        size: 64,
-                        color: Colors.grey,
-                      ),
-                      SizedBox(height: 16),
-                      Text(
-                        'No video loaded',
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: Colors.grey,
+                      ],
+                    ),
+        
+                    const SizedBox(height: 16),
+        
+                    // Saved Loops Section - Fixed height with scrollable content
+                    ClayContainer(
+                      color: Theme.of(context).colorScheme.surface,
+                      depth: 20,
+                      borderRadius: 16,
+                      child: Container(
+                        height: 250,
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(Icons.bookmark, size: 16, color: Theme.of(context).colorScheme.primary),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'Saved Loops',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold, 
+                                        fontSize: 14, 
+                                        color: Theme.of(context).colorScheme.onSurface
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                ElevatedButton.icon(
+                                  onPressed: _showSaveLoopDialog,
+                                  icon: const Icon(Icons.add, size: 16),
+                                  label: const Text('Save', style: TextStyle(fontSize: 12)),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.green.shade600,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    minimumSize: Size.zero,
+                                    alignment: Alignment.center,
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Expanded(
+                              child: _savedLoops.isEmpty
+                                  ? Center(
+                                      child: Text(
+                                        'No saved loops yet. Tap "Save" to save the current loop.',
+                                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    )
+                                  : ListView.builder(
+                                      itemCount: _savedLoops.length,
+                                      itemBuilder: (context, index) {
+                                        final loop = _savedLoops[index];
+                                        return Padding(
+                                          padding: const EdgeInsets.only(bottom: 6),
+                                          child: Container(
+                                            padding: const EdgeInsets.all(4),
+                                            child: Row(
+                                              children: [
+                                                Expanded(
+                                                  child: GestureDetector(
+                                                    onTap: () => _loadLoop(loop),
+                                                    child: ClayContainer(
+                                                      color: Theme.of(context).colorScheme.surfaceContainerHigh,
+                                                      depth: 15,
+                                                      borderRadius: 12,
+                                                      child: Container(
+                                                        padding: const EdgeInsets.all(12),
+                                                        child: Column(
+                                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                                          children: [
+                                                            Text(
+                                                              loop['title'] as String,
+                                                              style: const TextStyle(
+                                                                fontWeight: FontWeight.w600,
+                                                                fontSize: 12,
+                                                              ),
+                                                            ),
+                                                            Text(
+                                                              '${_formatTime((loop['startTime'] as num).toDouble())} → ${_formatTime((loop['endTime'] as num).toDouble())} (${((loop['speed'] as num?)?.toDouble() ?? 1.0).toStringAsFixed(2)}x)',
+                                                              style: TextStyle(
+                                                                fontSize: 10,
+                                                                color: Colors.grey.shade600,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 15),
+                                                GestureDetector(
+                                                  onTap: () => _deleteLoop(index),
+                                                  child: ClayContainer(
+                                                    color: Colors.red.shade100,
+                                                    depth: 10,
+                                                    spread: 2,
+                                                    borderRadius: 8,
+                                                    child: Container(
+                                                      padding: const EdgeInsets.all(6),
+                                                      child: Icon(
+                                                        Icons.delete_outline,
+                                                        size: 16,
+                                                        color: Colors.red.shade600,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                            ),
+                          ],
                         ),
                       ),
-                      SizedBox(height: 8),
-                      Text(
-                        'Paste a YouTube URL above to get started',
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
-            ],
             ),
+        
+          // No video loaded message
+          if (_controller == null)
+            const SizedBox(
+              height: 250,
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.video_library,
+                      size: 64,
+                      color: Colors.grey,
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      'No video loaded',
+                      style: TextStyle(
+                        fontSize: 18,
+                        color: Colors.grey,
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'Paste a YouTube URL above to get started',
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
           ),
         ),
       ),
