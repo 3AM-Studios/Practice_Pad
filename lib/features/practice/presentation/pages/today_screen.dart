@@ -72,49 +72,55 @@ class _TodayScreenState extends State<TodayScreen> {
     );
   }
 
-  Widget _buildTranscribeButton(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Center(
-        child: GestureDetector(
-          onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => const YouTubeVideosPage(),
+Widget _buildTranscribeButton(BuildContext context) {
+  final screenWidth = MediaQuery.of(context).size.width;
+
+  final double iconSize = (screenWidth * 0.052).clamp(20.0, 28.0);
+  final double fontSize = (screenWidth * 0.038).clamp(16.0, 22.0);
+
+  return Container(
+    // This container creates the responsive padding on the sides
+    padding: EdgeInsets.symmetric(horizontal: screenWidth - (screenWidth * 0.75)),
+    child: GestureDetector( // Remove the Center widget from here
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => const YouTubeVideosPage(),
+          ),
+        );
+      },
+      child: ClayContainer(
+        color: Theme.of(context).colorScheme.surface,
+        depth: 15,
+        borderRadius: 16,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          child: Row(
+            // Change MainAxisSize.min to MainAxisAlignment.center
+            // This makes the Row expand to fill the width and centers its children.
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.hearing,
+                color: Theme.of(context).colorScheme.primary,
+                size: iconSize,
               ),
-            );
-          },
-          child: ClayContainer(
-            color: Theme.of(context).colorScheme.surface,
-            depth: 15,
-            borderRadius: 16,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.hearing,
-                    color: Theme.of(context).colorScheme.primary,
-                    size: 24,
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    'Transcribe',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.primary,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
+              const SizedBox(width: 12),
+              Text(
+                'Transcribe',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.primary,
+                  fontSize: fontSize,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
+            ],
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
 Widget _buildBody(BuildContext context, TodayViewModel viewModel) {
   final theme = Theme.of(context);
@@ -183,7 +189,7 @@ Widget _buildBody(BuildContext context, TodayViewModel viewModel) {
       const SizedBox(height: 16),
       // Responsive bottom section
       _buildBottomSection(context, viewModel, widget.onStatsPressed, isTabletOrDesktop),
-      const SizedBox(height: 30),
+       SizedBox(height: isTabletOrDesktop? 120 : 30),
     ],
   );
 }
@@ -668,7 +674,7 @@ Future<void> _showDebugInfo(BuildContext context) async {
 Widget _buildBottomSection(BuildContext context, TodayViewModel viewModel, VoidCallback? onStatsPressed, bool isTabletOrDesktop) {
   // Get screen height and calculate 25% shorter bottom area
   final screenHeight = MediaQuery.of(context).size.height;
-  final bottomAreaHeight = screenHeight * 0.54; // Reduced from ~30% to ~23% (25% reduction)
+  final bottomAreaHeight = (isTabletOrDesktop ?350.0: 510.0); // Reduced from ~30% to ~23% (25% reduction)
   
   return SizedBox(
     height: bottomAreaHeight,
@@ -687,13 +693,10 @@ Widget _buildBottomSection(BuildContext context, TodayViewModel viewModel, VoidC
               ),
             ),
             // Right side: Calendar
-            Expanded(
-              flex: 1,
-              child: PracticeCalendar(
+            PracticeCalendar(
+                calendarSize: CalendarSize.medium,
                 onStatsPressed: onStatsPressed,
-                calendarSize: CalendarSize.medium, // Use medium size for better visibility
               ),
-            ),
           ],
         )
       : Column(
@@ -704,13 +707,11 @@ Widget _buildBottomSection(BuildContext context, TodayViewModel viewModel, VoidC
               child: buildGoalRing(context, viewModel, isLarge: false), // Small size for phones
             ),
             const Expanded(flex: 0, child: ActiveSessionBanner(isTabletOrDesktop: false)),
-            Expanded(
-              flex:1,
-              child: PracticeCalendar(
+            PracticeCalendar(
                 calendarSize: CalendarSize.small,
                 onStatsPressed: onStatsPressed,
               ),
-            ),
+            
           ],
         ),
   );

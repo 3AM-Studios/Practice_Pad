@@ -91,10 +91,7 @@ class _YouTubeVideosPageState extends State<YouTubeVideosPage> {
               ),
             ),
             const SizedBox(height: 16),
-          ],
-        ),
-        actions: [
-                      GestureDetector(
+            GestureDetector(
               onTap: () async {
                 final Uri youtubeUrl = Uri.parse('https://youtube.com');
                 if (await canLaunchUrl(youtubeUrl)) {
@@ -102,8 +99,10 @@ class _YouTubeVideosPageState extends State<YouTubeVideosPage> {
                 }
               },
               child: ClayContainer(
-                color: Theme.of(context).colorScheme.surface,
+                color: Colors.red,
+                parentColor: Theme.of(context).colorScheme.surface,
                 depth: 15,
+                emboss: true,
                 borderRadius: 8,
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -111,17 +110,17 @@ class _YouTubeVideosPageState extends State<YouTubeVideosPage> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        Icons.open_in_browser,
-                        color: Theme.of(context).colorScheme.primary,
+                        Icons.youtube_searched_for,
+                        color: Colors.white,
                         size: 16,
                       ),
                       const SizedBox(width: 8),
                       Text(
                         'Browse YouTube',
                         style: TextStyle(
-                          color: Theme.of(context).colorScheme.primary,
+                          color: Colors.white,
                           fontSize: 14,
-                          fontWeight: FontWeight.w500,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ],
@@ -129,6 +128,10 @@ class _YouTubeVideosPageState extends State<YouTubeVideosPage> {
                 ),
               ),
             ),
+          ],
+        ),
+        actions: [
+                      
 
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -255,20 +258,13 @@ class _YouTubeVideosPageState extends State<YouTubeVideosPage> {
                         ),
                       ),
                       const SizedBox(width: 16),
-                      const Expanded(
+                      const Center(
                         child: Text(
                           'YouTube Videos',
                           style: TextStyle(
                             fontSize: 25,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
-                            shadows: [
-                              Shadow(
-                                offset: Offset(1, 1),
-                                blurRadius: 3,
-                                color: Colors.black54,
-                              ),
-                            ],
                           ),
                         ),
                       ),
@@ -293,7 +289,12 @@ class _YouTubeVideosPageState extends State<YouTubeVideosPage> {
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                         child: TextField(
                           controller: _searchController,
+                          textAlign: TextAlign.center,
+                          textAlignVertical: TextAlignVertical.center,
                           decoration: const InputDecoration(
+                            floatingLabelAlignment: FloatingLabelAlignment.center,
+                            alignLabelWithHint: true,
+                           
                             hintText: 'Search videos...',
                             border: InputBorder.none,
                             prefixIcon: Icon(Icons.search),
@@ -394,7 +395,8 @@ class _YouTubeVideosPageState extends State<YouTubeVideosPage> {
                                         children: [
                                           // Video Icon
                                           ClayContainer(
-                                            color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                                            color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                                            parentColor: Theme.of(context).colorScheme.surface,
                                             depth: 10,
                                             borderRadius: 12,
                                             child: Container(
@@ -448,7 +450,8 @@ class _YouTubeVideosPageState extends State<YouTubeVideosPage> {
                                               video['title'] ?? 'Unknown',
                                             ),
                                             child: ClayContainer(
-                                              color: Colors.red.shade100,
+                                              color: Colors.red.shade100.withOpacity(0.6),
+                                              parentColor: Theme.of(context).colorScheme.surface,
                                               depth: 10,
                                               borderRadius: 8,
                                               child: Container(
