@@ -9,7 +9,7 @@ import 'package:practice_pad/features/song_viewer/presentation/viewers/pdf_viewe
 class FullscreenPDFViewer extends StatefulWidget {
   final ImagePainterController sourceController; // Source controller to copy data from
   final Uint8List pageImage; // The current page image data
-  final Function(int)? onPageChange; // Callback for page navigation
+  final Function(int, Function(Uint8List, ImagePainterController))? onPageChange; // Callback for page navigation with update callback
   final VoidCallback? onExit; // Callback when exiting fullscreen
 
   const FullscreenPDFViewer({
@@ -26,19 +26,18 @@ class FullscreenPDFViewer extends StatefulWidget {
 
 class _FullscreenPDFViewerState extends State<FullscreenPDFViewer> {
   late ImagePainterController _controller;
+  late Uint8List _currentPageImage;
+  Key _imagePainterKey = UniqueKey();
+  bool _isDisposed = false;
+  bool _isChangingPage = false;
+  VoidCallback? _currentListener;
   
   @override
   void initState() {
     super.initState();
     debugPrint('=== FULLSCREEN INIT: Starting initialization ===');
-    // Create a new controller for the fullscreen viewer
-    _controller = ImagePainterController();
-    debugPrint('FULLSCREEN INIT: Created new controller');
-    
-    // Add listener to track controller changes
-    _controller.addListener(() {
-      debugPrint('FULLSCREEN CONTROLLER: Listener triggered - paintHistory: ${_controller.paintHistory.length}, labels: ${_controller.labels.length}');
-    });
+    _currentPageImage = widget.pageImage;
+    _initializeController();
     
     // Defer copying drawing data until after first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -47,10 +46,40 @@ class _FullscreenPDFViewerState extends State<FullscreenPDFViewer> {
     });
   }
   
+  void _initializeController() {
+    // Create a new controller for the fullscreen viewer
+    _controller = ImagePainterController();
+    debugPrint('FULLSCREEN INIT: Created new controller');
+    
+    // Create and add listener to track controller changes
+    _currentListener = () {
+      if (!_isDisposed && mounted) {
+        debugPrint('FULLSCREEN CONTROLLER: Listener triggered - paintHistory: ${_controller.paintHistory.length}, labels: ${_controller.labels.length}');
+      }
+    };
+    _controller.addListener(_currentListener!);
+  }
+  
   @override
   void dispose() {
     debugPrint('=== FULLSCREEN DISPOSE: Starting disposal ===');
-    _controller.dispose();
+    _isDisposed = true;
+    
+    // Remove listener before disposing
+    if (_currentListener != null) {
+      try {
+        _controller.removeListener(_currentListener!);
+      } catch (e) {
+        debugPrint('Error removing listener during dispose: $e');
+      }
+    }
+    
+    try {
+      _controller.dispose();
+    } catch (e) {
+      debugPrint('Error disposing controller: $e');
+    }
+    
     super.dispose();
     debugPrint('=== FULLSCREEN DISPOSE: Disposal completed ===');
   }
@@ -80,19 +109,107 @@ class _FullscreenPDFViewerState extends State<FullscreenPDFViewer> {
 
   /// Copy changes back to source controller when exiting fullscreen
   void _copyChangesBack() {
-    // Clear source controller's current data
-    widget.sourceController.clear();
+    if (_isDisposed || !mounted) return;
     
-    // Copy updated paint history back directly without coordinate conversion
-    for (final paintInfo in _controller.paintHistory) {
-      widget.sourceController.addPaintInfo(paintInfo);
+    try {
+      // Clear source controller's current data
+      widget.sourceController.clear();
+      
+      // Copy updated paint history back directly without coordinate conversion
+      for (final paintInfo in _controller.paintHistory) {
+        widget.sourceController.addPaintInfo(paintInfo);
+      }
+      
+      // Copy labels back directly without coordinate conversion
+      widget.sourceController.labels.clear();
+      for (final label in _controller.labels) {
+        widget.sourceController.labels.add(label);
+      }
+    } catch (e) {
+      debugPrint('Error copying changes back: $e');
+    }
+  }
+
+  /// Handle page change and update the fullscreen view
+  void _handlePageChange(int direction) {
+    if (_isDisposed || !mounted || _isChangingPage) return;
+    
+    debugPrint('=== FULLSCREEN OVERLAY: Page change button tapped (direction: $direction) ===');
+    _isChangingPage = true;
+    
+    try {
+      // Copy any changes back to source controller first
+      _copyChangesBack();
+      
+      // Trigger page change in main viewer and get updated page data
+      widget.onPageChange?.call(direction, (newPageImage, newSourceController) {
+        if (mounted && !_isDisposed) {
+          // Create a new controller for the new page to avoid disposal issues
+          _reinitializeControllerForNewPage();
+          
+          setState(() {
+            _currentPageImage = newPageImage;
+          });
+          
+          // Copy new page data to our fresh controller
+          _copyDrawingDataFrom(newSourceController);
+        }
+        _isChangingPage = false;
+      });
+    } catch (e) {
+      debugPrint('Error handling page change: $e');
+      _isChangingPage = false;
+    }
+  }
+  
+  /// Reinitialize controller for new page to prevent disposal errors
+  void _reinitializeControllerForNewPage() {
+    if (_isDisposed || !mounted) return;
+    
+    try {
+      // Remove listener from old controller
+      if (_currentListener != null) {
+        _controller.removeListener(_currentListener!);
+      }
+      
+      // Dispose old controller
+      _controller.dispose();
+      
+      // Create new controller for this page
+      _controller = ImagePainterController();
+      
+      // Create and add new listener
+      _currentListener = () {
+        if (!_isDisposed && mounted) {
+          debugPrint('FULLSCREEN CONTROLLER: Listener triggered - paintHistory: ${_controller.paintHistory.length}, labels: ${_controller.labels.length}');
+        }
+      };
+      _controller.addListener(_currentListener!);
+      
+      // Generate new key to force ImagePainter rebuild
+      _imagePainterKey = UniqueKey();
+      
+      debugPrint('Reinitialized fullscreen controller for new page');
+    } catch (e) {
+      debugPrint('Error reinitializing fullscreen controller: $e');
+    }
+  }
+  
+  /// Copy drawing data from a specific controller
+  void _copyDrawingDataFrom(ImagePainterController sourceController) {
+    debugPrint('=== FULLSCREEN COPY: Copying from updated source controller ===');
+    
+    // Copy paint history directly without coordinate conversion
+    for (final paintInfo in sourceController.paintHistory) {
+      _controller.addPaintInfo(paintInfo);
     }
     
-    // Copy labels back directly without coordinate conversion
-    widget.sourceController.labels.clear();
-    for (final label in _controller.labels) {
-      widget.sourceController.labels.add(label);
+    // Copy labels directly without coordinate conversion
+    for (final label in sourceController.labels) {
+      _controller.labels.add(label);
     }
+    
+    debugPrint('FULLSCREEN COPY: Updated controller state - paintHistory: ${_controller.paintHistory.length}, labels: ${_controller.labels.length}');
   }
 
   @override
@@ -116,7 +233,7 @@ class _FullscreenPDFViewerState extends State<FullscreenPDFViewer> {
               },
               behavior: HitTestBehavior.translucent,
               child: ImagePainter.memory(
-                widget.pageImage,
+                _currentPageImage,
                 controller: _controller,
                 scalable: true,
                 controlsAtTop: false,
@@ -131,7 +248,7 @@ class _FullscreenPDFViewerState extends State<FullscreenPDFViewer> {
                 controlsBackgroundColor: Colors.transparent,
                 height: MediaQuery.of(context).size.height,
                 width: MediaQuery.of(context).size.width,
-                key: UniqueKey(), // Add unique key to avoid hero tag conflicts
+                key: _imagePainterKey, // Use dynamic key to force rebuild on page changes
               ),
             ),
           ),
@@ -150,11 +267,18 @@ class _FullscreenPDFViewerState extends State<FullscreenPDFViewer> {
                 child: InkWell(
                   borderRadius: BorderRadius.circular(25),
                   onTap: () {
+                    if (_isDisposed || !mounted || _isChangingPage) return;
+                    
                     debugPrint('=== FULLSCREEN OVERLAY: Exit button tapped ===');
-                    // Copy any changes made in fullscreen back to the source controller
-                    _copyChangesBack();
-                    widget.onExit?.call();
-                    Navigator.of(context).pop();
+                    try {
+                      // Copy any changes made in fullscreen back to the source controller
+                      _copyChangesBack();
+                      widget.onExit?.call();
+                      Navigator.of(context).pop();
+                    } catch (e) {
+                      debugPrint('Error handling exit: $e');
+                      Navigator.of(context).pop();
+                    }
                   },
                   child: const Padding(
                     padding: EdgeInsets.all(12),
@@ -183,23 +307,24 @@ class _FullscreenPDFViewerState extends State<FullscreenPDFViewer> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     // Left arrow
-                    Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(8),
-                          bottomLeft: Radius.circular(8),
-                        ),
-                        onTap: () {
-                          debugPrint('=== FULLSCREEN OVERLAY: Previous page button tapped ===');
-                          widget.onPageChange!(-1);
-                        },
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Icon(
-                            Icons.chevron_left,
-                            color: Theme.of(context).colorScheme.onSurface,
-                            size: 24,
+                    ClayContainer(
+                      child: Material(
+                        color: Colors.white,
+                        child: InkWell(
+                          borderRadius: const BorderRadius.only(
+                            topLeft: Radius.circular(8),
+                            bottomLeft: Radius.circular(8),
+                          ),
+                          onTap: () {
+                            _handlePageChange(-1);
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Icon(
+                              Icons.chevron_left,
+                              color: Theme.of(context).colorScheme.onSurface,
+                              size: 24,
+                            ),
                           ),
                         ),
                       ),
@@ -211,23 +336,24 @@ class _FullscreenPDFViewerState extends State<FullscreenPDFViewer> {
                       color: Theme.of(context).colorScheme.onSurface.withOpacity(0.2),
                     ),
                     // Right arrow
-                    Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        borderRadius: const BorderRadius.only(
-                          topRight: Radius.circular(8),
-                          bottomRight: Radius.circular(8),
-                        ),
-                        onTap: () {
-                          debugPrint('=== FULLSCREEN OVERLAY: Next page button tapped ===');
-                          widget.onPageChange!(1);
-                        },
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Icon(
-                            Icons.chevron_right,
-                            color: Theme.of(context).colorScheme.onSurface,
-                            size: 24,
+                    ClayContainer(
+                      child: Material(
+                        color: Colors.white,
+                        child: InkWell(
+                          borderRadius: const BorderRadius.only(
+                            topRight: Radius.circular(8),
+                            bottomRight: Radius.circular(8),
+                          ),
+                          onTap: () {
+                            _handlePageChange(1);
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Icon(
+                              Icons.chevron_right,
+                              color: Theme.of(context).colorScheme.onSurface,
+                              size: 24,
+                            ),
                           ),
                         ),
                       ),

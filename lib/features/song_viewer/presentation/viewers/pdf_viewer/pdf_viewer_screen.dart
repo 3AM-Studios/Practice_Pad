@@ -129,7 +129,11 @@ class _PDFViewerState extends State<PDFViewer>
     try {
       setState(() {
         _isLoading = true;
+        _isReady = false;
       });
+
+      // Reinitialize the ImagePainterController for the new PDF
+      _reinitializeController();
 
       // Copy PDF to app documents directory for permanent storage
       String permanentPdfPath = path;
@@ -235,10 +239,19 @@ class _PDFViewerState extends State<PDFViewer>
       if (result != null && result.files.single.path != null) {
         await _loadPDF(result.files.single.path!);
         
+        // Use a delay to ensure the widget tree is stable before showing snackbar
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('PDF loaded successfully!')),
-          );
+          Future.delayed(const Duration(milliseconds: 100), () {
+            if (mounted) {
+              try {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('PDF loaded successfully!')),
+                );
+              } catch (e) {
+                debugPrint('Error showing snackbar: $e');
+              }
+            }
+          });
         }
       }
     } catch (e) {
@@ -584,19 +597,23 @@ class _PDFViewerState extends State<PDFViewer>
   }
 
   /// Navigate to fullscreen PDF viewer
-  void _navigateToFullscreen() {
+  void _navigateToFullscreen() async {
     if (_currentPageImage == null) return;
     
-    Navigator.of(context).push(
+    await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => FullscreenPDFViewer(
           sourceController: _imagePainterController,
           pageImage: _currentPageImage!,
-          onPageChange: (direction) {
-            if (direction == -1) {
-              _previousPage();
-            } else if (direction == 1) {
-              _nextPage();
+          onPageChange: (direction, updateCallback) async {
+            if (direction == -1 && _currentPage > 0) {
+              await _previousPage();
+              // Provide updated page data to fullscreen viewer
+              updateCallback(_currentPageImage!, _imagePainterController);
+            } else if (direction == 1 && _currentPage < _totalPages - 1) {
+              await _nextPage();
+              // Provide updated page data to fullscreen viewer
+              updateCallback(_currentPageImage!, _imagePainterController);
             }
           },
           onExit: () {
@@ -605,6 +622,11 @@ class _PDFViewerState extends State<PDFViewer>
         ),
       ),
     );
+    
+    // Force rebuild when returning from fullscreen to ensure UI is updated
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   /// Build page navigation controls
