@@ -101,15 +101,24 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
 
   @override
   void dispose() {
-    // Remove listener before disposing
-    if (_controller != null) {
-      _controller!.removeListener(_videoListener);
-      _controller!.dispose();
-      _controller = null;
-    }
+    // Safely dispose of the YouTube controller
+    _disposeController();
     _sessionManager?.removeListener(_syncWithSessionManager);
     _urlController.dispose();
     super.dispose();
+  }
+
+  void _disposeController() {
+    if (_controller != null) {
+      try {
+        _controller!.removeListener(_videoListener);
+        _controller!.dispose();
+      } catch (e) {
+        debugPrint('Error disposing controller: $e');
+      } finally {
+        _controller = null;
+      }
+    }
   }
 
   Future<void> _loadYoutubeData() async {
@@ -173,25 +182,26 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
         _currentVideoId = videoId;
         
         // Dispose existing controller safely
-        if (_controller != null) {
-          _controller!.removeListener(_videoListener);
-          _controller!.dispose();
-          _controller = null;
-        }
+        _disposeController();
         
-        // Create new controller
-        _controller = YoutubePlayerController(
-          initialVideoId: videoId,
-          flags: const YoutubePlayerFlags(
-            autoPlay: false,
-            mute: false,
-            enableCaption: true,
-            loop: false,
-          ),
-        );
+        // Small delay to ensure disposal is complete
+        await Future.delayed(const Duration(milliseconds: 100));
+        
+        // Create new controller only if widget is still mounted
+        if (mounted) {
+          _controller = YoutubePlayerController(
+            initialVideoId: videoId,
+            flags: const YoutubePlayerFlags(
+              autoPlay: false,
+              mute: false,
+              enableCaption: true,
+              loop: false,
+            ),
+          );
 
-        _controller!.addListener(_videoListener);
-        _updatePlaybackSpeed();
+          _controller!.addListener(_videoListener);
+          _updatePlaybackSpeed();
+        }
         setState(() {
           _isLoadingVideo = false;
         });
@@ -214,10 +224,21 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
   }
 
   void _videoListener() {
-    if (_controller != null && _controller!.value.isReady && _isAutoLoop) {
-      final currentTime = _controller!.value.position.inSeconds.toDouble();
-      if (currentTime >= _loopEndTime && currentTime > 0) {
-        _controller!.seekTo(Duration(seconds: _loopStartTime.toInt()));
+    if (_controller != null && !_controller!.value.hasError && _controller!.value.isReady && mounted) {
+      try {
+        final currentTime = _controller!.value.position.inSeconds.toDouble();
+        if (currentTime >= _loopEndTime && currentTime > 0) {
+          if (_isAutoLoop) {
+            // Auto loop is on: jump back to start
+            _controller!.seekTo(Duration(seconds: _loopStartTime.toInt()));
+          } else {
+            // Auto loop is off: pause the video
+            _controller!.pause();
+          }
+        }
+      } catch (e) {
+        // Controller may have been disposed, ignore the error
+        debugPrint('Video listener error (controller likely disposed): $e');
       }
     }
   }
@@ -426,8 +447,12 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
   }
 
   void _updatePlaybackSpeed() {
-    if (_controller != null && _controller!.value.isReady) {
-      _controller!.setPlaybackRate(_playbackSpeed);
+    if (_controller != null && _controller!.value.isReady && mounted) {
+      try {
+        _controller!.setPlaybackRate(_playbackSpeed);
+      } catch (e) {
+        debugPrint('Error updating playback speed (controller likely disposed): $e');
+      }
     }
   }
 
@@ -439,9 +464,13 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
 
 
   void _playFromLoopStart() {
-    if (_controller != null && _controller!.value.isReady) {
-      _controller!.seekTo(Duration(seconds: _loopStartTime.toInt()));
-      _controller!.play();
+    if (_controller != null && _controller!.value.isReady && mounted) {
+      try {
+        _controller!.seekTo(Duration(seconds: _loopStartTime.toInt()));
+        _controller!.play();
+      } catch (e) {
+        debugPrint('Error playing from loop start (controller likely disposed): $e');
+      }
     }
   }
 
@@ -474,54 +503,6 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
     );
   }
 
-  Widget _buildSpeedButton({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: ClayContainer(
-        color: Theme.of(context).colorScheme.surface,
-        depth: 15,
-        borderRadius: 16,
-        width: 48,
-        height: 48,
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                color.withOpacity(0.8),
-                color,
-              ],
-            ),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                color: Colors.white,
-                size: 16,
-              ),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
   Widget _buildSimpleButton({
     required String label,
