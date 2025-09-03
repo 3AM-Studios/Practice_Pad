@@ -74,7 +74,7 @@ class _TodayScreenState extends State<TodayScreen> {
 Widget _buildBody(BuildContext context, TodayViewModel viewModel) {
   final theme = Theme.of(context);
   final isTabletOrDesktop = deviceType == DeviceType.tablet || deviceType == DeviceType.macOS;
-print('Device type: $deviceType, isTabletOrDesktop: $isTabletOrDesktop');
+
   if (viewModel.isLoading) {
     return Center(
       child: CupertinoActivityIndicator(
@@ -105,7 +105,7 @@ print('Device type: $deviceType, isTabletOrDesktop: $isTabletOrDesktop');
           ),
         ),
         _buildBottomSection(context, viewModel, widget.onStatsPressed, isTabletOrDesktop),
-        const SizedBox(height: 45),
+        SizedBox(height: MediaQuery.of(context).size.height * 0.003), //30% of overall height
       ],
     );
   }
@@ -190,42 +190,37 @@ Widget _buildFixedHeader(BuildContext context) {
     // Non-iPhone layout
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 8.0, 16, 8),
-      child: Stack(
+      child: Row(
         children: [
-          // Centered banner
-          Center(
-            child: ClayContainer(
-              borderRadius: 10,
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(35.0, 5, 35.0, 5),
-                decoration: BoxDecoration(
-                  image: const DecorationImage(
-                    image: AssetImage('assets/images/wood_texture_rotated.jpg'),
-                    fit: BoxFit.cover,
+          // Expanded banner that takes up available space and centers content
+          Expanded(
+            child: Center(
+              child: ClayContainer(
+                borderRadius: 10,
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(35.0, 5, 35.0, 5),
+                  decoration: BoxDecoration(
+                    image: const DecorationImage(
+                      image: AssetImage('assets/images/wood_texture_rotated.jpg'),
+                      fit: BoxFit.cover,
+                    ),
+                    border: Border.all(color: Theme.of(context).colorScheme.surface, width: 4),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  border: Border.all(color: Theme.of(context).colorScheme.surface, width: 4),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Text(
-                  'Today\'s Practice',
-                  style: TextStyle(
-                    fontSize: 20.0,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white
+                  child: const Text(
+                    'Today\'s Practice',
+                    style: TextStyle(
+                      fontSize: 20.0,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white
+                    ),
                   ),
                 ),
               ),
             ),
           ),
-          // Sync buttons positioned absolutely on the right
-          Positioned(
-            right: 50,
-            top: 50,
-            bottom: 0,
-            child: Center(
-              child: _buildSyncButtons(context),
-            ),
-          ),
+          // Sync buttons positioned at the end of the row
+          _buildSyncButtons(context),
         ],
       ),
     );

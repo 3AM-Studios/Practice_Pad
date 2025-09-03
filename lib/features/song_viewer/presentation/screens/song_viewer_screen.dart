@@ -261,7 +261,7 @@ class _SongViewerScreenState extends State<SongViewerScreen> {
                 const SizedBox(height: 16),
                 // Toolbar section
                 _buildToolbar(),
-                const SizedBox(height: 20),
+                _currentMode == ViewerMode.pdf ?  const SizedBox.shrink() : const SizedBox(height: 12),
                 // Content section
                 _buildContent(),
                 const SizedBox(height: 20),

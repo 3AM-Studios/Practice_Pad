@@ -670,67 +670,25 @@ class _PDFViewerState extends State<PDFViewer>
 
   /// Returns toolbar widget for main screen
   Widget buildToolbar() {
-    final theme = Theme.of(context);
-    final surfaceColor = theme.colorScheme.surface;
-
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      child: ClayContainer(
-        color: surfaceColor,
-        borderRadius: 20,
-        depth: 8,
-        spread: 2,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final isWideEnough = constraints.maxWidth > 350;
-              
-              if (isWideEnough) {
-                // Wide enough: single row layout
-                return Row(
-                  children: [
-                    // Books and Upload buttons (flexible to take available space)
-                    Expanded(
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _buildBooksButton(),
-                          const SizedBox(width: 8),
-                          _buildUploadButton(),
-                        ],
-                      ),
-                    ),
-                    
-                    // Transcribe button (fixed size)
-                    _buildTranscribeButton(),
-                  ],
-                );
-              } else {
-                // Narrow: stacked layout
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Top row: Books and Upload buttons
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _buildBooksButton(),
-                        const SizedBox(width: 8),
-                        _buildUploadButton(),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    // Bottom row: Transcribe button centered
-                    _buildTranscribeButton(),
-                  ],
-                );
-              }
-            },
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Top row: Books and Upload buttons
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _buildBooksButton(),
+              const SizedBox(width: 12),
+              _buildUploadButton(),
+            ],
           ),
-        ),
+          const SizedBox(height: 12),
+          // Bottom row: Transcribe button centered
+          _buildTranscribeButton(),
+        ],
       ),
     );
   }
