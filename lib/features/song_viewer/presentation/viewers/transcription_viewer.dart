@@ -42,6 +42,9 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
   double _playbackSpeed = 1.0;
   List<Map<String, dynamic>> _savedLoops = [];
   
+  // Loop control state
+  bool _isUserScrubbing = false;
+  
   // Practice session state
   PracticeSessionManager? _sessionManager;
   int _elapsedSeconds = 0;
@@ -224,7 +227,7 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
   }
 
   void _videoListener() {
-    if (_controller != null && !_controller!.value.hasError && _controller!.value.isReady && mounted) {
+    if (_controller != null && !_controller!.value.hasError && _controller!.value.isReady && mounted && !_isUserScrubbing) {
       try {
         final currentTime = _controller!.value.position.inSeconds.toDouble();
         if (currentTime >= _loopEndTime && currentTime > 0) {
@@ -474,6 +477,19 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
     }
   }
 
+  void _playFromSecondsBeforeEnd() {
+    if (_controller != null && _controller!.value.isReady && mounted) {
+      try {
+        // Play from 2 seconds before the loop end time
+        final playTime = (_loopEndTime - 2).clamp(0, _loopEndTime);
+        _controller!.seekTo(Duration(seconds: playTime.toInt()));
+        _controller!.play();
+      } catch (e) {
+        debugPrint('Error playing from seconds before end (controller likely disposed): $e');
+      }
+    }
+  }
+
 
   String _formatTime(double seconds) {
     final int minutes = (seconds ~/ 60);
@@ -488,17 +504,24 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
   }) {
     return GestureDetector(
       onTap: onTap,
-      child: ClayContainer(
-        color: Theme.of(context).colorScheme.surface,
-        depth: 20,
-        borderRadius: 12,
-        width: 44,
-        height: 44,
-        child: Icon(
-          icon,
-          color: color,
-          size: 20,
-        ),
+      child: _buildClayButtonWidget(icon: icon, color: color),
+    );
+  }
+
+  Widget _buildClayButtonWidget({
+    required IconData icon,
+    required Color color,
+  }) {
+    return ClayContainer(
+      color: Theme.of(context).colorScheme.surface,
+      depth: 20,
+      borderRadius: 12,
+      width: 44,
+      height: 44,
+      child: Icon(
+        icon,
+        color: color,
+        size: 20,
       ),
     );
   }
@@ -1448,26 +1471,56 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  _buildClayButton(
-                                    icon: Icons.remove,
-                                    color: Colors.red.shade600,
-                                    onTap: () {
+                                  GestureDetector(
+                                    onTapDown: (_) {
                                       setState(() {
+                                        _isUserScrubbing = true;
+                                      });
+                                    },
+                                    onTapUp: (_) {
+                                      setState(() {
+                                        _isUserScrubbing = false;
                                         _loopEndTime = (_loopEndTime - 1).clamp(_loopStartTime + 1, double.infinity);
                                       });
                                       _saveYoutubeData();
+                                      // Play from 2 seconds before the new end time
+                                      _playFromSecondsBeforeEnd();
                                     },
+                                    onTapCancel: () {
+                                      setState(() {
+                                        _isUserScrubbing = false;
+                                      });
+                                    },
+                                    child: _buildClayButtonWidget(
+                                      icon: Icons.remove,
+                                      color: Colors.red.shade600,
+                                    ),
                                   ),
                                   const SizedBox(width: 12),
-                                  _buildClayButton(
-                                    icon: Icons.add,
-                                    color: Colors.green.shade600,
-                                    onTap: () {
+                                  GestureDetector(
+                                    onTapDown: (_) {
                                       setState(() {
+                                        _isUserScrubbing = true;
+                                      });
+                                    },
+                                    onTapUp: (_) {
+                                      setState(() {
+                                        _isUserScrubbing = false;
                                         _loopEndTime = _loopEndTime + 1;
                                       });
                                       _saveYoutubeData();
+                                      // Play from 2 seconds before the new end time
+                                      _playFromSecondsBeforeEnd();
                                     },
+                                    onTapCancel: () {
+                                      setState(() {
+                                        _isUserScrubbing = false;
+                                      });
+                                    },
+                                    child: _buildClayButtonWidget(
+                                      icon: Icons.add,
+                                      color: Colors.green.shade600,
+                                    ),
                                   ),
                                 ],
                               ),

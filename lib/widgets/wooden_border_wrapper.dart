@@ -6,12 +6,14 @@ class WoodenBorderWrapper extends StatelessWidget {
   final Widget child;
   final double borderWidth;
   final double cornerRadius;
+  final String imagePath;
   
   const WoodenBorderWrapper({
     super.key,
     required this.child,
     this.borderWidth = 6.0,
     this.cornerRadius = 15.0,
+    this.imagePath = 'assets/images/wood_texture.jpg',
   });
 
   @override
@@ -19,8 +21,8 @@ class WoodenBorderWrapper extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         // Wooden texture background
-        image: const DecorationImage(
-          image: AssetImage('assets/images/wood_texture.jpg'),
+        image: DecorationImage(
+          image: AssetImage(imagePath),
           fit: BoxFit.cover,
         ),
         borderRadius: BorderRadius.circular(cornerRadius),

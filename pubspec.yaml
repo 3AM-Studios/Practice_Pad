@@ -75,6 +75,9 @@ dependencies:
     path: packages/youtube_player_flutter
   google_fonts: ^6.3.0
   url_launcher: ^6.1.0
+  flutter_launcher_icons: ^0.14.4
+  concentric_transition:
+    path: packages/concentric_transition
 
 dev_dependencies:
   flutter_test:
@@ -100,7 +103,10 @@ flutter:
   assets:
     - assets/songs/
     - assets/images/
-
+    - assets/images/onboarding/page_1/
+    - assets/images/onboarding/page_2/
+    - assets/images/onboarding/page_3/
+    - assets/images/onboarding/page_4/
         # You can also add other weights like bold if you 
   # To add assets to your application, add an assets section, like this:
   # assets:

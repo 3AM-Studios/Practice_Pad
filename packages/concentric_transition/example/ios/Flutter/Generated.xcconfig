@@ -1,6 +1,6 @@
 // This is a generated file; do not edit or check into version control.
 FLUTTER_ROOT=/Users/mohammedelmzoudi/flutter
-FLUTTER_APPLICATION_PATH=/Users/mohammedelmzoudi/Desktop/Endeavors/Projects/MusicMind/Flutter/music_mind/packages/concentric_transition/example
+FLUTTER_APPLICATION_PATH=/Volumes/ExternalTings/Practice_Pad/packages/concentric_transition/example
 COCOAPODS_PARALLEL_CODE_SIGN=true
 FLUTTER_TARGET=lib/main.dart
 FLUTTER_BUILD_DIR=build

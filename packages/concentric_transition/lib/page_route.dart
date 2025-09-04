@@ -44,7 +44,7 @@ class ConcentricPageRoute<T> extends PageRoute<T> {
     Animation<double> animation,
     Animation<double> secondaryAnimation,
   ) {
-    final Widget result = builder(context);
+    final Widget? result = builder(context);
     assert(() {
       if (result == null) {
         throw FlutterError(

@@ -24,6 +24,7 @@ import 'package:practice_pad/services/home_widget_service.dart';
 import 'package:practice_pad/services/widget_update_service.dart';
 import 'package:practice_pad/services/widget_action_handler.dart';
 import 'package:practice_pad/services/widget_integration.dart';
+import 'package:practice_pad/onboarding.dart';
 import 'dart:math' as math;
 
 import 'package:window_manager/window_manager.dart';
@@ -156,7 +157,7 @@ class PracticeLoverApp extends StatelessWidget {
         supportedLocales: const [
           Locale('en', ''),
         ],
-        home: MainAppScaffold(),
+        home: const AppRouter(),
       ),
     );
   }
@@ -970,5 +971,64 @@ class SettingsScreen extends StatelessWidget {
       ),
       child: Center(child: Text('Settings Screen - Placeholder')),
     );
+  }
+}
+
+class AppRouter extends StatefulWidget {
+  const AppRouter({super.key});
+
+  @override
+  State<AppRouter> createState() => _AppRouterState();
+}
+
+class _AppRouterState extends State<AppRouter> {
+  bool _isCheckingOnboarding = true;
+  bool _showOnboarding = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkOnboardingStatus();
+  }
+
+  Future<void> _checkOnboardingStatus() async {
+    // Development: Always show onboarding
+    // final isCompleted = await OnboardingService.isOnboardingCompleted();
+    setState(() {
+      _showOnboarding = true; // Always show during development
+      _isCheckingOnboarding = false;
+    });
+    
+    // Production: Uncomment below and comment out above
+    // final isCompleted = await OnboardingService.isOnboardingCompleted();
+    // setState(() {
+    //   _showOnboarding = !isCompleted;
+    //   _isCheckingOnboarding = false;
+    // });
+  }
+
+  void _onOnboardingComplete() {
+    setState(() {
+      _showOnboarding = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isCheckingOnboarding) {
+      return const Scaffold(
+        body: Center(
+          child: CupertinoActivityIndicator(),
+        ),
+      );
+    }
+
+    if (_showOnboarding) {
+      return OnboardingScreen(
+        onComplete: _onOnboardingComplete,
+      );
+    }
+
+    return const MainAppScaffold();
   }
 }

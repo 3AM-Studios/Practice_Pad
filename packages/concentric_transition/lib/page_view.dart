@@ -2,10 +2,8 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
-import 'package:practice_pad/services/texture_utils.dart';
+
 import 'clipper.dart';
-import 'dart:ui' as ui;
-import 'dart:math';
 
 class ConcentricPageView extends StatefulWidget {
   final Function(int index) itemBuilder;
@@ -26,10 +24,13 @@ class ConcentricPageView extends StatefulWidget {
   final Duration duration;
   final Curve curve;
   final Key? pageViewKey;
-  static const List<bool> applyTexture = [true, false, false];
 
   /// Useful for adding a next icon to the page view button
   final WidgetBuilder? nextButtonBuilder;
+  
+  /// Support for multi-image screens
+  final List<int>? imagesPerScreen;
+  final Function(int screenIndex, int imageIndex)? onImageChange;
 
   const ConcentricPageView({
     Key? key,
@@ -46,12 +47,14 @@ class ConcentricPageView extends StatefulWidget {
     this.scaleFactor = 0.3,
     this.opacityFactor = 0.0,
     this.radius = 40.0,
-    this.verticalPosition = 0.75,
+    this.verticalPosition = 0.88,
     this.direction = Axis.horizontal,
     this.physics = const ClampingScrollPhysics(),
     this.duration = const Duration(milliseconds: 1500),
     this.curve = Curves.easeInOutSine, // const Cubic(0.7, 0.5, 0.5, 0.1),
     this.nextButtonBuilder,
+    this.imagesPerScreen,
+    this.onImageChange,
   })  : assert(colors.length >= 2),
         super(key: key);
 
@@ -65,19 +68,15 @@ class _ConcentricPageViewState extends State<ConcentricPageView> {
   int _prevPage = 0;
   Color? _prevColor;
   Color? _nextColor;
-  final List<double> _applyTextureToPages = [0, 0, 0, 0];
-  double? _prevTextureOpacity;
-  double? _nextTextureOpacity;
-  ui.Image? texture;
+  
+  // Multi-image support
+  int _currentScreenIndex = 0;
+  int _currentImageIndex = 0;
 
   @override
   void initState() {
-    texture = TextureUtils.instance.getTexture('rosewood')!;
     _prevColor = widget.colors[_prevPage];
     _nextColor = widget.colors[_prevPage + 1];
-    _prevTextureOpacity = _applyTextureToPages[_prevPage];
-    _nextTextureOpacity = _applyTextureToPages[_prevPage + 1];
-
     _pageController = (widget.pageController ?? PageController(initialPage: 0))
       ..addListener(_onScroll);
     super.initState();
@@ -103,6 +102,9 @@ class _ConcentricPageViewState extends State<ConcentricPageView> {
           child: _Button(
             pageController: _pageController,
             widget: widget,
+            currentScreenIndex: _currentScreenIndex,
+            currentImageIndex: _currentImageIndex,
+            onNextImage: _handleNextImage,
           ),
         ),
       ],
@@ -167,52 +169,20 @@ class _ConcentricPageViewState extends State<ConcentricPageView> {
     return AnimatedBuilder(
       animation: _pageController,
       builder: (ctx, _) {
-        return Stack(
-          children: [
-            ColoredBox(
-              color: _prevColor!,
+        return ColoredBox(
+          color: _prevColor!,
+          child: ClipPath(
+            clipper: ConcentricClipper(
+              progress: _progress,
+              reverse: widget.reverse,
+              radius: widget.radius,
+              verticalPosition: widget.verticalPosition,
+            ),
+            child: ColoredBox(
+              color: _nextColor!,
               child: const SizedBox.expand(),
             ),
-            CustomPaint(
-              painter: ConcentricRingPainter(
-                  texture: texture!,
-                  thickness: 12, // Adjust for desired ring thickness
-                  progress: -_progress,
-                  radius: widget.radius,
-                  verticalPosition: widget.verticalPosition,
-                  reverse: widget.reverse),
-              child: const SizedBox.expand(),
-            ),
-            ClipPath(
-              clipper: ConcentricClipper(
-                progress: _progress,
-                reverse: widget.reverse,
-                radius: widget.radius,
-                verticalPosition: widget.verticalPosition,
-              ),
-              child: Stack(
-                children: [
-                  ColoredBox(
-                    color: _nextColor!,
-                    child: const SizedBox.expand(),
-                  ),
-                  Opacity(
-                    opacity: 1,
-                    child: CustomPaint(
-                      painter: ConcentricRingPainter(
-                          texture: texture!,
-                          thickness: 10, // Adjust for desired ring thickness
-                          progress: _progress,
-                          radius: widget.radius,
-                          verticalPosition: widget.verticalPosition,
-                          reverse: widget.reverse),
-                      child: const SizedBox.expand(),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+          ),
         );
       },
     );
@@ -243,119 +213,45 @@ class _ConcentricPageViewState extends State<ConcentricPageView> {
 
     widget.notifier?.value = page - _prevPage;
   }
-}
-
-class ConcentricRingPainter extends CustomPainter {
-  final double radius;
-  final double limit;
-  final double verticalPosition;
-  final double progress;
-  final double growFactor;
-  final bool reverse;
-  final ui.Image texture;
-  final double thickness;
-
-  ConcentricRingPainter({
-    required this.texture,
-    required this.thickness,
-    this.progress = 0.0,
-    this.verticalPosition = 0.85,
-    this.radius = 30.0,
-    this.growFactor = 30.0,
-    this.reverse = false,
-  }) : limit = 0.5;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final path = Path();
-    path.fillType = PathFillType.evenOdd;
-
-    final halfWidth = size.width / 2;
-    final centerY = (size.height * verticalPosition) + radius;
-
-    // Keep the radius constant, or adjust as needed
-    print('prog $progress');
-    double r = radius * 0.7 - radius * 0.8 * sin(pi * (1 - progress));
-
-    // Calculate the displacement needed to move the ring offscreen to the right
-    double displacement = halfWidth + radius + 30;
-
-    // Use the sine function to calculate centerX
-    // This moves the ring from center to right offscreen and back to center
-    double centerX = halfWidth + displacement * sin(pi * progress);
-
-    if (reverse) {
-      // If reverse is true, mirror the movement to the left
-      centerX = size.width - centerX;
+  
+  void _handleNextImage() {
+    if (widget.imagesPerScreen == null) {
+      // Standard behavior - go to next screen
+      _nextScreen();
+      return;
     }
-
-    final circleCenter = Offset(centerX, centerY);
-    final shape = Rect.fromCircle(center: circleCenter, radius: r);
-
-    // Build the clipping path
-    path.addOval(shape);
-
-    // Save the canvas state before clipping
-    canvas.save();
-
-    // Clip the canvas to the path
-    canvas.clipPath(path);
-
-    // Draw the content that should appear inside the clip
-    canvas.drawRect(
-      Rect.fromLTWH(0, 0, size.width, size.height),
-      Paint()..color = Colors.transparent,
+    
+    final imagesInCurrentScreen = widget.imagesPerScreen![_currentScreenIndex];
+    
+    if (_currentImageIndex < imagesInCurrentScreen - 1) {
+      // Move to next image in current screen
+      setState(() {
+        _currentImageIndex++;
+      });
+      widget.onImageChange?.call(_currentScreenIndex, _currentImageIndex);
+    } else {
+      // All images in current screen viewed, move to next screen
+      _nextScreen();
+    }
+  }
+  
+  void _nextScreen() {
+    final isFinal = _pageController.page == widget.colors.length - 1;
+    if (isFinal && widget.onFinish != null) {
+      widget.onFinish!();
+      return;
+    }
+    
+    _pageController.nextPage(
+      duration: widget.duration,
+      curve: widget.curve,
     );
-
-    // Restore the canvas state
-    canvas.restore();
-
-    // Now, draw the textured ring
-    final paint = Paint()
-      ..shader = ImageShader(
-        texture,
-        TileMode.repeated,
-        TileMode.repeated,
-        Matrix4.identity().storage,
-      )
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = thickness;
-
-    // Draw the ring
-    canvas.drawArc(
-      shape,
-      0,
-      2 * pi,
-      false,
-      paint,
-    );
+    
+    setState(() {
+      _currentScreenIndex++;
+      _currentImageIndex = 0;
+    });
   }
-
-  @override
-  bool shouldRepaint(covariant ConcentricRingPainter oldDelegate) {
-    return oldDelegate.progress != progress || oldDelegate.reverse != reverse;
-  }
-}
-
-class TexturePainter extends CustomPainter {
-  final ui.Image texture;
-
-  TexturePainter({required this.texture});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    Paint paint = Paint()
-      ..shader = ImageShader(
-        texture,
-        TileMode.repeated,
-        TileMode.repeated,
-        Matrix4.identity().storage,
-      );
-    canvas.drawRect(Offset.zero & size, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _Button extends StatelessWidget {
@@ -363,10 +259,16 @@ class _Button extends StatelessWidget {
     Key? key,
     required this.pageController,
     required this.widget,
+    required this.currentScreenIndex,
+    required this.currentImageIndex,
+    required this.onNextImage,
   }) : super(key: key);
 
   final PageController pageController;
   final ConcentricPageView widget;
+  final int currentScreenIndex;
+  final int currentImageIndex;
+  final VoidCallback onNextImage;
 
   @override
   Widget build(BuildContext context) {
@@ -377,23 +279,10 @@ class _Button extends StatelessWidget {
 
     child = GestureDetector(
       excludeFromSemantics: true,
-      onTap: () {
-        final isFinal = pageController.page == widget.colors.length - 1;
-        if (isFinal && widget.onFinish != null) {
-          widget.onFinish!();
-          return;
-        }
-        pageController.nextPage(
-          duration: widget.duration,
-          curve: widget.curve,
-        );
-      },
+      onTap: onNextImage,
       child: DecoratedBox(
         decoration: const BoxDecoration(shape: BoxShape.circle),
-        child: SizedBox.fromSize(
-          size: Size.square(size),
-          child: child,
-        ),
+        child: Center(child: child),
       ),
     );
 

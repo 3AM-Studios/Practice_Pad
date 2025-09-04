@@ -1,4 +1,5 @@
-import 'dart:math' show pow;
+import 'dart:math';
+
 import 'package:flutter/rendering.dart';
 
 class ConcentricClipper extends CustomClipper<Path> {
@@ -38,10 +39,10 @@ class ConcentricClipper extends CustomClipper<Path> {
   }
 
   Rect _createGrowingShape(Path path, Size size) {
-    double progressValue = progress * growFactor;
-    double limitValue = limit * growFactor;
-    double r = radius + pow(2, progressValue);
-    double delta = (1 - (progressValue / limitValue)) * radius;
+    double _progress = progress * growFactor;
+    double _limit = limit * growFactor;
+    double r = radius + pow(2, _progress);
+    double delta = (1 - (_progress / _limit)) * radius;
     double x = (size.width / 2) + r - delta - 2.0;
     double y = (size.height * verticalPosition) + radius;
 
@@ -53,10 +54,10 @@ class ConcentricClipper extends CustomClipper<Path> {
   }
 
   Rect _createShrinkingShape(Path path, Size size) {
-    double progressValue = (progress - limit) * growFactor;
-    double limitValue = limit * growFactor;
-    double r = radius + pow(2, limitValue - progressValue);
-    double delta = (progressValue / limitValue) * radius;
+    double _progress = (progress - limit) * growFactor;
+    double _limit = limit * growFactor;
+    double r = radius + pow(2, _limit - _progress);
+    double delta = (_progress / _limit) * radius;
     double x = size.width / 2 - r + delta;
     double y = (size.height * verticalPosition) + radius;
 

@@ -1,7 +1,7 @@
 #!/bin/sh
 # This is a generated file; do not edit or check into version control.
 export "FLUTTER_ROOT=/Users/mohammedelmzoudi/flutter"
-export "FLUTTER_APPLICATION_PATH=/Users/mohammedelmzoudi/Desktop/Endeavors/Projects/MusicMind/Flutter/music_mind/packages/concentric_transition/example"
+export "FLUTTER_APPLICATION_PATH=/Volumes/ExternalTings/Practice_Pad/packages/concentric_transition/example"
 export "COCOAPODS_PARALLEL_CODE_SIGN=true"
 export "FLUTTER_TARGET=lib/main.dart"
 export "FLUTTER_BUILD_DIR=build"
