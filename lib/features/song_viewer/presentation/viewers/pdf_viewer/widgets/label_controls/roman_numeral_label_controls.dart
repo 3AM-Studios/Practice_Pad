@@ -21,6 +21,7 @@ class _RomanNumeralLabelControlsState extends State<RomanNumeralLabelControls> {
   bool _seventhToggled = false;
   String _currentQuality = 'Maj'; // Track current quality state
   String _selectedAccidental = '♮'; // Track selected accidental (natural by default)
+  String? _lastSelectedLabelId; // Track last selected label to detect changes
 
   @override
   void initState() {
@@ -43,6 +44,7 @@ class _RomanNumeralLabelControlsState extends State<RomanNumeralLabelControls> {
   void _onControllerChanged() {
     _updateTextField();
     _parseCurrentChord();
+    _checkForSelectedLabelChange();
   }
 
   void _updateTextField() {
@@ -66,6 +68,29 @@ class _RomanNumeralLabelControlsState extends State<RomanNumeralLabelControls> {
         _selectedAccidental = '♮'; // Default to natural
       }
     });
+  }
+
+  void _checkForSelectedLabelChange() {
+    final selectedLabel = widget.controller.selectedLabel;
+    
+    // Check if a Roman numeral label is selected and it's different from the last one
+    if (selectedLabel is RomanNumeralLabel) {
+      final currentLabelId = selectedLabel.id;
+      
+      // If this is a new/different selected label, populate controls with its text
+      if (_lastSelectedLabelId != currentLabelId) {
+        _lastSelectedLabelId = currentLabelId;
+        
+        // Set the current chord text to the selected label's roman numeral
+        widget.controller.setCurrentChordText(selectedLabel.romanNumeral);
+        
+        // The _parseCurrentChord method will be called through _onControllerChanged
+        // and will update all the control states to match the selected label
+      }
+    } else {
+      // No Roman numeral label selected, reset tracking
+      _lastSelectedLabelId = null;
+    }
   }
 
   @override
@@ -371,10 +396,7 @@ class _RomanNumeralLabelControlsState extends State<RomanNumeralLabelControls> {
             mini: true,
             onPressed: () {
               // Use the stored _currentQuality instead of parsing from text
-              
               String baseChord = _applyQuality(numeral, _currentQuality, hasSeventh: _seventhToggled);
-
-              print('baseChord: $baseChord');
               
               // Add accidental prefix if not natural
               String newChord = _selectedAccidental == '♮' ? baseChord : '$_selectedAccidental$baseChord';
@@ -441,15 +463,11 @@ class _RomanNumeralLabelControlsState extends State<RomanNumeralLabelControls> {
     // Extract accidental and roman numeral parts
     String accidental = '';
     String numeral = base;
-    print('Extracting base numeral from: $base');
     
     if (base.startsWith('♯') || base.startsWith('♭') || base.startsWith('♮')) {
       accidental = base.substring(0, 1);
       numeral = base.substring(1); 
     }
-   
-    print('Accidental: $accidental');
-    print('Numeral: $numeral');
     
     return accidental + numeral.toUpperCase();
   }

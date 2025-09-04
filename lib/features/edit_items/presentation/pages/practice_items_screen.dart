@@ -177,7 +177,6 @@ class _PracticeItemsScreenState extends State<PracticeItemsScreen> {
       return const Center(child: CupertinoActivityIndicator());
     }
 
-    // TODO: Add error display from viewModel if specific item loading errors are implemented
 
     if (_items.isEmpty && !isLoading) {
       return Center(
@@ -216,7 +215,7 @@ class _PracticeItemsScreenState extends State<PracticeItemsScreen> {
           onRefresh: _loadItems,
         ),
                 const SliverToBoxAdapter(
-          child: SizedBox(height: 80),
+          child: SizedBox(height: 100),
         ),
         SliverList(
           delegate: SliverChildBuilderDelegate(

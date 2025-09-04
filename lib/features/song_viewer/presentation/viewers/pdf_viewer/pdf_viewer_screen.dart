@@ -433,7 +433,7 @@ class _PDFViewerState extends State<PDFViewer>
           final label = RomanNumeralLabel(
             id: data['id'],
             position: position,
-            romanNumeral: data['numeral'] ?? 'I',
+            romanNumeral: data['romanNumeral'] ?? 'I',
             size: data['size'] ?? 10.0,
             color: Color(data['color'] ?? 0xFF2196F3),
           );

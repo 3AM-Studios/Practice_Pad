@@ -79,6 +79,24 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     bgColor: Colors.white,
     textColor: Colors.black,
   ),
+    OnboardingScreenData(
+    title: "Practice Instantly",
+    subtitle: "Add a Home Screen widget to start practicing with one tap",
+    imagePaths: [
+      'assets/images/onboarding/page_5/image_1.png',
+    ],
+    bgColor: Theme.of(context).colorScheme.primary,
+    textColor: Colors.white,
+  ),
+    const OnboardingScreenData(
+    title: "Stay in Sync With iCloud",
+    subtitle: "Pick up on another device right where you left off",
+    imagePaths: [
+      'assets/images/onboarding/page_6/image_1.png',
+    ],
+    bgColor: Colors.white,
+    textColor: Colors.black,
+  ),
 ];
 
     return WoodenBorderWrapper(
@@ -87,7 +105,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       child: Scaffold(
         backgroundColor: Colors.transparent,
         body: ConcentricPageView(
-          duration: const Duration(milliseconds: 800),
+          duration: const Duration(milliseconds: 950),
           colors: onboardingScreens.map((screen) => screen.bgColor).toList(),
           radius: 30,
           imagesPerScreen: onboardingScreens.map((screen) => screen.imagePaths.length).toList(),
@@ -100,7 +118,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           nextButtonBuilder: (context) => Center(
             child: Icon(
               Icons.navigate_next,
-              size: screenWidth * 0.08,
+              size: 40,
             ),
           ),
           onFinish: () async {

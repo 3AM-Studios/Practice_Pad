@@ -180,6 +180,85 @@ struct ToggleSessionIntent: AppIntent {
     }
 }
 
+struct NavigatePracticeAreaIntent: AppIntent {
+    static var title: LocalizedStringResource = "Navigate Practice Area"
+    static var description = IntentDescription("Navigate between practice areas in the widget.")
+    
+    @Parameter(title: "Direction")
+    var direction: String
+    
+    init(direction: String) {
+        self.direction = direction
+    }
+    
+    init() {
+        self.direction = "next"
+    }
+
+    func perform() async throws -> some IntentResult {
+        NSLog("Widget: NavigatePracticeAreaIntent.perform() called with direction: \(direction)")
+        
+        guard let userDefaults = UserDefaults(suiteName: "group.com.3amstudios.jazzpad") else {
+            NSLog("Widget: ERROR - Could not access UserDefaults with app group!")
+            return .result()
+        }
+        
+        let currentIndex = userDefaults.integer(forKey: "practice_area_index") // defaults to 0 if not set
+        
+        // Load practice areas to determine max index
+        var practiceAreasCount = 0
+        if let practiceAreasJson = userDefaults.string(forKey: "practice_areas"),
+           !practiceAreasJson.isEmpty,
+           let practiceAreasData = practiceAreasJson.data(using: .utf8) {
+            do {
+                if let decoded = try JSONSerialization.jsonObject(with: practiceAreasData) as? [[String: Any]] {
+                    // Apply filtering logic to get actual filtered count
+                    let selectedFilter = userDefaults.string(forKey: "selected_area_filter") ?? "all"
+                    var filteredCount = decoded.count
+                    
+                    if selectedFilter != "all" {
+                        filteredCount = decoded.filter { areaDict in
+                            guard let type = areaDict["type"] as? String else { return false }
+                            switch selectedFilter {
+                            case "songs": return type.lowercased() == "song"
+                            case "exercises": return type.lowercased() == "exercise"
+                            case "chordProgressions": return type.lowercased() == "chordprogression"
+                            default: return true
+                            }
+                        }.count
+                    }
+                    
+                    practiceAreasCount = filteredCount
+                }
+            } catch {
+                NSLog("Widget: Error decoding practice areas for navigation: \(error)")
+            }
+        }
+        
+        if practiceAreasCount == 0 {
+            NSLog("Widget: No practice areas available for navigation")
+            return .result()
+        }
+        
+        let newIndex: Int
+        if direction == "next" {
+            newIndex = (currentIndex + 1) % practiceAreasCount
+        } else {
+            newIndex = currentIndex == 0 ? practiceAreasCount - 1 : currentIndex - 1
+        }
+        
+        userDefaults.set(newIndex, forKey: "practice_area_index")
+        userDefaults.synchronize()
+        
+        NSLog("Widget: Navigation - moved from index \(currentIndex) to \(newIndex) (total: \(practiceAreasCount))")
+        
+        // Trigger widget reload
+        WidgetCenter.shared.reloadTimelines(ofKind: "PracticePadWidget")
+        
+        return .result()
+    }
+}
+
 // MARK: - Timeline Provider
 struct PracticePadTimelineProvider: TimelineProvider {
     func placeholder(in context: Context) -> PracticePadEntry {
@@ -526,6 +605,9 @@ struct PracticePadWidgetEntryView: View {
             PracticeAreasView(entry: entry)
             
             Spacer()
+            
+            // Navigation arrows at the bottom
+            NavigationArrowsView(entry: entry)
         }
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -645,17 +727,25 @@ struct PracticeAreasView: View {
         let filteredAreas = getFilteredAreas()
         
         if !filteredAreas.isEmpty {
-            VStack(spacing: 10) {
-                ForEach(filteredAreas.prefix(2), id: \.name) { area in
+            let currentIndex = getCurrentPracticeAreaIndex()
+            let currentArea = getCurrentPracticeArea(from: filteredAreas, at: currentIndex)
+            
+            if let area = currentArea {
+                VStack(spacing: 10) {
                     PracticeAreaView(area: area)
+                    
+                    // Show area indicator if there are multiple areas
+                    if filteredAreas.count > 1 {
+                        HStack {
+                            Text("\(currentIndex + 1) of \(filteredAreas.count)")
+                                .font(.caption2)
+                                .foregroundColor(.gray)
+                        }
+                    }
                 }
-                
-                if filteredAreas.count > 2 {
-                    Text("+ \(filteredAreas.count - 2) more areas")
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                        .padding(.top, 4)
-                }
+            } else {
+                // Fallback to first area if index is out of bounds
+                PracticeAreaView(area: filteredAreas[0])
             }
         } else {
             VStack(spacing: 8) {
@@ -707,6 +797,18 @@ struct PracticeAreasView: View {
         }
         
         return filteredAreas
+    }
+    
+    private func getCurrentPracticeAreaIndex() -> Int {
+        let userDefaults = UserDefaults(suiteName: "group.com.3amstudios.jazzpad")
+        return userDefaults?.integer(forKey: "practice_area_index") ?? 0
+    }
+    
+    private func getCurrentPracticeArea(from areas: [PracticeAreaData], at index: Int) -> PracticeAreaData? {
+        guard !areas.isEmpty, index >= 0, index < areas.count else {
+            return areas.first
+        }
+        return areas[index]
     }
 }
 
@@ -780,5 +882,98 @@ struct PracticeItemRowView: View {
             .contentShape(Rectangle())
             .accessibilityLabel("Start practice for \(item.name)")
         }
+    }
+}
+
+struct NavigationArrowsView: View {
+    let entry: PracticePadEntry
+    
+    var body: some View {
+        let filteredAreas = getFilteredAreas()
+        let currentIndex = getCurrentPracticeAreaIndex()
+        
+        if filteredAreas.count > 1 {
+            HStack(spacing: 20) {
+                // Left arrow - show only if not at first area
+                if currentIndex > 0 {
+                    Button(intent: NavigatePracticeAreaIntent(direction: "previous")) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.blue)
+                            .frame(width: 32, height: 32)
+                            .background(Color.blue.opacity(0.1))
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Previous practice area")
+                } else {
+                    // Invisible spacer to maintain layout balance
+                    Color.clear
+                        .frame(width: 32, height: 32)
+                }
+                
+                Spacer()
+                
+                // Right arrow - show only if not at last area
+                if currentIndex < filteredAreas.count - 1 {
+                    Button(intent: NavigatePracticeAreaIntent(direction: "next")) {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.blue)
+                            .frame(width: 32, height: 32)
+                            .background(Color.blue.opacity(0.1))
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Next practice area")
+                } else {
+                    // Invisible spacer to maintain layout balance
+                    Color.clear
+                        .frame(width: 32, height: 32)
+                }
+            }
+        }
+    }
+    
+    private func getFilteredAreas() -> [PracticeAreaData] {
+        let userDefaults = UserDefaults(suiteName: "group.com.3amstudios.jazzpad")
+        let selectedFilter = userDefaults?.string(forKey: "selected_area_filter") ?? "all"
+        
+        // Get the active item name to filter it out
+        let activeItemName = entry.activeSession?.itemName
+        
+        var filteredAreas = entry.practiceAreas
+        
+        // Apply type filter
+        if selectedFilter != "all" {
+            filteredAreas = filteredAreas.filter { area in
+                switch selectedFilter {
+                case "songs": return area.type.lowercased() == "song"
+                case "exercises": return area.type.lowercased() == "exercise"
+                case "chordProgressions": return area.type.lowercased() == "chordprogression"
+                default: return true
+                }
+            }
+        }
+        
+        // Filter out the currently active practice item
+        if let activeItemName = activeItemName {
+            filteredAreas = filteredAreas.map { area in
+                let filteredItems = area.items.filter { item in
+                    item.name != activeItemName
+                }
+                return PracticeAreaData(name: area.name, type: area.type, items: filteredItems)
+            }.filter { area in
+                // Only keep areas that still have items after filtering
+                !area.items.isEmpty
+            }
+        }
+        
+        return filteredAreas
+    }
+    
+    private func getCurrentPracticeAreaIndex() -> Int {
+        let userDefaults = UserDefaults(suiteName: "group.com.3amstudios.jazzpad")
+        return userDefaults?.integer(forKey: "practice_area_index") ?? 0
     }
 }

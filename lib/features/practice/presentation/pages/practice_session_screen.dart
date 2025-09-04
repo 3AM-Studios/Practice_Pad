@@ -234,7 +234,7 @@ class _PracticeSessionScreenState extends State<PracticeSessionScreen> {
           child: CustomScrollView(
             slivers: [
               SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
                 sliver: SliverList(
                   delegate: SliverChildListDelegate([
                     // Main practice interface
@@ -314,40 +314,46 @@ class _PracticeSessionScreenState extends State<PracticeSessionScreen> {
               child: Container(
                 width: double.infinity,
                 margin: const EdgeInsets.symmetric(horizontal: 4),
-                padding: const EdgeInsets.all(28),
-                child: Column(
+                child: Stack(
                   children: [
-                    // Practice item name with X button
-                    Row(
-                      children: [
-                        ClayContainer(
-                          color: Theme.of(context).colorScheme.surface,
-                          borderRadius: 20,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              image: const DecorationImage(
-                                image: AssetImage(
-                                    'assets/images/wood_texture_rotated.jpg'),
-                                fit: BoxFit.cover,
-                              ),
-                              border: Border.all(
-                                  color: Theme.of(context).colorScheme.surface,
-                                  width: 4),
-                              borderRadius: BorderRadius.circular(20),
+                    // X button positioned in absolute top left corner
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: ClayContainer(
+                        color: Theme.of(context).colorScheme.surface,
+                        borderRadius: 20,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            image: const DecorationImage(
+                              image: AssetImage(
+                                  'assets/images/wood_texture_rotated.jpg'),
+                              fit: BoxFit.cover,
                             ),
-                            child: CupertinoButton(
-                              padding: const EdgeInsets.all(8),
-                              onPressed: () => Navigator.of(context).pop(),
-                              child: const Icon(
-                                CupertinoIcons.xmark,
-                                color: CupertinoColors.white,
-                                size: 20,
-                              ),
+                            border: Border.all(
+                                color: Theme.of(context).colorScheme.surface,
+                                width: 4),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: CupertinoButton(
+                            padding: const EdgeInsets.all(8),
+                            onPressed: () => Navigator.of(context).pop(),
+                            child: const Icon(
+                              CupertinoIcons.xmark,
+                              color: CupertinoColors.white,
+                              size: 20,
                             ),
                           ),
                         ),
-                        Expanded(
-                          child: Text(
+                      ),
+                    ),
+                    // Main content with padding for normal layout
+                    Padding(
+                      padding: const EdgeInsets.all(28),
+                      child: Column(
+                        children: [
+                          // Practice item name (centered)
+                          Text(
                             widget.practiceItem.name,
                             style: TextStyle(
                               fontSize: 34,
@@ -360,93 +366,92 @@ class _PracticeSessionScreenState extends State<PracticeSessionScreen> {
                             ),
                             textAlign: TextAlign.center,
                           ),
-                        ),
-                        const SizedBox(width: 48), // Balance the X button width
-                      ],
-                    ),
-                    // Add description as subtitle if it exists
-                    if (widget.practiceItem.description.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        widget.practiceItem.description,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                          color: CupertinoTheme.of(context)
-                              .textTheme
-                              .textStyle
-                              .color
-                              ?.withOpacity(0.7),
-                          letterSpacing: 0.3,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                    const SizedBox(height: 20),
+                          // Add description as subtitle if it exists
+                          if (widget.practiceItem.description.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              widget.practiceItem.description,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                                color: CupertinoTheme.of(context)
+                                    .textTheme
+                                    .textStyle
+                                    .color
+                                    ?.withOpacity(0.7),
+                                letterSpacing: 0.3,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                          const SizedBox(height: 20),
 
-                    // Timer display with wooden styling
-                    ClayContainer(
-                      color: Theme.of(context).colorScheme.surface,
-                      borderRadius: 20,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 32, vertical: 16),
-                        decoration: BoxDecoration(
-                          image: const DecorationImage(
-                            image: AssetImage(
-                                'assets/images/wood_texture_rotated.jpg'),
-                            fit: BoxFit.cover,
-                          ),
-                          border: Border.all(
-                              color: Theme.of(context).colorScheme.surface,
-                              width: 4),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          _formatTime(_elapsedSeconds),
-                          style: const TextStyle(
-                            fontSize: 32,
-                            fontWeight: FontWeight.w900,
-                            color: CupertinoColors.white,
-                            letterSpacing: 2,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    // Timer controls with clay containers
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ClayContainer(
+                          // Timer display with wooden styling
+                          ClayContainer(
                             color: Theme.of(context).colorScheme.surface,
-                            borderRadius: 16,
-                            child: _buildModernButton(
-                              text: _isTimerRunning ? 'Stop' : 'Start',
-                              onPressed:
-                                  !_isTimerRunning ? _startTimer : _stopTimer,
-                              color: _isTimerRunning
-                                  ? CupertinoColors.systemRed
-                                  : CupertinoColors.activeGreen,
+                            borderRadius: 20,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 32, vertical: 16),
+                              decoration: BoxDecoration(
+                                image: const DecorationImage(
+                                  image: AssetImage(
+                                      'assets/images/wood_texture_rotated.jpg'),
+                                  fit: BoxFit.cover,
+                                ),
+                                border: Border.all(
+                                    color: Theme.of(context).colorScheme.surface,
+                                    width: 4),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                _formatTime(_elapsedSeconds),
+                                style: const TextStyle(
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.w900,
+                                  color: CupertinoColors.white,
+                                  letterSpacing: 2,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: ClayContainer(
-                            color: Theme.of(context).colorScheme.surface,
-                            borderRadius: 16,
-                            child: _buildModernButton(
-                              text: 'Reset',
-                              onPressed: _resetTimer,
-                              color: CupertinoColors.systemGrey,
-                            ),
+
+                          const SizedBox(height: 24),
+
+                          // Timer controls with clay containers
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ClayContainer(
+                                  color: Theme.of(context).colorScheme.surface,
+                                  borderRadius: 16,
+                                  child: _buildModernButton(
+                                    text: _isTimerRunning ? 'Stop' : 'Start',
+                                    onPressed:
+                                        !_isTimerRunning ? _startTimer : _stopTimer,
+                                    color: _isTimerRunning
+                                        ? CupertinoColors.systemRed
+                                        : CupertinoColors.activeGreen,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: ClayContainer(
+                                  color: Theme.of(context).colorScheme.surface,
+                                  borderRadius: 16,
+                                  child: _buildModernButton(
+                                    text: 'Reset',
+                                    onPressed: _resetTimer,
+                                    color: CupertinoColors.systemGrey,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -500,8 +505,12 @@ class _PracticeSessionScreenState extends State<PracticeSessionScreen> {
                     // Combined Circle of Fifths with Internal Bar Graph
                     SizedBox(
                       height: 420,
-                      child: Center(
-                        child: _buildCircularKeysWithBarGraph(),
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          return Center(
+                            child: _buildCircularKeysWithBarGraph(constraints),
+                          );
+                        },
                       ),
                     ),
 
@@ -590,7 +599,13 @@ class _PracticeSessionScreenState extends State<PracticeSessionScreen> {
     );
   }
 
-  Widget _buildCircularKeysWithBarGraph() {
+  Widget _buildCircularKeysWithBarGraph(BoxConstraints constraints) {
+    // Calculate responsive dimensions based on available space
+    final availableSize = constraints.biggest.shortestSide;
+    final containerSize = (availableSize * 0.95).clamp(300.0, 430.0); // Scale between 300-430px
+    final padding = containerSize * 0.093; // ~40px at 430px size
+    final paintSize = containerSize - (padding * 2);
+    
     return ClayContainer(
       color: CupertinoTheme.of(context).scaffoldBackgroundColor,
       borderRadius: 32,
@@ -598,9 +613,9 @@ class _PracticeSessionScreenState extends State<PracticeSessionScreen> {
       spread: 3,
       curveType: CurveType.concave,
       child: Container(
-        width: 430,
-        height: 430,
-        padding: const EdgeInsets.all(40),
+        width: containerSize,
+        height: containerSize,
+        padding: EdgeInsets.all(padding),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(32),
           gradient: RadialGradient(
@@ -627,13 +642,13 @@ class _PracticeSessionScreenState extends State<PracticeSessionScreen> {
         ),
         child: GestureDetector(
           onTapDown: (details) {
-            final result = _getKeyFromPosition(details.localPosition);
+            final result = _getKeyFromPosition(details.localPosition, paintSize);
             if (result != null) {
               _incrementKeyReps(result);
             }
           },
           child: CustomPaint(
-            size: const Size(350, 350), // Account for padding (430-80)
+            size: Size(paintSize, paintSize),
             painter: _CircularKeyBarGraphPainter(
               majorKeys: _majorKeys,
               keysPracticed: _keysPracticed,
@@ -648,36 +663,43 @@ class _PracticeSessionScreenState extends State<PracticeSessionScreen> {
     );
   }
 
-  String? _getKeyFromPosition(Offset position) {
-    const customPaintSize = 350.0;
-    const customPaintCenter = Offset(customPaintSize / 2, customPaintSize / 2);
-
-    // The position is already in CustomPaint coordinates (0-350)
-    final dx = position.dx - customPaintCenter.dx;
-    final dy = position.dy - customPaintCenter.dy;
-
-    // Use the same radius calculations as in the painter
-    const outerRadius = customPaintSize / 2 * 0.8; // 350/2 * 0.8 = 140
-    const buttonRadius =
-        customPaintSize / 2 * 0.14; // Match painter buttonRadius
+  String? _getKeyFromPosition(Offset position, double paintSize) {
+    // GestureDetector is inside Container's padding, so position coordinates
+    // match the CustomPaint size - no coordinate transformation needed!
+    
+    // Ensure the touch is within the paint area
+    if (position.dx < 0 || position.dx > paintSize ||
+        position.dy < 0 || position.dy > paintSize) {
+      return null;
+    }
+    
+    // Use the exact same calculations as in the CustomPainter
+    final center = Offset(paintSize / 2, paintSize / 2);
+    final outerRadius = paintSize / 2 * 0.8; // Same as painter
+    final buttonRadius = paintSize / 2 * 0.14; // Same as painter
 
     double minDistance = double.infinity;
     String? closestKey;
 
     for (int i = 0; i < _majorKeys.length; i++) {
-      final anglePerItem = 2 * pi / _majorKeys.length;
-      final buttonAngle = i * anglePerItem - pi / 2; // Start from top
+      const anglePerItem = 2 * pi / 12; // 12 keys in circle of fifths
+      final angle = i * anglePerItem - pi / 2; // Start from top, same as painter
+      
+      // Calculate button center using exact same logic as painter
       final buttonCenter = Offset(
-        customPaintCenter.dx + outerRadius * cos(buttonAngle),
-        customPaintCenter.dy + outerRadius * sin(buttonAngle),
+        center.dx + outerRadius * cos(angle),
+        center.dy + outerRadius * sin(angle),
       );
-      final distanceToButton = sqrt(pow(position.dx - buttonCenter.dx, 2) +
-          pow(position.dy - buttonCenter.dy, 2));
+      
+      final distance = sqrt(
+        pow(position.dx - buttonCenter.dx, 2) +
+        pow(position.dy - buttonCenter.dy, 2)
+      );
 
-      // Use generous threshold for touch interface
-      const threshold = 30.0;
-      if (distanceToButton < minDistance && distanceToButton <= threshold) {
-        minDistance = distanceToButton;
+      // Use button radius as threshold for more precise touch detection
+      final threshold = buttonRadius + 5; // Add small buffer for easier tapping
+      if (distance <= threshold && distance < minDistance) {
+        minDistance = distance;
         closestKey = _majorKeys[i];
       }
     }
@@ -727,35 +749,6 @@ class _PracticeSessionScreenState extends State<PracticeSessionScreen> {
     }
   }
 
-  void _showEndSessionDialog() {
-    showCupertinoDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return CupertinoAlertDialog(
-          title: const Text('End Practice Session'),
-          content: const Text(
-              'Are you sure you want to end this practice session? Your progress will be saved.'),
-          actions: [
-            CupertinoDialogAction(
-              child: const Text('Cancel'),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-            ),
-            CupertinoDialogAction(
-              isDestructiveAction: true,
-              child: const Text('End Session'),
-              onPressed: () {
-                _sessionManager?.cancelSession();
-                Navigator.of(context).pop(); // Close dialog
-                Navigator.of(context).pop(false); // Close screen
-              },
-            ),
-          ],
-        );
-      },
-    );
-  }
 }
 
 class _CircularKeyBarGraphPainter extends CustomPainter {

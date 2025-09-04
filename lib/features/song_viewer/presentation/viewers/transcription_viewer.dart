@@ -1162,12 +1162,23 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
                                     isLoopEnabled: _isAutoLoop,
                                     onLoopUpdate: (start, end) {
                                       debugPrint('PARENT: Received loop update start=${start.inSeconds}s, end=${end.inSeconds}s');
+                                      
+                                      // Check if end time changed (for drag end control)
+                                      final oldEndTime = _loopEndTime;
+                                      final newEndTime = end.inSeconds.toDouble();
+                                      final endTimeChanged = oldEndTime != newEndTime;
+                                      
                                       setState(() {
                                         _loopStartTime = start.inSeconds.toDouble();
-                                        _loopEndTime = end.inSeconds.toDouble();
+                                        _loopEndTime = newEndTime;
                                         _hasLoopSection = true;
                                       });
                                       _saveYoutubeData();
+                                      
+                                      // If end time changed via drag, play from 2 seconds before end
+                                      if (endTimeChanged) {
+                                        _playFromSecondsBeforeEnd();
+                                      }
                                     },
                                     onLoopPlay: _playFromLoopStart,
                                     onLoopToggle: (enabled) {

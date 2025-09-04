@@ -160,7 +160,7 @@ class ImagePainterController extends ChangeNotifier {
   String _currentChordText = 'I';
   
   // Shared label state
-  double _labelSize = 10.0; // Default label size
+  double _labelSize = 15.0; // Default label size
   Color _labelColor = const Color(0xFF2196F3); // Default blue color
 
   ui.Image? get image => _image;
