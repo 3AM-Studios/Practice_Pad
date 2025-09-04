@@ -153,7 +153,7 @@ class DrawImage extends CustomPainter {
       // Apply unified scaling to live drawing stroke width  
       // Assume current strokeWidth is relative to a 1000px baseline image
       if (coordinateTransformer != null) {
-        final relativeStrokeWidth = _controller.strokeWidth / 1000.0; // Convert current value to relative
+        final relativeStrokeWidth = _controller.scaledStrokeWidth / 1000.0; // Convert current value to relative
         _paint.strokeWidth = coordinateTransformer!.scaleStroke(relativeStrokeWidth);
       }
       switch (_controller.mode) {
@@ -238,8 +238,9 @@ class DrawImage extends CustomPainter {
     // Use unified scaling system for font size
     // Convert label.size (stored as absolute) to relative then scale it
     final relativeSize = label.size / 1000.0; // Assume 1000px as baseline reference
-    final fontSize = coordinateTransformer?.scaleFont(relativeSize * 0.8) ?? (label.size * labelScaleFactor * 0.8);
-    
+    final scaleFactor = label is RomanNumeralLabel ? 1.2 : 0.8;
+    final fontSize = coordinateTransformer?.scaleFont(relativeSize * scaleFactor) ?? (label.size * labelScaleFactor * scaleFactor);
+
     // Check if this is a roman numeral that needs superscript formatting
     if (label is RomanNumeralLabel) {
       // For roman numerals, draw selection background if selected
@@ -344,7 +345,7 @@ class DrawImage extends CustomPainter {
     }
     
     // Then extract roman numeral and quality
-    final romanNumeralPattern = RegExp(r'^(i{1,3}v?|iv|v|vi{0,2}|VII?)', caseSensitive: false);
+    final romanNumeralPattern = RegExp(r'^(vii|vi|iv|iii|ii|v|i)', caseSensitive: false);
     final romanMatch = romanNumeralPattern.firstMatch(remainingText);
     
     if (romanMatch != null) {

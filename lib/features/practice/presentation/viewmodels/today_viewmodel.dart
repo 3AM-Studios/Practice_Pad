@@ -285,10 +285,10 @@ class TodayViewModel extends ChangeNotifier {
   Future<void> _loadDailyGoal() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      _dailyGoalMinutes = prefs.getInt('daily_goal_minutes') ?? 30;
+      _dailyGoalMinutes = prefs.getInt('daily_goal_minutes') ?? 10;
       notifyListeners();
     } catch (e) {
-      _dailyGoalMinutes = 30; // Default fallback
+      _dailyGoalMinutes = 10; // Default fallback
     }
   }
 

@@ -87,6 +87,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       child: Scaffold(
         backgroundColor: Colors.transparent,
         body: ConcentricPageView(
+          duration: const Duration(milliseconds: 800),
           colors: onboardingScreens.map((screen) => screen.bgColor).toList(),
           radius: 30,
           imagesPerScreen: onboardingScreens.map((screen) => screen.imagePaths.length).toList(),

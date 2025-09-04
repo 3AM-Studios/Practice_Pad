@@ -371,7 +371,10 @@ class _RomanNumeralLabelControlsState extends State<RomanNumeralLabelControls> {
             mini: true,
             onPressed: () {
               // Use the stored _currentQuality instead of parsing from text
+              
               String baseChord = _applyQuality(numeral, _currentQuality, hasSeventh: _seventhToggled);
+
+              print('baseChord: $baseChord');
               
               // Add accidental prefix if not natural
               String newChord = _selectedAccidental == '♮' ? baseChord : '$_selectedAccidental$baseChord';
@@ -438,11 +441,15 @@ class _RomanNumeralLabelControlsState extends State<RomanNumeralLabelControls> {
     // Extract accidental and roman numeral parts
     String accidental = '';
     String numeral = base;
+    print('Extracting base numeral from: $base');
     
     if (base.startsWith('♯') || base.startsWith('♭') || base.startsWith('♮')) {
       accidental = base.substring(0, 1);
-      numeral = base.substring(1);
+      numeral = base.substring(1); 
     }
+   
+    print('Accidental: $accidental');
+    print('Numeral: $numeral');
     
     return accidental + numeral.toUpperCase();
   }

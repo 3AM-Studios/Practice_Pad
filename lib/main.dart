@@ -260,31 +260,35 @@ class MainAppScaffoldState extends State<MainAppScaffold> {
     return Scaffold(
       extendBody: true,
       backgroundColor: Colors.white, // White app background
-      body: Stack(
-        children: [
-          // Main content
-          Positioned.fill(
-            child: IndexedStack(
-              index: _currentIndex,
-              children: _tabs,
+      body: SafeArea(
+        top:false,
+        bottom: false,
+        child: Stack(
+          children: [
+            // Main content
+            Positioned.fill(
+              child: IndexedStack(
+                index: _currentIndex,
+                children: _tabs,
+              ),
             ),
-          ),
-          // Custom neumorphic navigation bar positioned at the bottom
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: ClayNavigationBar(
-              items: _tabItems,
-              currentIndex: _currentIndex,
-              onTap: (index) {
-                setState(() {
-                  _currentIndex = index;
-                });
-              },
+            // Custom neumorphic navigation bar positioned at the bottom
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: ClayNavigationBar(
+                items: _tabItems,
+                currentIndex: _currentIndex,
+                onTap: (index) {
+                  setState(() {
+                    _currentIndex = index;
+                  });
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

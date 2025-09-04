@@ -221,35 +221,23 @@ class _FullscreenPDFViewerState extends State<FullscreenPDFViewer> {
         children: [
           // Main fullscreen image painter with touch debug
           SizedBox.expand(
-            child: GestureDetector(
-              onTapDown: (details) {
-                debugPrint('=== FULLSCREEN TOUCH: TapDown detected at ${details.localPosition} ===');
-              },
-              onPanStart: (details) {
-                debugPrint('=== FULLSCREEN TOUCH: PanStart detected at ${details.localPosition} ===');
-              },
-              onTap: () {
-                debugPrint('=== FULLSCREEN TOUCH: Tap detected ===');
-              },
-              behavior: HitTestBehavior.translucent,
-              child: ImagePainter.memory(
-                _currentPageImage,
-                controller: _controller,
-                scalable: true,
-                controlsAtTop: false,
-                showControls: true,
-                textDelegate: TextDelegate() ,
-                enableFullscreen: true,
-                selectedColor: Theme.of(context).colorScheme.primary  ,
-                unselectedColor: Theme.of(context).colorScheme.onSurface      ,
-                optionColor: Theme.of(context).colorScheme.onSurface   ,
-                romanNumeralControlsWidget: RomanNumeralLabelControls(controller: _controller) ,
-                extensionLabelControlsWidget: ExtensionLabelControls(controller: _controller),
-                controlsBackgroundColor: Colors.transparent,
-                height: MediaQuery.of(context).size.height,
-                width: MediaQuery.of(context).size.width,
-                key: _imagePainterKey, // Use dynamic key to force rebuild on page changes
-              ),
+            child: ImagePainter.memory(
+              _currentPageImage,
+              controller: _controller,
+              scalable: true,
+              controlsAtTop: false,
+              showControls: true,
+              textDelegate: TextDelegate() ,
+              enableFullscreen: true,
+              selectedColor: Theme.of(context).colorScheme.primary  ,
+              unselectedColor: Theme.of(context).colorScheme.onSurface      ,
+              optionColor: Theme.of(context).colorScheme.onSurface   ,
+              romanNumeralControlsWidget: RomanNumeralLabelControls(controller: _controller) ,
+              extensionLabelControlsWidget: ExtensionLabelControls(controller: _controller),
+              controlsBackgroundColor: Colors.transparent,
+              height: MediaQuery.of(context).size.height,
+              width: MediaQuery.of(context).size.width,
+              key: _imagePainterKey, // Use dynamic key to force rebuild on page changes
             ),
           ),
           
@@ -298,68 +286,64 @@ class _FullscreenPDFViewerState extends State<FullscreenPDFViewer> {
             Positioned(
               bottom: 80,
               right: 20,
-              child: ClayContainer(
-                color: Theme.of(context).colorScheme.surface,
-                borderRadius: 8,
-                depth: 4,
-                spread: 1,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Left arrow
-                    ClayContainer(
-                      child: Material(
-                        color: Colors.white,
-                        child: InkWell(
-                          borderRadius: const BorderRadius.only(
-                            topLeft: Radius.circular(8),
-                            bottomLeft: Radius.circular(8),
-                          ),
-                          onTap: () {
-                            _handlePageChange(-1);
-                          },
-                          child: Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Icon(
-                              Icons.chevron_left,
-                              color: Theme.of(context).colorScheme.onSurface,
-                              size: 24,
-                            ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Left arrow
+                  ClayContainer(
+                    spread: 1,
+                    child: Material(
+                      color: Colors.white,
+                      child: InkWell(
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(8),
+                          bottomLeft: Radius.circular(8),
+                        ),
+                        onTap: () {
+                          _handlePageChange(-1);
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Icon(
+                            Icons.chevron_left,
+                            color: Theme.of(context).colorScheme.onSurface,
+                            size: 24,
                           ),
                         ),
                       ),
                     ),
-                    // Divider
-                    Container(
-                      width: 1,
-                      height: 48,
-                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.2),
-                    ),
-                    // Right arrow
-                    ClayContainer(
-                      child: Material(
-                        color: Colors.white,
-                        child: InkWell(
-                          borderRadius: const BorderRadius.only(
-                            topRight: Radius.circular(8),
-                            bottomRight: Radius.circular(8),
-                          ),
-                          onTap: () {
-                            _handlePageChange(1);
-                          },
-                          child: Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Icon(
-                              Icons.chevron_right,
-                              color: Theme.of(context).colorScheme.onSurface,
-                              size: 24,
-                            ),
+                  ),
+                  // Divider
+                  Container(
+                    width: 1,
+                    height: 48,
+                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.2),
+                  ),
+                  // Right arrow
+                  ClayContainer(
+                    spread: 1,
+                    child: Material(
+                      color: Colors.white,
+                      child: InkWell(
+                        borderRadius: const BorderRadius.only(
+                          topRight: Radius.circular(8),
+                          bottomRight: Radius.circular(8),
+                        ),
+                        onTap: () {
+                          _handlePageChange(1);
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Icon(
+                            Icons.chevron_right,
+                            color: Theme.of(context).colorScheme.onSurface,
+                            size: 24,
                           ),
                         ),
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
         ],

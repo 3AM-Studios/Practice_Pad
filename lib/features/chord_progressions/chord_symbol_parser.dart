@@ -93,6 +93,7 @@ class ChordSymbolParser {
     
     // Try parsing as Roman numeral first
     final romanMatch = _romanNumeralPattern.firstMatch(cleanInput);
+    print('romanMatch: $romanMatch');
     if (romanMatch != null) {
       return _parseRomanNumeral(cleanInput, romanMatch);
     }

@@ -15,6 +15,7 @@ import 'package:practice_pad/services/widget_integration.dart';
 import 'package:practice_pad/services/icloud_sync_service.dart';
 import 'package:practice_pad/services/local_storage_service.dart';
 import 'package:practice_pad/features/transcription/presentation/pages/youtube_videos_page.dart';
+import 'package:practice_pad/onboarding.dart';
 import 'package:provider/provider.dart';
 
 class TodayScreen extends StatefulWidget {
@@ -200,45 +201,56 @@ Widget _buildFixedHeader(BuildContext context) {
   if (isIPhone) {
     return Column(
       children: [
-        // Top section with sync buttons
+        const SizedBox(height: 16), // Top spacing
+        // Combined row with tutorial button, banner, and sync buttons on same level
         Container(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          padding: const EdgeInsets.fromLTRB(16, 25, 16, 8),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              Padding(
-                padding: const EdgeInsets.only(right: 20.0),
-                child: _buildSyncButtons(context),
+              // Tutorial button on the left - fixed width for symmetry
+              SizedBox(
+                width: 80, // Fixed width to balance with sync buttons
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: _buildTutorialButton(context),
+                ),
+              ),
+              // Expanded banner in the center
+              Expanded(
+                child: Center(
+                  child: ClayContainer(
+                    borderRadius: 10,
+                    child: Container(
+                      padding: const EdgeInsets.fromLTRB(13.0, 5, 13.0, 5),
+                      decoration: BoxDecoration(
+                        image: const DecorationImage(
+                          image: AssetImage('assets/images/wood_texture_rotated.jpg'),
+                          fit: BoxFit.cover,
+                        ),
+                        border: Border.all(color: Theme.of(context).colorScheme.surface, width: 4),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Text(
+                        'Today\'s Practice',
+                        style: TextStyle(
+                          fontSize: 14.0,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              // Sync buttons on the right - fixed width for symmetry
+              SizedBox(
+                width: 80, // Fixed width to balance with tutorial button
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: _buildSyncButtons(context),
+                ),
               ),
             ],
-          ),
-        ),
-        // Banner section with top padding
-        Container(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8), // 60 - 8 = 52 to match original positioning
-          child: Center(
-            child: ClayContainer(
-              borderRadius: 10,
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(13.0, 5, 13.0, 5),
-                decoration: BoxDecoration(
-                  image: const DecorationImage(
-                    image: AssetImage('assets/images/wood_texture_rotated.jpg'),
-                    fit: BoxFit.cover,
-                  ),
-                  border: Border.all(color: Theme.of(context).colorScheme.surface, width: 4),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Text(
-                  'Today\'s Practice',
-                  style: TextStyle(
-                    fontSize: 14.0,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white
-                  ),
-                ),
-              ),
-            ),
           ),
         ),
       ],
@@ -249,6 +261,9 @@ Widget _buildFixedHeader(BuildContext context) {
       padding: const EdgeInsets.fromLTRB(16, 8.0, 16, 8),
       child: Row(
         children: [
+          // Tutorial button at the start of the row
+          _buildTutorialButton(context),
+          const SizedBox(width: 16),
           // Expanded banner that takes up available space and centers content
           Expanded(
             child: Center(
@@ -276,6 +291,7 @@ Widget _buildFixedHeader(BuildContext context) {
               ),
             ),
           ),
+          const SizedBox(width: 16),
           // Sync buttons positioned at the end of the row
           _buildSyncButtons(context),
         ],
@@ -306,6 +322,26 @@ Widget _buildSyncButtons(BuildContext context) {
         onLongPress: () => _showDebugInfo(context),
       ),
     ],
+  );
+}
+
+Widget _buildTutorialButton(BuildContext context) {
+  return _buildSyncButton(
+    context: context,
+    icon: CupertinoIcons.question_circle,
+    color: Theme.of(context).colorScheme.primary,
+    onTap: () => _showTutorial(context),
+  );
+}
+
+void _showTutorial(BuildContext context) {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => OnboardingScreen(
+        onComplete: () => Navigator.pop(context),
+      ),
+    ),
   );
 }
 
