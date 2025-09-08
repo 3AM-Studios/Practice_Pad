@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:practice_pad/models/practice_area.dart';
 import 'package:practice_pad/models/practice_item.dart';
 import 'package:practice_pad/features/song_viewer/data/models/song.dart';
-import 'package:practice_pad/services/local_storage_service.dart';
+import 'package:practice_pad/services/storage/local_storage_service.dart';
 // import 'package:practice_pad/services/cloud_kit_service.dart'; // SIDELINED
 import 'dart:developer' as developer; // For logging
 import 'dart:math'; // For random ID generation
@@ -92,6 +92,12 @@ class EditItemsViewModel extends ChangeNotifier {
     } catch (e) {
       developer.log('Error in auto-save: $e', error: e);
     }
+  }
+
+  /// Reload all data from storage (useful after iCloud sync)
+  Future<void> reloadFromStorage() async {
+    developer.log("ViewModel: Reloading all data from storage", name: 'EditItemsViewModel');
+    await fetchPracticeAreas();
   }
 
   Future<void> fetchPracticeAreas() async {

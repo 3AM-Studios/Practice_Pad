@@ -3,7 +3,7 @@ import 'package:practice_pad/features/edit_items/presentation/viewmodels/edit_it
 import 'package:practice_pad/features/routines/models/day_of_week.dart';
 import 'package:practice_pad/models/practice_item.dart';
 import 'package:practice_pad/models/practice_area.dart';
-import 'package:practice_pad/services/local_storage_service.dart';
+import 'package:practice_pad/services/storage/local_storage_service.dart';
 import 'dart:developer' as developer;
 
 class RoutinesViewModel extends ChangeNotifier {
@@ -152,6 +152,12 @@ class RoutinesViewModel extends ChangeNotifier {
   // NEW: Get today's practice areas
   List<PracticeArea> getTodaysPracticeAreas() {
     return _routines[today] ?? [];
+  }
+
+  /// Reload all data from storage (useful after iCloud sync)
+  Future<void> reloadFromStorage() async {
+    developer.log('Reloading routines data from storage', name: 'RoutinesVM');
+    await _loadWeeklySchedule();
   }
 
   /// Load weekly schedule from local storage

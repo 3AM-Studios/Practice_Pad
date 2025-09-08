@@ -13,17 +13,19 @@ import 'package:provider/provider.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:practice_pad/widgets/wooden_border_wrapper.dart';
 
-import 'package:practice_pad/services/cloud_kit_service.dart';
-import 'package:practice_pad/services/local_storage_service.dart';
+import 'package:practice_pad/services/storage/cloud_kit_service.dart';
+import 'package:practice_pad/services/storage/local_storage_service.dart';
 import 'package:practice_pad/features/edit_items/presentation/pages/edit_items_screen.dart';
 import 'package:practice_pad/features/routines/presentation/pages/edit_routines_screen.dart';
-import 'package:practice_pad/services/practice_session_manager.dart';
+import 'package:practice_pad/features/practice/presentation/viewmodels/practice_session_manager.dart';
 import 'package:practice_pad/models/statistics.dart';
 import 'package:practice_pad/models/practice_area.dart';
-import 'package:practice_pad/services/home_widget_service.dart';
-import 'package:practice_pad/services/widget_update_service.dart';
-import 'package:practice_pad/services/widget_action_handler.dart';
-import 'package:practice_pad/services/widget_integration.dart';
+import 'package:practice_pad/services/widget/home_widget_service.dart';
+import 'package:practice_pad/services/widget/widget_update_service.dart';
+import 'package:practice_pad/services/widget/widget_action_handler.dart';
+import 'package:practice_pad/services/widget/widget_integration.dart';
+import 'package:practice_pad/services/automatic_sync_manager.dart';
+import 'package:practice_pad/services/sync_integration_service.dart';
 import 'package:practice_pad/onboarding.dart';
 import 'dart:math' as math;
 
@@ -89,6 +91,16 @@ void main() async {
     // Clear any stale widget data on startup to ensure fresh data
     await WidgetActionHandler.clearAllWidgetData();
     print('Main: Cleared all widget data on startup');
+
+  // Initialize automatic sync manager
+  try {
+    print("🤖 Initializing AutomaticSyncManager...");
+    await AutomaticSyncManager.instance.initialize();
+    print("✅ AutomaticSyncManager initialized successfully");
+  } catch (e) {
+    print("⚠️ AutomaticSyncManager initialization failed: $e");
+    print("   Automatic sync will not be available");
+  }
 
 
   runApp(const PracticeLoverApp());
@@ -204,6 +216,9 @@ class MainAppScaffoldState extends State<MainAppScaffold> {
       },
     );
     
+    // Initialize sync integration service for automatic background sync
+    SyncIntegrationService.instance.initialize(context);
+    
     // Force initial widget update after initialization
     print('Main: Forcing initial widget update after setup');
     WidgetUpdateService.instance.updateWidget();
@@ -212,6 +227,7 @@ class MainAppScaffoldState extends State<MainAppScaffold> {
   @override
   void dispose() {
     WidgetUpdateService.instance.dispose();
+    SyncIntegrationService.instance.dispose();
     super.dispose();
   }
 
@@ -997,7 +1013,7 @@ class _AppRouterState extends State<AppRouter> {
 
   Future<void> _checkOnboardingStatus() async {
     // Development: Always show onboarding
-    // final isCompleted = await OnboardingService.isOnboardingCompleted();
+    final isCompleted = await OnboardingService.isOnboardingCompleted();
     setState(() {
       _showOnboarding = true; // Always show during development
       _isCheckingOnboarding = false;

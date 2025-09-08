@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:clay_containers/clay_containers.dart';
-import 'package:practice_pad/services/local_storage_service.dart';
+import 'package:practice_pad/services/storage/local_storage_service.dart';
 import 'package:practice_pad/features/song_viewer/presentation/viewers/transcription_viewer.dart';
 import 'package:url_launcher/url_launcher.dart';
 

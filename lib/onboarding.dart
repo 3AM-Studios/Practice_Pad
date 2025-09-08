@@ -83,7 +83,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     title: "Practice Instantly",
     subtitle: "Add a Home Screen widget to start practicing with one tap",
     imagePaths: [
-      'assets/images/onboarding/page_5/image_1.png',
+      'assets/images/onboarding/page_5/image_1.jpg',
     ],
     bgColor: Theme.of(context).colorScheme.primary,
     textColor: Colors.white,

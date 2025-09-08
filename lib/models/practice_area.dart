@@ -80,17 +80,7 @@ class PracticeArea {
           id: 'default_shells_${DateTime.now().millisecondsSinceEpoch}_1',
           name: 'Shells only',
           description: 'Practice basic chord shells',
-        ),
-        PracticeItem(
-          id: 'default_shells_melody_${DateTime.now().millisecondsSinceEpoch}_2',
-          name: 'Shells only + melody',
-          description: 'Practice shells with melody line',
-        ),
-        PracticeItem(
-          id: 'default_shells_free_${DateTime.now().millisecondsSinceEpoch}_3',
-          name: 'Shells + free chord',
-          description: 'Practice shells with free chord voicings',
-        ),
+        )
       ]);
     }
   }

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:clay_containers/clay_containers.dart';
-import 'package:practice_pad/services/local_storage_service.dart';
+import 'package:practice_pad/services/storage/local_storage_service.dart';
 import 'package:practice_pad/features/song_viewer/data/models/song.dart';
-import 'package:practice_pad/services/practice_session_manager.dart';
+import 'package:practice_pad/features/practice/presentation/viewmodels/practice_session_manager.dart';
 import 'package:practice_pad/models/practice_item.dart';
 import 'package:practice_pad/models/statistics.dart';
 import 'package:provider/provider.dart';

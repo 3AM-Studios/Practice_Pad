@@ -23,7 +23,7 @@ import 'package:practice_pad/features/practice/presentation/pages/practice_sessi
 import 'package:practice_pad/features/edit_items/presentation/viewmodels/edit_items_viewmodel.dart';
 import 'package:provider/provider.dart';
 import 'package:music_sheet/index.dart';
-import 'package:practice_pad/services/local_storage_service.dart';
+import 'package:practice_pad/services/storage/local_storage_service.dart';
 
 // Import transcription viewer
 import 'transcription_viewer.dart';
@@ -1620,6 +1620,49 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
     );
   }
   Widget _buildChordProgressionButton() => const SizedBox.shrink();
+
+  /// Returns true if any chords are currently selected
+  bool hasSelectedChords() {
+    return _selectedChordIndices.isNotEmpty;
+  }
+
+  /// Returns the selected chord progression as a ChordProgression object
+  ChordProgression? getSelectedChordProgression() {
+    if (_selectedChordIndices.isEmpty) return null;
+
+    // Sort the selected indices to get chords in order
+    final sortedIndices = _selectedChordIndices.toList()..sort();
+    
+    // Get the chord symbols for the selected indices
+    final selectedChords = <ChordSymbol>[];
+    for (final index in sortedIndices) {
+      if (index < _chordSymbols.length) {
+        selectedChords.add(_chordSymbols[index]);
+      }
+    }
+
+    if (selectedChords.isEmpty) return null;
+
+    // Create chord progression name from selected chords
+    final chordNames = selectedChords.map((chord) => chord.displayText).join(' - ');
+    final progressionName = chordNames.length > 50 
+        ? '${chordNames.substring(0, 47)}...' 
+        : chordNames;
+
+    return ChordProgression(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      name: progressionName,
+      chords: selectedChords.map((chord) => chord.displayText).toList(),
+    );
+  }
+
+  /// Clears the current chord selection
+  void clearChordSelection() {
+    setState(() {
+      _selectedChordIndices.clear();
+    });
+    widget.onStateChanged?.call(); // Notify parent that selection changed
+  }
 
   /// Builds the transcription button
   Widget _buildTranscriptionButton() {

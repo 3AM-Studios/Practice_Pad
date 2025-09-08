@@ -7,7 +7,7 @@ import 'package:clay_containers/clay_containers.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:practice_pad/models/practice_area.dart';
-import 'package:practice_pad/services/local_storage_service.dart';
+import 'package:practice_pad/services/storage/local_storage_service.dart';
 import 'package:pdf_to_image_converter/pdf_to_image_converter.dart';
 import 'package:image_painter/image_painter.dart';
 

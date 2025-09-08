@@ -4,8 +4,8 @@ import 'package:clay_containers/clay_containers.dart';
 import 'package:flutter/material.dart';
 import 'package:practice_pad/models/practice_item.dart';
 import 'package:practice_pad/models/statistics.dart';
-import 'package:practice_pad/services/practice_session_manager.dart';
-import 'package:practice_pad/services/local_storage_service.dart';
+import 'package:practice_pad/features/practice/presentation/viewmodels/practice_session_manager.dart';
+import 'package:practice_pad/services/storage/local_storage_service.dart';
 import 'package:provider/provider.dart';
 
 /// Screen for conducting a practice session with a specific practice item

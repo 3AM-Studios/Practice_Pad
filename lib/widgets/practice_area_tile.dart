@@ -7,7 +7,7 @@ import 'package:practice_pad/models/statistics.dart';
 import 'package:practice_pad/features/practice/presentation/viewmodels/today_viewmodel.dart';
 import 'package:practice_pad/features/practice/presentation/pages/practice_session_screen.dart';
 import 'package:practice_pad/features/song_viewer/presentation/screens/song_viewer_screen.dart';
-import 'package:practice_pad/services/practice_session_manager.dart';
+import 'package:practice_pad/features/practice/presentation/viewmodels/practice_session_manager.dart';
 import 'package:provider/provider.dart';
 
 /// Expandable tile widget for practice areas that shows practice items as sub-items

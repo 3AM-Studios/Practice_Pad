@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'dart:convert';
+import 'dart:developer' as developer;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -9,14 +11,16 @@ import 'package:practice_pad/services/device_type.dart';
 import 'package:practice_pad/widgets/practice_area_tile.dart';
 import 'package:practice_pad/widgets/active_session_banner.dart';
 import 'package:practice_pad/widgets/practice_calendar.dart';
-import 'package:practice_pad/services/practice_session_manager.dart';
+import 'package:practice_pad/features/practice/presentation/viewmodels/practice_session_manager.dart';
 import 'package:practice_pad/features/edit_items/presentation/viewmodels/edit_items_viewmodel.dart';
-import 'package:practice_pad/services/widget_integration.dart';
+import 'package:practice_pad/features/routines/presentation/viewmodels/routines_viewmodel.dart';
+import 'package:practice_pad/services/widget/widget_integration.dart';
 import 'package:practice_pad/services/icloud_sync_service.dart';
-import 'package:practice_pad/services/local_storage_service.dart';
+import 'package:practice_pad/services/storage/local_storage_service.dart';
 import 'package:practice_pad/features/transcription/presentation/pages/youtube_videos_page.dart';
 import 'package:practice_pad/onboarding.dart';
 import 'package:provider/provider.dart';
+import 'package:path_provider/path_provider.dart';
 
 class TodayScreen extends StatefulWidget {
   final VoidCallback? onStatsPressed;
@@ -160,7 +164,7 @@ Widget _buildBody(BuildContext context, TodayViewModel viewModel) {
         _buildTranscribeButton(context),
         const SizedBox(height: 16),
         _buildBottomSection(context, viewModel, widget.onStatsPressed, isTabletOrDesktop),
-        SizedBox(height: MediaQuery.of(context).size.height * 0.003), //30% of overall height
+        SizedBox(height: isTabletOrDesktop? 120 : 0),
       ],
     );
   }
@@ -190,7 +194,7 @@ Widget _buildBody(BuildContext context, TodayViewModel viewModel) {
       const SizedBox(height: 16),
       // Responsive bottom section
       _buildBottomSection(context, viewModel, widget.onStatsPressed, isTabletOrDesktop),
-       SizedBox(height: isTabletOrDesktop? 120 : 30),
+       SizedBox(height: isTabletOrDesktop? 120 : 0),
     ],
   );
 }
@@ -371,10 +375,96 @@ Widget _buildSyncButton({
     ),
   );
 }
+  Future<void> _reloadAllViewModelsAfterSync(BuildContext context) async {
+    developer.log('🔄 Reloading all ViewModels after iCloud sync');
+    
+    try {
+      // Show loading dialog while reloading
+      if (context.mounted) {
+        showCupertinoDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const CupertinoAlertDialog(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CupertinoActivityIndicator(),
+                SizedBox(height: 16),
+                Text('Reloading data...\nYour synced data will appear shortly.'),
+              ],
+            ),
+          ),
+        );
+      }
+      
+      // Get ViewModels from Provider
+      if (context.mounted) {
+        final editItemsViewModel = Provider.of<EditItemsViewModel>(context, listen: false);
+        final routinesViewModel = Provider.of<RoutinesViewModel>(context, listen: false);
+        final todayViewModel = Provider.of<TodayViewModel>(context, listen: false);
+        
+        // Reload in proper order: EditItems -> Routines -> Today
+        // EditItemsViewModel needs to load first since others depend on it
+        await editItemsViewModel.reloadFromStorage();
+        
+        // RoutinesViewModel depends on EditItemsViewModel data
+        await routinesViewModel.reloadFromStorage();
+        
+        // TodayViewModel depends on both
+        await todayViewModel.reloadFromStorage();
+        
+        developer.log('✅ All ViewModels reloaded successfully after iCloud sync');
+      }
+      
+      // Close loading dialog
+      if (context.mounted) {
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      developer.log('❌ Error reloading ViewModels after sync: $e');
+      developer.log('❌ Stack trace: ${StackTrace.current}');
+      
+      // Close loading dialog if it's still open
+      if (context.mounted) {
+        Navigator.of(context).pop();
+        
+        // Show error message with specific error details
+        showCupertinoDialog(
+          context: context,
+          builder: (context) => CupertinoAlertDialog(
+            title: const Text('Reload Failed'),
+            content: Text('Data downloaded successfully but failed to reload the interface.\n\nError: $e\n\nPlease restart the app to see your synced data.'),
+            actions: [
+              CupertinoDialogAction(
+                child: const Text('OK'),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ],
+          ),
+        );
+      }
+    }
+  }
 
 Future<void> _downloadFromICloud(BuildContext context) async {
   // First check iCloud availability
   final icloudService = ICloudSyncService();
+  
+  // Migrate to organized structure first (if needed)
+  try {
+    await ICloudSyncService.migrateToOrganizedStructure();
+  } catch (e) {
+    developer.log('⚠️ Migration failed but continuing: $e');
+  }
+  
+  // DEBUG: Show container analysis IMMEDIATELY
+  print("🔍 [DEBUG] Starting container analysis...");
+  try {
+    await icloudService.listICloudFiles();
+  } catch (e) {
+    print("❌ [DEBUG] Container analysis failed: $e");
+  }
+  
   final isAvailable = await icloudService.isICloudAvailable();
   
   if (!isAvailable) {
@@ -441,27 +531,84 @@ Future<void> _downloadFromICloud(BuildContext context) async {
   }
 
   try {
-    // Download specific practice-related files
-    final filesToDownload = [
-      'custom_songs.json',
-      'practice_sessions.json',
-      'practice_areas.json',
-      'practice_items.json',
-      'weekly_schedule.json',
-      'song_changes.json',
-      'chord_keys.json',
-    ];
+    // Get all available files in iCloud
+    final availableFiles = await icloudService.listICloudFiles();
+    
+    // Download ALL files from iCloud - let the service handle timestamp comparison
+    final filesToDownload = availableFiles.toList();
+    
+    developer.log('📥 [DOWNLOAD] Checking ${filesToDownload.length} files for sync: $filesToDownload');
     
     int successCount = 0;
     List<String> failedFiles = [];
+    List<String> actualFilesToDownload = [];
     
+    if (filesToDownload.isEmpty) {
+      developer.log('ℹ️ No files found in iCloud to download');
+    }
+    
+    // First pass: check which files actually need downloading (newer than local)
     for (final fileName in filesToDownload) {
       try {
+        final fileInfo = await icloudService.getICloudFileInfo(fileName);
+        final localDir = await getApplicationDocumentsDirectory();
+        final localFile = File('${localDir.path}/$fileName');
+        
+        if (!await localFile.exists()) {
+          // Local file doesn't exist, download it
+          actualFilesToDownload.add(fileName);
+          developer.log('📥 [DOWNLOAD] Local file missing, will download: $fileName');
+        } else {
+          // Compare timestamps if available
+          if (fileInfo['lastModified'] != null) {
+            final localTimestamp = await localFile.lastModified();
+            final remoteTimestamp = DateTime.parse(fileInfo['lastModified']);
+            
+            if (remoteTimestamp.isAfter(localTimestamp)) {
+              actualFilesToDownload.add(fileName);
+              developer.log('📥 [DOWNLOAD] Remote newer, will download: $fileName (remote: $remoteTimestamp, local: $localTimestamp)');
+            } else {
+              developer.log('📥 [DOWNLOAD] Local up-to-date, skipping: $fileName');
+            }
+          } else {
+            // No timestamp info available, download anyway to be safe
+            actualFilesToDownload.add(fileName);
+            developer.log('📥 [DOWNLOAD] No timestamp info, will download: $fileName');
+          }
+        }
+      } catch (e) {
+        // If we can't get file info, try downloading anyway
+        actualFilesToDownload.add(fileName);
+        developer.log('📥 [DOWNLOAD] Error checking file info, will download: $fileName - $e');
+      }
+    }
+    
+    developer.log('📥 [DOWNLOAD] Will download ${actualFilesToDownload.length} files that need updating');
+    
+    // Second pass: actually download the files that need updating
+    for (final fileName in actualFilesToDownload) {
+      try {
         final result = await icloudService.downloadFile(fileName);
+        
         if (result.success) {
           successCount++;
+          
+          // Show what was actually downloaded for practice_areas.json only
+          if (fileName == 'practice_areas.json') {
+            try {
+              final localDir = await getApplicationDocumentsDirectory();
+              final file = File('${localDir.path}/$fileName');
+              if (await file.exists()) {
+                final content = await file.readAsString();
+                developer.log('📥 [DOWNLOAD] practice_areas.json content: $content');
+              }
+            } catch (e) {
+              developer.log('❌ Could not read downloaded practice_areas.json: $e');
+            }
+          }
         } else {
-          failedFiles.add('$fileName: ${result.error ?? "Unknown error"}');
+          final error = result.error ?? "Unknown error";
+          failedFiles.add('$fileName: $error');
         }
       } catch (e) {
         failedFiles.add('$fileName: $e');
@@ -472,11 +619,20 @@ Future<void> _downloadFromICloud(BuildContext context) async {
       Navigator.of(context).pop();
       
       if (failedFiles.isEmpty) {
+        final message = actualFilesToDownload.isEmpty
+            ? 'All files are up to date. No downloads needed.'
+            : 'Successfully downloaded $successCount files from iCloud.';
+        
+        // If files were successfully downloaded, reload all ViewModels
+        if (successCount > 0) {
+          await _reloadAllViewModelsAfterSync(context);
+        }
+        
         showCupertinoDialog(
           context: context,
           builder: (context) => CupertinoAlertDialog(
             title: const Text('Success'),
-            content: Text('Successfully downloaded $successCount files from iCloud.'),
+            content: Text(message),
             actions: [
               CupertinoDialogAction(
                 child: const Text('OK'),
@@ -490,7 +646,7 @@ Future<void> _downloadFromICloud(BuildContext context) async {
           context: context,
           builder: (context) => CupertinoAlertDialog(
             title: const Text('Partial Success'),
-            content: Text('Downloaded $successCount/${filesToDownload.length} files.\n\nFailed files:\n${failedFiles.join('\n')}'),
+            content: Text('Downloaded $successCount/${actualFilesToDownload.length} files.\n\nFailed files:\n${failedFiles.join('\n')}'),
             actions: [
               CupertinoDialogAction(
                 child: const Text('OK'),
@@ -525,6 +681,13 @@ Future<void> _downloadFromICloud(BuildContext context) async {
 Future<void> _uploadToICloud(BuildContext context) async {
   // First check iCloud availability
   final icloudService = ICloudSyncService();
+  
+  // Migrate to organized structure first (if needed)
+  try {
+    await ICloudSyncService.migrateToOrganizedStructure();
+  } catch (e) {
+    developer.log('⚠️ Migration failed but continuing: $e');
+  }
   final isAvailable = await icloudService.isICloudAvailable();
   
   if (!isAvailable) {
@@ -591,7 +754,31 @@ Future<void> _uploadToICloud(BuildContext context) async {
   }
 
   try {
+    // Create complete organized folder structure before upload
+    developer.log('📤 [UPLOAD] Creating organized folder structure for upload');
+    
+    if (context.mounted) {
+      final editItemsViewModel = Provider.of<EditItemsViewModel>(context, listen: false);
+      final routinesViewModel = Provider.of<RoutinesViewModel>(context, listen: false);
+      final todayViewModel = Provider.of<TodayViewModel>(context, listen: false);
+      
+      // Create organized structure based on current app data
+      await _createOrganizedStructureForUpload(editItemsViewModel, routinesViewModel);
+      
+      developer.log('📤 [UPLOAD] Organized structure created successfully');
+    }
+    
+    // DEBUG: Show what data is being uploaded
+    developer.log('📤 [UPLOAD] Starting upload to iCloud');
+    final localDir = await getApplicationDocumentsDirectory();
+    final practiceAreasFile = File('${localDir.path}/practice_areas.json');
+    if (await practiceAreasFile.exists()) {
+      final content = await practiceAreasFile.readAsString();
+      developer.log('📤 [UPLOAD] practice_areas.json content: $content');
+    }
+    
     final result = await LocalStorageService.syncAllToICloud();
+    
 
     if (context.mounted) {
       Navigator.of(context).pop();
@@ -641,6 +828,7 @@ Future<void> _uploadToICloud(BuildContext context) async {
       }
     }
   } catch (e) {
+    developer.log('❌ [UPLOAD DEBUG] Upload exception: $e');
     if (context.mounted) {
       Navigator.of(context).pop();
       
@@ -704,6 +892,81 @@ Future<void> _showDebugInfo(BuildContext context) async {
         ),
       );
     }
+  }
+
+  /// Reload all ViewModels after successful iCloud sync
+}
+
+/// Create organized folder structure for upload
+Future<void> _createOrganizedStructureForUpload(
+  EditItemsViewModel editItemsViewModel, 
+  RoutinesViewModel routinesViewModel,
+) async {
+  try {
+    final localDir = await getApplicationDocumentsDirectory();
+    
+    // 1. Create config files
+    developer.log('📤 Creating config files...');
+    await LocalStorageService.saveCustomSongs([]);  
+    await LocalStorageService.saveBooks([]);        
+    await LocalStorageService.saveYoutubeVideosList([]);
+    
+    // 2. Create main practice areas structure  
+    developer.log('📤 Creating practice areas structure...');
+    await LocalStorageService.savePracticeAreas(editItemsViewModel.areas);
+    
+    // 3. Create individual practice area folders with their data
+    for (final area in editItemsViewModel.areas) {
+      developer.log('📤 Creating folder for practice area: ${area.name}');
+      
+      // Create practice area JSON file
+      final areaData = {
+        'recordName': area.recordName,
+        'name': area.name,
+        'type': area.type.toString(),
+        'song': area.song?.toJson(),  // Convert song to JSON if it exists
+        'itemCount': area.practiceItems.length,
+      };
+      
+      // Save individual practice area file
+      final areaFileName = 'practice_areas_${area.recordName}_area.json';
+      final areaFile = File('${localDir.path}/$areaFileName');
+      await areaFile.writeAsString(json.encode(areaData));
+      
+      // Create practice items for this area
+      if (area.practiceItems.isNotEmpty) {
+        for (int i = 0; i < area.practiceItems.length; i++) {
+          final item = area.practiceItems[i];
+          final itemData = {
+            'id': item.id,
+            'name': item.name,
+            'description': item.description,
+            'chordProgression': item.chordProgression?.toJson(),  // Convert chord progression if it exists
+            'keysPracticed': item.keysPracticed,
+          };
+          
+          final itemFileName = 'practice_areas_${area.recordName}_item_${i + 1}.json';
+          final itemFile = File('${localDir.path}/$itemFileName');
+          await itemFile.writeAsString(json.encode(itemData));
+        }
+      }
+    }
+    
+    // 4. Create songs structure (if any songs exist)
+    developer.log('📤 Creating songs structure...');
+    // For now, create empty structure - can be enhanced later with actual song data
+    final songsData = {
+      'songs': [],
+      'drawings': {},
+      'sheet_music': {},
+    };
+    final songsFile = File('${localDir.path}/songs_structure.json');
+    await songsFile.writeAsString(json.encode(songsData));
+    
+    developer.log('📤 Organized structure creation completed');
+  } catch (e) {
+    developer.log('❌ Error creating organized structure: $e');
+    rethrow;
   }
 }
 

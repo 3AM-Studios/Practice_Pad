@@ -5,6 +5,7 @@ import 'package:practice_pad/features/chord_progressions/chord_progression_input
 import 'package:practice_pad/models/practice_area.dart';
 import 'package:practice_pad/models/practice_item.dart';
 import 'package:practice_pad/models/chord_progression.dart';
+import 'package:practice_pad/services/device_type.dart';
 import 'package:provider/provider.dart';
 import 'dart:developer' as developer;
 
@@ -170,12 +171,16 @@ class _PracticeItemsScreenState extends State<PracticeItemsScreen> {
   }
 
   Widget _buildItemList(BuildContext context) {
+    final isTabletOrDesktop = deviceType == DeviceType.tablet || deviceType == DeviceType.macOS;
+    
     final bool isLoading =
         _viewModel.isLoadingItemsForArea(widget.practiceArea.recordName);
 
     if (isLoading && _items.isEmpty) {
       return const Center(child: CupertinoActivityIndicator());
     }
+
+
 
 
     if (_items.isEmpty && !isLoading) {
@@ -214,8 +219,8 @@ class _PracticeItemsScreenState extends State<PracticeItemsScreen> {
         CupertinoSliverRefreshControl(
           onRefresh: _loadItems,
         ),
-                const SliverToBoxAdapter(
-          child: SizedBox(height: 100),
+                 SliverToBoxAdapter(
+          child: SizedBox(height: isTabletOrDesktop? 50: 100),
         ),
         SliverList(
           delegate: SliverChildBuilderDelegate(

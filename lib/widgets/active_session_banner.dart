@@ -1,7 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:clay_containers/clay_containers.dart';
-import 'package:practice_pad/services/practice_session_manager.dart';
+import 'package:practice_pad/features/practice/presentation/viewmodels/practice_session_manager.dart';
 import 'package:practice_pad/features/practice/presentation/pages/practice_session_screen.dart';
 import 'package:provider/provider.dart';
 

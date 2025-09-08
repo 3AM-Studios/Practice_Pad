@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:clay_containers/clay_containers.dart';
 import 'package:practice_pad/features/practice/presentation/pages/practice_session_screen.dart';
 import 'package:practice_pad/models/practice_area.dart';
+import 'package:practice_pad/models/practice_item.dart';
 import 'package:practice_pad/widgets/active_session_banner.dart';
 import 'package:practice_pad/features/song_viewer/presentation/viewers/simple_sheet_music_viewer.dart';
 import 'package:practice_pad/features/song_viewer/presentation/viewers/pdf_viewer/pdf_viewer_screen.dart';
@@ -267,9 +268,10 @@ class _SongViewerScreenState extends State<SongViewerScreen> {
                 const SizedBox(height: 20),
                 
                 // Practice-related widgets (shared between modes)
+                _buildAddProgressionButton(),
                 const ActiveSessionBanner(),
                 _buildPracticeItemsWidget(),
-                _buildGeneralPracticeItemButton(),
+                
                 
                 const SizedBox(height: 20), // Bottom padding for scroll
               ],
@@ -289,7 +291,6 @@ class _SongViewerScreenState extends State<SongViewerScreen> {
 
     final theme = Theme.of(context);
     final primaryColor = theme.colorScheme.primary;
-    final secondaryColor = theme.colorScheme.secondary;
     final surfaceColor = theme.colorScheme.surface;
 
     return Container(
@@ -427,39 +428,128 @@ class _SongViewerScreenState extends State<SongViewerScreen> {
     );
   }
 
-  Widget _buildGeneralPracticeItemButton() {
+  Widget _buildAddProgressionButton() {
+    // Only show if we have a practice area and selected chords
     if (widget.practiceArea == null) {
+      return const SizedBox.shrink();
+    }
+
+    // Check if we're in sheet music mode and have selected chords
+    final hasSelectedChords = _currentMode == ViewerMode.simpleSheetMusic && 
+        _sheetMusicViewer != null && 
+        (_sheetMusicKey.currentState as dynamic)?.hasSelectedChords() == true;
+
+    if (!hasSelectedChords) {
       return const SizedBox.shrink();
     }
 
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.all(16),
-      child: ClayContainer(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: 20,
-        depth: 5,
-        curveType: CurveType.convex,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.add,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Add Practice Item',
-                style: TextStyle(
+      child: GestureDetector(
+        onTap: _addSelectedProgressionToPracticeItems,
+        child: ClayContainer(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: 20,
+          depth: 5,
+          curveType: CurveType.convex,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.add,
                   color: Theme.of(context).colorScheme.primary,
-                  fontWeight: FontWeight.w600,
                 ),
-              ),
-            ],
+                const SizedBox(width: 8),
+                Text(
+                  'Add Selected Progression',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
+      ),
+    );
+  }
+
+  /// Adds the selected chord progression to practice items
+  Future<void> _addSelectedProgressionToPracticeItems() async {
+    if (widget.practiceArea == null || _sheetMusicViewer == null) return;
+
+    try {
+      // Get the selected chord progression from the sheet music viewer
+      final progression = (_sheetMusicKey.currentState as dynamic)?.getSelectedChordProgression();
+      
+      if (progression == null) {
+        _showErrorDialog('No chord progression selected');
+        return;
+      }
+
+      // Get the EditItemsViewModel
+      final editItemsViewModel = Provider.of<EditItemsViewModel>(context, listen: false);
+
+      // Create a new practice item with the chord progression
+      final practiceItem = PracticeItem(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        name: 'Chord Progression: ${progression.name}',
+        description: 'Chords: ${progression.chords.join(' - ')}',
+        chordProgression: progression,
+      );
+
+      // Add the practice item to the practice area
+      await editItemsViewModel.addPracticeItem(widget.practiceArea!.recordName, practiceItem);
+
+      // Clear the selection in the sheet music viewer
+      (_sheetMusicKey.currentState as dynamic)?.clearChordSelection();
+
+      // Show success feedback
+      _showSuccessDialog('Chord progression added to practice items!');
+
+    } catch (e) {
+      _showErrorDialog('Failed to add chord progression: $e');
+    }
+  }
+
+  /// Shows an error dialog to the user
+  void _showErrorDialog(String message) {
+    if (!mounted) return;
+    
+    showCupertinoDialog(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: const Text('Error'),
+        content: Text(message),
+        actions: [
+          CupertinoDialogAction(
+            child: const Text('OK'),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Shows a success dialog to the user
+  void _showSuccessDialog(String message) {
+    if (!mounted) return;
+    
+    showCupertinoDialog(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: const Text('Success'),
+        content: Text(message),
+        actions: [
+          CupertinoDialogAction(
+            child: const Text('OK'),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ],
       ),
     );
   }

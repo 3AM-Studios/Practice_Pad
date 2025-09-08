@@ -31,12 +31,9 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # firebase_core: any
-  # flutter_bloc: any
-  # firebase_auth: any
-  # equatable: any
-
-
+  # CloudKit integration for iOS
+  cloud_kit: ^1.0.0
+  
   table_calendar: any
   provider: ^6.0.0
   flutter_localizations:
@@ -107,6 +104,8 @@ flutter:
     - assets/images/onboarding/page_2/
     - assets/images/onboarding/page_3/
     - assets/images/onboarding/page_4/
+    - assets/images/onboarding/page_5/
+    - assets/images/onboarding/page_6/
         # You can also add other weights like bold if you 
   # To add assets to your application, add an assets section, like this:
   # assets:

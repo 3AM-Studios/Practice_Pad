@@ -329,6 +329,15 @@ class TodayViewModel extends ChangeNotifier {
     }
   }
 
+  /// Reload all data from storage (useful after iCloud sync)
+  Future<void> reloadFromStorage() async {
+    developer.log('[TodayViewModel] Reloading all data from storage', name: 'TodayVM');
+    await _loadDailyGoal();
+    await _loadTodaysPracticeTime();
+    // Reload today's items (this will reload from RoutinesViewModel which should already be refreshed)
+    _loadTodaysItems();
+  }
+
   /// Public method to reload today's practice time (call after session completion)
   Future<void> reloadTodaysPracticeTime() async {
     await _loadTodaysPracticeTime();

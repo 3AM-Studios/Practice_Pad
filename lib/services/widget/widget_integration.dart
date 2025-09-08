@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'package:practice_pad/services/widget_action_handler.dart';
-import 'package:practice_pad/services/practice_session_manager.dart';
+import 'package:practice_pad/services/widget/widget_action_handler.dart';
+import 'package:practice_pad/features/practice/presentation/viewmodels/practice_session_manager.dart';
 import 'package:practice_pad/features/practice/presentation/viewmodels/today_viewmodel.dart';
 import 'package:practice_pad/features/edit_items/presentation/viewmodels/edit_items_viewmodel.dart';
 

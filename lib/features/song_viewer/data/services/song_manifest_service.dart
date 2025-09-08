@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:practice_pad/features/song_viewer/data/models/song.dart';
-import 'package:practice_pad/services/local_storage_service.dart';
+import 'package:practice_pad/services/storage/local_storage_service.dart';
 
 class SongManifestService {
   Future<List<Song>> loadSongs() async {

@@ -8,11 +8,12 @@ import WebKit
 @objc class AppDelegate: FlutterAppDelegate {
     
     private let WIDGET_CHANNEL_NAME = "com.3amstudios.jazzpad/widget"
-    private let CLOUDKIT_CHANNEL_NAME = "iCloud.com.practicepad"
+    private let CLOUDKIT_CHANNEL_NAME = "practice_pad_cloudkit"
     private let USER_DEFAULTS_SUITE = "group.com.3amstudios.jazzpad"
     
     private var widgetMethodChannel: FlutterMethodChannel?
     private var userDefaults: UserDefaults?
+    private let cloudKitHandler = CloudKitHandler()
     
     // Timer for polling widget actions
     private var widgetActionTimer: Timer?
@@ -31,22 +32,8 @@ import WebKit
         // --- Set up CloudKit Channel ---
         let cloudKitChannel = FlutterMethodChannel(name: CLOUDKIT_CHANNEL_NAME,
                                                    binaryMessenger: controller.binaryMessenger)
-        cloudKitChannel.setMethodCallHandler({
-            (call: FlutterMethodCall, result: @escaping FlutterResult) -> Void in
-            switch call.method {
-            case "fetchRecords": self.fetchRecords(call: call, result: result)
-            case "saveRecord": self.saveRecord(call: call, result: result)
-            case "deleteRecord": self.deleteRecord(call: call, result: result)
-            default: result(FlutterMethodNotImplemented)
-            }
-        })
-        
-        // --- Set up iCloud Documents Sync Channel ---
-        let icloudSyncChannel = FlutterMethodChannel(name: "icloud_documents_sync",
-                                                    binaryMessenger: controller.binaryMessenger)
-        let icloudSyncHandler = ICloudSyncHandler()
-        icloudSyncChannel.setMethodCallHandler { (call, result) in
-            icloudSyncHandler.handle(call, result: result)
+        cloudKitChannel.setMethodCallHandler { [weak self] (call, result) in
+            self?.cloudKitHandler.handle(call, result: result)
         }
 
         // --- Set up Widget Channel ---
@@ -169,89 +156,4 @@ import WebKit
         }
     }
 
-    // MARK: - CloudKit Methods (Your existing code)
-    
-    private func getDatabase(containerId: String) -> CKDatabase {
-        let container = CKContainer(identifier: containerId)
-        return container.privateCloudDatabase
-    }
-
-    private func ckRecordToDictionary(record: CKRecord) -> [String: Any] {
-        var dict: [String: Any] = [:]
-        dict["recordName"] = record.recordID.recordName
-        for key in record.allKeys() {
-            if let value = record[key] {
-                if let stringValue = value as? String { dict[key] = stringValue }
-                else if let intValue = value as? Int64 { dict[key] = intValue }
-                else if let doubleValue = value as? Double { dict[key] = doubleValue }
-                else if let dateValue = value as? Date { dict[key] = dateValue.timeIntervalSince1970 * 1000 }
-            }
-        }
-        return dict
-    }
-
-    private func fetchRecords(call: FlutterMethodCall, result: @escaping FlutterResult) {
-        guard let args = call.arguments as? [String: Any],
-              let containerId = args["containerId"] as? String,
-              let recordType = args["recordType"] as? String else {
-            result(FlutterError(code: "INVALID_ARGUMENTS", message: "Missing arguments", details: nil))
-            return
-        }
-        let database = getDatabase(containerId: containerId)
-        let query = CKQuery(recordType: recordType, predicate: NSPredicate(value: true))
-        database.perform(query, inZoneWith: nil) { (records, error) in
-            DispatchQueue.main.async {
-                if let error = error {
-                    result(FlutterError(code: "CLOUDKIT_ERROR", message: error.localizedDescription, details: nil))
-                    return
-                }
-                let resultsArray = records?.map { self.ckRecordToDictionary(record: $0) } ?? []
-                result(resultsArray)
-            }
-        }
-    }
-
-    private func saveRecord(call: FlutterMethodCall, result: @escaping FlutterResult) {
-        guard let args = call.arguments as? [String: Any],
-              let containerId = args["containerId"] as? String,
-              let recordType = args["recordType"] as? String,
-              let fields = args["fields"] as? [String: Any] else {
-            result(FlutterError(code: "INVALID_ARGUMENTS", message: "Missing arguments", details: nil))
-            return
-        }
-        let recordName = args["recordName"] as? String
-        let database = getDatabase(containerId: containerId)
-        let recordID = (recordName != nil) ? CKRecord.ID(recordName: recordName!) : CKRecord.ID()
-        let ckRecord = CKRecord(recordType: recordType, recordID: recordID)
-        fields.forEach { key, value in ckRecord[key] = value as? CKRecordValue }
-        database.save(ckRecord) { (savedRecord, error) in
-            DispatchQueue.main.async {
-                if let error = error {
-                    result(FlutterError(code: "CLOUDKIT_ERROR", message: error.localizedDescription, details: nil))
-                    return
-                }
-                result(self.ckRecordToDictionary(record: savedRecord!))
-            }
-        }
-    }
-
-    private func deleteRecord(call: FlutterMethodCall, result: @escaping FlutterResult) {
-        guard let args = call.arguments as? [String: Any],
-              let containerId = args["containerId"] as? String,
-              let recordName = args["recordName"] as? String else {
-            result(FlutterError(code: "INVALID_ARGUMENTS", message: "Missing arguments", details: nil))
-            return
-        }
-        let database = getDatabase(containerId: containerId)
-        let recordID = CKRecord.ID(recordName: recordName)
-        database.delete(withRecordID: recordID) { (deletedRecordID, error) in
-            DispatchQueue.main.async {
-                if let error = error {
-                    result(FlutterError(code: "CLOUDKIT_ERROR", message: error.localizedDescription, details: nil))
-                    return
-                }
-                result(nil)
-            }
-        }
-    }
 }

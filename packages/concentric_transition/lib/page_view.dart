@@ -72,6 +72,10 @@ class _ConcentricPageViewState extends State<ConcentricPageView> {
   // Multi-image support
   int _currentScreenIndex = 0;
   int _currentImageIndex = 0;
+  
+  // Debouncing
+  bool _isProcessing = false;
+  DateTime? _lastTapTime;
 
   @override
   void initState() {
@@ -215,10 +219,25 @@ class _ConcentricPageViewState extends State<ConcentricPageView> {
   }
   
   void _handleNextImage() {
+    // Debounce rapid taps
+    final now = DateTime.now();
+    if (_isProcessing || (_lastTapTime != null && now.difference(_lastTapTime!).inMilliseconds < 300)) {
+      return;
+    }
+    
+    _lastTapTime = now;
+    _isProcessing = true;
+    
     if (widget.imagesPerScreen == null) {
       // Standard behavior - go to next screen
       _nextScreen();
       return;
+    }
+    
+    // Add bounds check to prevent RangeError
+    if (_currentScreenIndex >= widget.imagesPerScreen!.length) {
+      _isProcessing = false;
+      return; // Don't do anything if we're out of bounds
     }
     
     final imagesInCurrentScreen = widget.imagesPerScreen![_currentScreenIndex];
@@ -229,6 +248,7 @@ class _ConcentricPageViewState extends State<ConcentricPageView> {
         _currentImageIndex++;
       });
       widget.onImageChange?.call(_currentScreenIndex, _currentImageIndex);
+      _isProcessing = false;
     } else {
       // All images in current screen viewed, move to next screen
       _nextScreen();
@@ -236,20 +256,33 @@ class _ConcentricPageViewState extends State<ConcentricPageView> {
   }
   
   void _nextScreen() {
-    final isFinal = _pageController.page == widget.colors.length - 1;
+    final currentPage = _pageController.page?.round() ?? 0;
+    final isFinal = currentPage >= widget.colors.length - 1;
+    
     if (isFinal && widget.onFinish != null) {
       widget.onFinish!();
+      _isProcessing = false;
+      return;
+    }
+    
+    // Don't proceed if we're already at or past the last page
+    if (currentPage >= widget.colors.length - 1) {
+      _isProcessing = false;
       return;
     }
     
     _pageController.nextPage(
       duration: widget.duration,
       curve: widget.curve,
-    );
-    
-    setState(() {
-      _currentScreenIndex++;
-      _currentImageIndex = 0;
+    ).then((_) {
+      // Update the state AFTER the page transition completes
+      // This prevents showing the first image of the next screen during transition
+      setState(() {
+        _currentScreenIndex++;
+        _currentImageIndex = 0;
+      });
+      widget.onImageChange?.call(_currentScreenIndex, _currentImageIndex);
+      _isProcessing = false;
     });
   }
 }
@@ -272,7 +305,6 @@ class _Button extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final size = widget.radius * 2;
     Widget? child = widget.nextButtonBuilder != null
         ? widget.nextButtonBuilder!(context)
         : null;

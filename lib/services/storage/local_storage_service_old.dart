@@ -11,7 +11,7 @@ import 'package:music_sheet/index.dart';
 import 'package:flutter_drawing_board/paint_contents.dart';
 import 'dart:developer' as developer;
 import 'package:image_painter/image_painter.dart';
-import 'package:practice_pad/services/icloud_sync_service.dart';
+import 'package:practice_pad/services/storage/cloudkit_sync_service.dart';
 
 /// Local storage service for persisting app data
 class LocalStorageService {
@@ -705,9 +705,7 @@ class LocalStorageService {
             continue;
         }
 
-        if (content != null) {
-          contents.add(content);
-        } else {}
+        contents.add(content);
       } catch (e) {
         developer.log('Error deserializing paint content: $e');
         // Continue with other items even if one fails
@@ -775,6 +773,9 @@ class LocalStorageService {
 
         developer.log(
             '✅ SERIALIZED SAVE: Saved ${drawingData.length} PDF drawing elements for song: $songId page: $pageNumber with timestamp: $timestamp');
+        
+        // Sync to iCloud after successful save
+        await _syncFileToICloud(_pdfDrawingsFileName);
       } catch (e) {
         developer.log('❌ SERIALIZED PDF SAVE ERROR: $e', error: e);
         throw Exception('Failed to save PDF drawings: $e');
@@ -903,6 +904,9 @@ class LocalStorageService {
       final file = await _getFile(_youtubeLinksFileName);
       await file.writeAsString(json.encode(allYoutubeLinks));
       developer.log('Saved YouTube link for song: $songId');
+      
+      // Sync to iCloud after successful save
+      await _syncFileToICloud(_youtubeLinksFileName);
     } catch (e) {
       developer.log('Error saving YouTube link: $e', error: e);
       throw Exception('Failed to save YouTube link: $e');
@@ -1056,12 +1060,18 @@ class LocalStorageService {
           await tempFile.writeAsString(json.encode(books));
           await tempFile.rename(file.path);
           developer.log('📚 Books saved successfully: ${books.length} books');
+          
+          // Sync to iCloud after successful save
+          await _syncFileToICloud(_booksFileName);
         } catch (renameError) {
           developer.log('⚠️ Books rename failed, falling back to direct write: $renameError');
           await file.writeAsString(json.encode(books));
           if (await tempFile.exists()) {
             await tempFile.delete();
           }
+          
+          // Sync to iCloud after successful save
+          await _syncFileToICloud(_booksFileName);
         }
       } catch (e) {
         developer.log('❌ Error saving books: $e');
@@ -1247,6 +1257,15 @@ class LocalStorageService {
     return await _icloudSyncService!.syncAllData();
   }
 
+  /// Intelligently sync all data to iCloud with automatic conflict resolution
+  static Future<SyncResult> syncAllToICloudIntelligently() async {
+    if (!isICloudSyncEnabled) {
+      return SyncResult.error('iCloud sync not available or enabled');
+    }
+    
+    return await _icloudSyncService!.syncAllDataIntelligently();
+  }
+
   /// Enhanced save methods with iCloud sync integration
 
   /// Save custom songs with iCloud sync
@@ -1286,6 +1305,9 @@ class LocalStorageService {
       final jsonData = areas.map((area) => _practiceAreaToJson(area)).toList();
       await file.writeAsString(json.encode(jsonData));
       developer.log('Saved ${areas.length} practice areas to local storage');
+      
+      // Also create individual practice area files for organized structure
+      await _createIndividualPracticeAreaFiles(areas);
       
       // Sync to iCloud after successful save
       await _syncFileToICloud(_practiceAreasFileName);
@@ -1379,9 +1401,9 @@ class LocalStorageService {
           }
         }
         
-        // Sync to iCloud after successful save
-        final fileName = file.path.split('/').last;
-        await _syncFileToICloud(fileName);
+        // Sync to iCloud after successful save (use relative filename for labels)
+        final labelsFileName = '${_getSafeFilename(songAssetPath)}_pdf_page_${page}_labels.json';
+        await _syncFileToICloud(labelsFileName);
       } catch (e) {
         developer.log('❌ Error saving labels for $songAssetPath page $page: $e');
         throw Exception('Failed to save labels: $e');
@@ -1520,5 +1542,52 @@ class LocalStorageService {
     _icloudSyncService?.dispose();
     _icloudSyncService = null;
     _icloudSyncEnabled = false;
+  }
+
+  /// Create individual practice area files for organized structure
+  static Future<void> _createIndividualPracticeAreaFiles(List<PracticeArea> areas) async {
+    try {
+      final directory = await getApplicationDocumentsDirectory();
+      
+      for (final area in areas) {
+        // Create individual practice area file
+        final areaData = {
+          'recordName': area.recordName,
+          'name': area.name,
+          'type': area.type.toString(),
+          'song': area.song?.toJson(),
+          'itemCount': area.practiceItems.length,
+        };
+        
+        final areaFileName = 'practice_areas_${area.recordName}_area.json';
+        final areaFile = File('${directory.path}/$areaFileName');
+        await areaFile.writeAsString(json.encode(areaData));
+        
+        // Sync individual area file to iCloud
+        await _syncFileToICloud(areaFileName);
+        
+        // Create individual practice item files
+        for (int i = 0; i < area.practiceItems.length; i++) {
+          final item = area.practiceItems[i];
+          final itemData = {
+            'id': item.id,
+            'name': item.name,
+            'description': item.description,
+            'chordProgression': item.chordProgression?.toJson(),
+            'keysPracticed': item.keysPracticed,
+          };
+          
+          final itemFileName = 'practice_areas_${area.recordName}_item_${i + 1}.json';
+          final itemFile = File('${directory.path}/$itemFileName');
+          await itemFile.writeAsString(json.encode(itemData));
+          
+          // Sync individual item file to iCloud
+          await _syncFileToICloud(itemFileName);
+        }
+      }
+    } catch (e) {
+      developer.log('⚠️ Error creating individual practice area files: $e');
+      // Don't throw - this is supplementary to the main save
+    }
   }
 }

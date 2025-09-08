@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:home_widget/home_widget.dart';
-import 'package:practice_pad/services/practice_session_manager.dart';
+import 'package:practice_pad/features/practice/presentation/viewmodels/practice_session_manager.dart';
 import 'package:practice_pad/features/practice/presentation/viewmodels/today_viewmodel.dart';
 import 'dart:async';
 
