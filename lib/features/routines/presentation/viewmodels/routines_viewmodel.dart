@@ -3,7 +3,7 @@ import 'package:practice_pad/features/edit_items/presentation/viewmodels/edit_it
 import 'package:practice_pad/features/routines/models/day_of_week.dart';
 import 'package:practice_pad/models/practice_item.dart';
 import 'package:practice_pad/models/practice_area.dart';
-import 'package:practice_pad/services/storage/local_storage_service.dart';
+import 'package:practice_pad/services/storage/storage_service.dart';
 import 'dart:developer' as developer;
 
 class RoutinesViewModel extends ChangeNotifier {
@@ -164,7 +164,7 @@ class RoutinesViewModel extends ChangeNotifier {
   Future<void> _loadWeeklySchedule() async {
     try {
       developer.log('Loading weekly schedule from local storage', name: 'RoutinesVM');
-      final schedule = await LocalStorageService.loadWeeklySchedule();
+      final schedule = await StorageService.loadWeeklySchedule();
       
       // Convert the schedule map from area record names to PracticeArea objects
       for (final dayEntry in schedule.entries) {
@@ -212,7 +212,7 @@ class RoutinesViewModel extends ChangeNotifier {
         schedule[dayString] = areas.map((area) => area.recordName).toList();
       }
       
-      await LocalStorageService.saveWeeklySchedule(schedule);
+      await StorageService.saveWeeklySchedule(schedule);
       developer.log('Saved weekly schedule to local storage', name: 'RoutinesVM');
     } catch (e) {
       developer.log('Error saving weekly schedule: $e', error: e);

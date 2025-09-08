@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:clay_containers/clay_containers.dart';
-import 'package:practice_pad/services/storage/local_storage_service.dart';
+import 'package:practice_pad/services/storage/storage_service.dart';
 import 'package:practice_pad/features/song_viewer/data/models/song.dart';
 import 'package:practice_pad/features/practice/presentation/viewmodels/practice_session_manager.dart';
 import 'package:practice_pad/models/practice_item.dart';
@@ -136,7 +136,7 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
       }
       
       // Load saved YouTube data for this storage key
-      final youtubeData = await LocalStorageService.loadYoutubeLinkForSong(_getStorageKey());
+      final youtubeData = await StorageService.loadYoutubeLinkForSong(_getStorageKey());
       if (youtubeData.isNotEmpty) {
         final url = youtubeData['url'] as String?;
         final loopStartTime = (youtubeData['loopStartTime'] as num?)?.toDouble() ?? 0.0;
@@ -167,7 +167,7 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
         'isAutoLoop': _isAutoLoop,
         'playbackSpeed': _playbackSpeed,
       };
-      await LocalStorageService.saveYoutubeLinkForSong(_getStorageKey(), youtubeData);
+      await StorageService.saveYoutubeLinkForSong(_getStorageKey(), youtubeData);
     } catch (e) {
       debugPrint('Error saving YouTube data: $e');
     }
@@ -248,7 +248,7 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
 
   Future<void> _loadSavedLoops() async {
     try {
-      final loops = await LocalStorageService.loadSavedLoopsForSong(_getStorageKey());
+      final loops = await StorageService.loadSavedLoopsForSong(_getStorageKey());
       setState(() {
         _savedLoops = loops;
       });
@@ -259,7 +259,7 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
 
   Future<void> _saveSavedLoops() async {
     try {
-      await LocalStorageService.saveSavedLoopsForSong(_getStorageKey(), _savedLoops);
+      await StorageService.saveSavedLoopsForSong(_getStorageKey(), _savedLoops);
     } catch (e) {
       debugPrint('Error saving loops: $e');
     }

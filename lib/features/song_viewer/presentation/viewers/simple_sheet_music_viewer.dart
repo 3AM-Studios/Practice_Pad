@@ -23,7 +23,7 @@ import 'package:practice_pad/features/practice/presentation/pages/practice_sessi
 import 'package:practice_pad/features/edit_items/presentation/viewmodels/edit_items_viewmodel.dart';
 import 'package:provider/provider.dart';
 import 'package:music_sheet/index.dart';
-import 'package:practice_pad/services/storage/local_storage_service.dart';
+import 'package:practice_pad/services/storage/storage_service.dart';
 
 // Import transcription viewer
 import 'transcription_viewer.dart';
@@ -267,7 +267,7 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
   Future<void> _loadSongViewerSettings() async {
     try {
       final songChanges =
-          await LocalStorageService.loadSongChanges(widget.songAssetPath);
+          await StorageService.loadSongChanges(widget.songAssetPath);
       if (songChanges.isNotEmpty) {
         setState(() {
           if (songChanges.containsKey('canvasScale')) {
@@ -295,7 +295,7 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
         'extensionNumbersRelativeToChords': _extensionNumbersRelativeToChords,
         'lastModified': DateTime.now().toIso8601String(),
       };
-      await LocalStorageService.saveSongChanges(widget.songAssetPath, settings);
+      await StorageService.saveSongChanges(widget.songAssetPath, settings);
       
     } catch (e) {
       
@@ -315,7 +315,7 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
         );
       }).toList();
       
-      await LocalStorageService.saveSheetMusicForSong(widget.songAssetPath, measures);
+      await StorageService.saveSheetMusicForSong(widget.songAssetPath, measures);
       developer.log('✅ Saved sheet music data: ${measures.length} measures');
     } catch (e) {
       developer.log('❌ Error saving sheet music data: $e');
@@ -327,7 +327,7 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
     try {
       if (!mounted) return;
       
-      final savedMeasures = await LocalStorageService.loadSheetMusicForSong(widget.songAssetPath);
+      final savedMeasures = await StorageService.loadSheetMusicForSong(widget.songAssetPath);
       
       if (savedMeasures.isNotEmpty && mounted) {
         // Apply saved modifications to existing measures
@@ -427,7 +427,7 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
       }
       
       if (chordKeys.isNotEmpty) {
-        await LocalStorageService.saveChordKeys(widget.songAssetPath, chordKeys);
+        await StorageService.saveChordKeys(widget.songAssetPath, chordKeys);
         developer.log('✅ Saved chord key modifications: ${chordKeys.length} chords');
       }
     } catch (e) {
@@ -445,14 +445,14 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
       
       
       // Load saved drawings from LocalStorageService
-      final drawingData = await LocalStorageService.loadDrawingsForSong(drawingKeyPath);
+      final drawingData = await StorageService.loadDrawingsForSong(drawingKeyPath);
       
       
       
       if (drawingData.isNotEmpty && mounted) {
         // Convert JSON data back to PaintContent objects
         
-        final paintContents = LocalStorageService.drawingJsonToPaintContents(drawingData);
+        final paintContents = StorageService.drawingJsonToPaintContents(drawingData);
         
         
         // Debug each paint content
@@ -495,7 +495,7 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
       
       
       // Always save, even if empty (to clear old data)
-      await LocalStorageService.saveDrawingsForSong(drawingKeyPath, jsonData);
+      await StorageService.saveDrawingsForSong(drawingKeyPath, jsonData);
       
     } catch (e) {
       
@@ -779,7 +779,7 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
   /// Load saved chord key modifications from storage
   Future<void> _loadChordKeys() async {
     try {
-      final chordKeys = await LocalStorageService.loadChordKeys(widget.songAssetPath);
+      final chordKeys = await StorageService.loadChordKeys(widget.songAssetPath);
       if (chordKeys.isNotEmpty) {
         // Apply saved chord modifications
         for (final entry in chordKeys.entries) {

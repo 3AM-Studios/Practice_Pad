@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:clay_containers/clay_containers.dart';
-import 'package:practice_pad/services/storage/local_storage_service.dart';
+import 'package:practice_pad/services/storage/storage_service.dart';
 import 'package:practice_pad/features/song_viewer/presentation/viewers/transcription_viewer.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -36,7 +36,7 @@ class _YouTubeVideosPageState extends State<YouTubeVideosPage> {
     });
 
     try {
-      final videos = await LocalStorageService.loadYoutubeVideosList();
+      final videos = await StorageService.loadYoutubeVideosList();
       setState(() {
         _videos = videos;
         _filteredVideos = videos;
@@ -160,7 +160,7 @@ class _YouTubeVideosPageState extends State<YouTubeVideosPage> {
     };
 
     try {
-      await LocalStorageService.addYoutubeVideo(video);
+      await StorageService.addYoutubeVideo(video);
       await _loadVideos();
       
       if (mounted) {
@@ -179,7 +179,7 @@ class _YouTubeVideosPageState extends State<YouTubeVideosPage> {
 
   Future<void> _deleteVideo(String videoId, String title) async {
     try {
-      await LocalStorageService.deleteYoutubeVideo(videoId);
+      await StorageService.deleteYoutubeVideo(videoId);
       await _loadVideos();
       
       if (mounted) {

@@ -16,7 +16,7 @@ import 'package:practice_pad/features/edit_items/presentation/viewmodels/edit_it
 import 'package:practice_pad/features/routines/presentation/viewmodels/routines_viewmodel.dart';
 import 'package:practice_pad/services/widget/widget_integration.dart';
 import 'package:practice_pad/services/icloud_sync_service.dart';
-import 'package:practice_pad/services/storage/local_storage_service.dart';
+import 'package:practice_pad/services/storage/storage_service.dart';
 import 'package:practice_pad/features/transcription/presentation/pages/youtube_videos_page.dart';
 import 'package:practice_pad/onboarding.dart';
 import 'package:provider/provider.dart';
@@ -777,7 +777,7 @@ Future<void> _uploadToICloud(BuildContext context) async {
       developer.log('📤 [UPLOAD] practice_areas.json content: $content');
     }
     
-    final result = await LocalStorageService.syncAllToICloud();
+    final result = await StorageService.syncAllToICloud();
     
 
     if (context.mounted) {
@@ -907,13 +907,13 @@ Future<void> _createOrganizedStructureForUpload(
     
     // 1. Create config files
     developer.log('📤 Creating config files...');
-    await LocalStorageService.saveCustomSongs([]);  
-    await LocalStorageService.saveBooks([]);        
-    await LocalStorageService.saveYoutubeVideosList([]);
+    await StorageService.saveCustomSongs([]);  
+    await StorageService.saveBooks([]);        
+    await StorageService.saveYoutubeVideosList([]);
     
     // 2. Create main practice areas structure  
     developer.log('📤 Creating practice areas structure...');
-    await LocalStorageService.savePracticeAreas(editItemsViewModel.areas);
+    await StorageService.savePracticeAreas(editItemsViewModel.areas);
     
     // 3. Create individual practice area folders with their data
     for (final area in editItemsViewModel.areas) {

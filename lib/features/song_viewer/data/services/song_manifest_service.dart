@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:practice_pad/features/song_viewer/data/models/song.dart';
-import 'package:practice_pad/services/storage/local_storage_service.dart';
+import 'package:practice_pad/services/storage/storage_service.dart';
 
 class SongManifestService {
   Future<List<Song>> loadSongs() async {
@@ -57,7 +57,7 @@ class SongManifestService {
 
   Future<List<Song>> _loadCustomSongs() async {
     try {
-      final customSongsData = await LocalStorageService.loadCustomSongs();
+      final customSongsData = await StorageService.loadCustomSongs();
       final songs = customSongsData.map((data) => Song.fromJson(data)).toList();
       print('Loaded ${songs.length} custom songs from local storage');
       return songs;
@@ -99,7 +99,7 @@ class SongManifestService {
     }
     
     try {
-      await LocalStorageService.addCustomSong(song.toJson());
+      await StorageService.addCustomSong(song.toJson());
       print('Saved custom song: ${song.title}');
     } catch (e) {
       print('Error saving custom song: $e');
@@ -110,7 +110,7 @@ class SongManifestService {
   /// Delete a custom song from local storage
   Future<void> deleteCustomSong(String songPath) async {
     try {
-      await LocalStorageService.deleteCustomSong(songPath);
+      await StorageService.deleteCustomSong(songPath);
       print('Deleted custom song with path: $songPath');
     } catch (e) {
       print('Error deleting custom song: $e');

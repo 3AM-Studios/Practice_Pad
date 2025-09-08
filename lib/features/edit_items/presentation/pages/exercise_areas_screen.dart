@@ -5,7 +5,7 @@ import 'package:practice_pad/features/edit_items/presentation/pages/practice_ite
 import 'package:practice_pad/features/edit_items/presentation/viewmodels/edit_items_viewmodel.dart';
 import 'package:practice_pad/models/practice_area.dart';
 import 'package:practice_pad/services/device_type.dart';
-import 'package:practice_pad/services/storage/local_storage_service.dart';
+import 'package:practice_pad/services/storage/storage_service.dart';
 import 'package:provider/provider.dart';
 import 'dart:developer' as developer;
 

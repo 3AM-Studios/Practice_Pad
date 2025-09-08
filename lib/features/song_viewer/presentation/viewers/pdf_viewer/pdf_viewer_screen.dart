@@ -7,7 +7,7 @@ import 'package:clay_containers/clay_containers.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:practice_pad/models/practice_area.dart';
-import 'package:practice_pad/services/storage/local_storage_service.dart';
+import 'package:practice_pad/services/storage/storage_service.dart';
 import 'package:pdf_to_image_converter/pdf_to_image_converter.dart';
 import 'package:image_painter/image_painter.dart';
 
@@ -331,7 +331,7 @@ class _PDFViewerState extends State<PDFViewer>
       
       // Save PaintInfo data using LocalStorageService
       final safeFilename = _getSafeFilename(widget.songAssetPath);
-      await LocalStorageService.savePDFDrawingsForSongPage(
+      await StorageService.savePDFDrawingsForSongPage(
         safeFilename,
         _currentPage,
         _imagePainterController.paintHistory,
@@ -352,7 +352,7 @@ class _PDFViewerState extends State<PDFViewer>
       
       // Load PaintInfo data using LocalStorageService
       final safeFilename = _getSafeFilename(widget.songAssetPath);
-      final paintHistory = await LocalStorageService.loadPDFDrawingsForSongPage(
+      final paintHistory = await StorageService.loadPDFDrawingsForSongPage(
         safeFilename,
         _currentPage,
       );
@@ -379,7 +379,7 @@ class _PDFViewerState extends State<PDFViewer>
     if (_pdfPath == null) return;
     
     try {
-      await LocalStorageService.saveLabelsForPage(
+      await StorageService.saveLabelsForPage(
         widget.songAssetPath,
         _currentPage,
         _imagePainterController.labels,
@@ -395,7 +395,7 @@ class _PDFViewerState extends State<PDFViewer>
     if (_pdfPath == null) return;
     
     try {
-      final labelsData = await LocalStorageService.loadLabelsForPage(
+      final labelsData = await StorageService.loadLabelsForPage(
         widget.songAssetPath,
         _currentPage,
       );
@@ -870,7 +870,7 @@ class _PDFViewerState extends State<PDFViewer>
             final updatedBook = Map<String, dynamic>.from(book);
             updatedBook['fileName'] = legacyFileName;
             updatedBook.remove('path');
-            await LocalStorageService.updateBook(book['id'], updatedBook);
+            await StorageService.updateBook(book['id'], updatedBook);
             return fullPath;
           }
         }
@@ -1012,7 +1012,7 @@ class _PDFViewerState extends State<PDFViewer>
   /// Load registered books from local storage
   Future<List<Map<String, dynamic>>> _loadBooks() async {
     try {
-      final books = await LocalStorageService.loadBooks();
+      final books = await StorageService.loadBooks();
       // Clean up any books whose files no longer exist
       await _cleanupMissingBooks(books);
       return books;
@@ -1043,7 +1043,7 @@ class _PDFViewerState extends State<PDFViewer>
     // Remove orphaned books
     for (final bookId in booksToRemove) {
       try {
-        await LocalStorageService.deleteBook(bookId);
+        await StorageService.deleteBook(bookId);
       } catch (e) {
         debugPrint('Error removing orphaned book $bookId: $e');
       }
@@ -1173,7 +1173,7 @@ class _PDFViewerState extends State<PDFViewer>
         };
         
         // Save to LocalStorageService
-        await LocalStorageService.addBook(book);
+        await StorageService.addBook(book);
         debugPrint('Registered book: $book');
         
         if (mounted) {
@@ -1417,7 +1417,7 @@ class _PDFViewerState extends State<PDFViewer>
                   try {
                     final updatedBook = Map<String, dynamic>.from(book);
                     updatedBook['name'] = newName;
-                    await LocalStorageService.updateBook(book['id'], updatedBook);
+                    await StorageService.updateBook(book['id'], updatedBook);
                     
                     if (mounted) {
                       navigator.pop();
@@ -1463,7 +1463,7 @@ class _PDFViewerState extends State<PDFViewer>
                 final messenger = ScaffoldMessenger.of(context);
                 
                 try {
-                  await LocalStorageService.deleteBook(book['id']);
+                  await StorageService.deleteBook(book['id']);
                   
                   if (mounted) {
                     navigator.pop();

@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:practice_pad/models/practice_item.dart';
 import 'package:practice_pad/models/statistics.dart';
 import 'package:practice_pad/features/practice/presentation/viewmodels/practice_session_manager.dart';
-import 'package:practice_pad/services/storage/local_storage_service.dart';
+import 'package:practice_pad/services/storage/storage_service.dart';
 import 'package:provider/provider.dart';
 
 /// Screen for conducting a practice session with a specific practice item
@@ -723,7 +723,7 @@ class _PracticeSessionScreenState extends State<PracticeSessionScreen> {
   Future<void> _savePracticeItemProgress() async {
     try {
       // Load all practice items from storage
-      final itemsByArea = await LocalStorageService.loadPracticeItems();
+      final itemsByArea = await StorageService.loadPracticeItems();
 
       // Find and update this practice item across all areas
       bool itemUpdated = false;
@@ -742,7 +742,7 @@ class _PracticeSessionScreenState extends State<PracticeSessionScreen> {
 
       // Save the updated data back to storage
       if (itemUpdated) {
-        await LocalStorageService.savePracticeItems(itemsByArea);
+        await StorageService.savePracticeItems(itemsByArea);
       }
     } catch (e) {
       // Silently handle errors - practice can continue even if save fails

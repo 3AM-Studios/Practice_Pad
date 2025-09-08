@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:practice_pad/models/practice_area.dart';
 import 'package:practice_pad/models/practice_item.dart';
 import 'package:practice_pad/features/song_viewer/data/models/song.dart';
-import 'package:practice_pad/services/storage/local_storage_service.dart';
+import 'package:practice_pad/services/storage/storage_service.dart';
 // import 'package:practice_pad/services/cloud_kit_service.dart'; // SIDELINED
 import 'dart:developer' as developer; // For logging
 import 'dart:math'; // For random ID generation
@@ -77,7 +77,7 @@ class EditItemsViewModel extends ChangeNotifier {
   Future<void> _autoSave() async {
     try {
       // Save practice areas
-      await LocalStorageService.savePracticeAreas(_areas);
+      await StorageService.savePracticeAreas(_areas);
       
       // Prepare items by area map
       final itemsByArea = <String, List<PracticeItem>>{};
@@ -86,7 +86,7 @@ class EditItemsViewModel extends ChangeNotifier {
       }
       
       // Save practice items
-      await LocalStorageService.savePracticeItems(itemsByArea);
+      await StorageService.savePracticeItems(itemsByArea);
       
       developer.log('Auto-saved all data to local storage');
     } catch (e) {
@@ -109,12 +109,12 @@ class EditItemsViewModel extends ChangeNotifier {
 
     try {
       // Load practice areas from local storage
-      final loadedAreas = await LocalStorageService.loadPracticeAreas();
+      final loadedAreas = await StorageService.loadPracticeAreas();
       _areas.clear();
       _areas.addAll(loadedAreas);
       
       // Load practice items for each area
-      final loadedItems = await LocalStorageService.loadPracticeItems();
+      final loadedItems = await StorageService.loadPracticeItems();
       
       // Ensure each area has its practice items populated
       for (final area in _areas) {
