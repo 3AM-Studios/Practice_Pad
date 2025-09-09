@@ -10,6 +10,7 @@ class PracticeArea {
   List<PracticeItem> practiceItems; // NEW: embedded practice items
   Song? song; // NEW: Optional song reference for song-type practice areas
   String? recordChangeTag; // CloudKit record change tag for sync
+  DateTime lastModified; // For sync comparison
 
   PracticeArea({
     required this.recordName,
@@ -18,7 +19,9 @@ class PracticeArea {
     List<PracticeItem>? practiceItems,
     this.song,
     this.recordChangeTag,
-  }) : practiceItems = practiceItems ?? [];
+    DateTime? lastModified,
+  }) : practiceItems = practiceItems ?? [],
+       lastModified = lastModified ?? DateTime.now();
 
   // Factory constructor to create a PracticeArea from a CloudKit record map
   factory PracticeArea.fromCloudKitRecord(Map<String, dynamic> record) {
@@ -46,6 +49,7 @@ class PracticeArea {
       name: record['name'] as String, // Assuming 'name' is a direct field in the returned map
       type: type,
       song: song,
+      lastModified: DateTime.fromMillisecondsSinceEpoch(record['lastModified'] as int? ?? 0),
       // Note: practiceItems will be loaded separately as they're no longer stored in CloudKit for PracticeArea
     );
   }
@@ -54,13 +58,13 @@ class PracticeArea {
   // Adjusted to return a flat map, hoping the plugin handles type specifics.
   Map<String, dynamic> toCloudKitRecordFields() {
     final fields = <String, dynamic>{
-      'name': name, // Simplified: direct value
+      'name': name,
       'type': type == PracticeAreaType.song 
           ? 'song' 
           : type == PracticeAreaType.chordProgression
               ? 'chordProgression'
               : 'exercise',
-      // Note: practiceItems are not stored in CloudKit for PracticeArea anymore
+      'lastModified': lastModified.millisecondsSinceEpoch,
     };
     
     // Add song fields if this is a song-type practice area

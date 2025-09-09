@@ -55,20 +55,6 @@ class _TodayScreenState extends State<TodayScreen> {
         }
 
         return _buildBody(context, todayViewModel);
-        // return CupertinoPageScaffold(
-        //   navigationBar:
-        //       CupertinoNavigationBar(
-        //         middle: Text(
-        //           'Today\'s Practice',
-        //           style: TextStyle(color: theme.colorScheme.onSurface),
-        //         ),
-        //         backgroundColor: theme.colorScheme.surface,
-        //         transitionBetweenRoutes: false,
-        //       ),
-        //  child: SafeArea(
-        //     child: _buildBody(context, viewModel),
-        //   ),
-        // );
       },
     );
   }
@@ -80,9 +66,8 @@ Widget _buildTranscribeButton(BuildContext context) {
   final double fontSize = (screenWidth * 0.038).clamp(16.0, 22.0);
 
   return Container(
-    // This container creates the responsive padding on the sides
     padding: EdgeInsets.symmetric(horizontal: screenWidth - (screenWidth * 0.75)),
-    child: GestureDetector( // Remove the Center widget from here
+    child: GestureDetector(
       onTap: () {
         Navigator.of(context).push(
           MaterialPageRoute(
@@ -97,8 +82,6 @@ Widget _buildTranscribeButton(BuildContext context) {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
           child: Row(
-            // Change MainAxisSize.min to MainAxisAlignment.center
-            // This makes the Row expand to fill the width and centers its children.
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
@@ -139,7 +122,6 @@ Widget _buildBody(BuildContext context, TodayViewModel viewModel) {
     return Column(
       children: [
         const SizedBox(height: 10),
-        // Fixed header with Today's Practice banner and sync buttons (also shown in empty state)
         _buildFixedHeader(context),
         Expanded(
           child: Center(
@@ -156,7 +138,6 @@ Widget _buildBody(BuildContext context, TodayViewModel viewModel) {
             ),
           ),
         ),
-        // Transcribe button  
         _buildTranscribeButton(context),
         const SizedBox(height: 16),
         _buildBottomSection(context, viewModel, widget.onStatsPressed, isTabletOrDesktop),
@@ -165,13 +146,10 @@ Widget _buildBody(BuildContext context, TodayViewModel viewModel) {
     );
   }
   
-  // Main change: Use Column with fixed header and scrollable content
   return Column(
     children: [
       const SizedBox(height: 10),
-      // Fixed header with Today's Practice banner and sync buttons
       _buildFixedHeader(context),
-      // Scrollable practice areas in the middle (takes remaining space)
       Expanded(
         child: ListView.builder(
           padding: const EdgeInsets.fromLTRB(0, 4, 0, 0),
@@ -185,10 +163,8 @@ Widget _buildBody(BuildContext context, TodayViewModel viewModel) {
           },
         ),
       ),
-      // Transcribe button
       _buildTranscribeButton(context),
       const SizedBox(height: 16),
-      // Responsive bottom section
       _buildBottomSection(context, viewModel, widget.onStatsPressed, isTabletOrDesktop),
        SizedBox(height: isTabletOrDesktop? 120 : 0),
     ],
@@ -201,21 +177,18 @@ Widget _buildFixedHeader(BuildContext context) {
   if (isIPhone) {
     return Column(
       children: [
-        const SizedBox(height: 16), // Top spacing
-        // Combined row with tutorial button, banner, and sync buttons on same level
+        const SizedBox(height: 16),
         Container(
           padding: const EdgeInsets.fromLTRB(16, 25, 16, 8),
           child: Row(
             children: [
-              // Tutorial button on the left - fixed width for symmetry
               SizedBox(
-                width: 80, // Fixed width to balance with sync buttons
+                width: 80,
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: _buildTutorialButton(context),
                 ),
               ),
-              // Expanded banner in the center
               Expanded(
                 child: Center(
                   child: ClayContainer(
@@ -242,9 +215,8 @@ Widget _buildFixedHeader(BuildContext context) {
                   ),
                 ),
               ),
-              // Sync buttons on the right - fixed width for symmetry
               SizedBox(
-                width: 80, // Fixed width to balance with tutorial button
+                width: 80,
                 child: Align(
                   alignment: Alignment.centerRight,
                   child: _buildSyncButtons(context),
@@ -256,15 +228,12 @@ Widget _buildFixedHeader(BuildContext context) {
       ],
     );
   } else {
-    // Non-iPhone layout
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 8.0, 16, 8),
       child: Row(
         children: [
-          // Tutorial button at the start of the row
           _buildTutorialButton(context),
           const SizedBox(width: 16),
-          // Expanded banner that takes up available space and centers content
           Expanded(
             child: Center(
               child: ClayContainer(
@@ -292,7 +261,6 @@ Widget _buildFixedHeader(BuildContext context) {
             ),
           ),
           const SizedBox(width: 16),
-          // Sync buttons positioned at the end of the row
           _buildSyncButtons(context),
         ],
       ),
@@ -304,21 +272,19 @@ Widget _buildSyncButtons(BuildContext context) {
   return Row(
     mainAxisSize: MainAxisSize.min,
     children: [
-      // Download from iCloud button
       _buildSyncButton(
         context: context,
         icon: CupertinoIcons.cloud_download,
         color: CupertinoColors.systemBlue,
-        onTap: () => _downloadFromCloudKit(context),
+        onTap: () => _syncWithCloudKit(context),
         onLongPress: () => _showDebugInfo(context),
       ),
       const SizedBox(width: 8),
-      // Upload to iCloud button
       _buildSyncButton(
         context: context,
         icon: CupertinoIcons.cloud_upload,
         color: CupertinoColors.systemGreen,
-        onTap: () => _uploadToCloudKit(context),
+        onTap: () => _syncWithCloudKit(context),
         onLongPress: () => _showDebugInfo(context),
       ),
     ],
@@ -375,7 +341,6 @@ Widget _buildSyncButton({
     developer.log('🔄 Reloading all ViewModels after CloudKit sync');
     
     try {
-      // Show loading dialog while reloading
       if (context.mounted) {
         showCupertinoDialog(
           context: context,
@@ -393,63 +358,34 @@ Widget _buildSyncButton({
         );
       }
       
-      // Get ViewModels from Provider with error handling
       if (context.mounted) {
         try {
           final editItemsViewModel = Provider.of<EditItemsViewModel>(context, listen: false);
           final routinesViewModel = Provider.of<RoutinesViewModel>(context, listen: false);
           final todayViewModel = Provider.of<TodayViewModel>(context, listen: false);
           
-          // Reload EditItemsViewModel first (other ViewModels depend on it)
-          try {
-            await editItemsViewModel.reloadFromStorage();
-            developer.log('✅ EditItemsViewModel reloaded successfully');
-          } catch (editError) {
-            developer.log('⚠️ EditItemsViewModel reload failed: $editError');
-          }
+          await editItemsViewModel.reloadFromStorage();
+          await routinesViewModel.reloadFromStorage();
+          await todayViewModel.reloadFromStorage();
           
-          // Reload RoutinesViewModel second
-          try {
-            await routinesViewModel.reloadFromStorage();
-            developer.log('✅ RoutinesViewModel reloaded successfully');
-          } catch (routinesError) {
-            developer.log('⚠️ RoutinesViewModel reload failed: $routinesError');
-          }
-          
-          // Special handling for TodayViewModel since it's prone to disposal
-          try {
-            await todayViewModel.reloadFromStorage();
-            developer.log('✅ TodayViewModel reloaded successfully');
-          } catch (todayError) {
-            developer.log('⚠️ TodayViewModel reload failed (likely disposed): $todayError');
-            // Continue anyway - the UI will refresh when the widget rebuilds
-          }
-          
-          developer.log('✅ ViewModels reload completed after CloudKit sync');
         } catch (providerError) {
           developer.log('❌ Error getting ViewModels from Provider: $providerError');
           rethrow;
         }
       }
       
-      // Close loading dialog
       if (context.mounted) {
         Navigator.of(context).pop();
       }
     } catch (e) {
       developer.log('❌ Error reloading ViewModels after sync: $e');
-      developer.log('❌ Stack trace: ${StackTrace.current}');
-      
-      // Close loading dialog if it's still open
       if (context.mounted) {
         Navigator.of(context).pop();
-        
-        // Show less alarming error message since data is downloaded
         showCupertinoDialog(
           context: context,
           builder: (context) => CupertinoAlertDialog(
-            title: const Text('Data Downloaded'),
-            content: const Text('CloudKit sync completed successfully. The interface will refresh automatically. If changes don\'t appear, try navigating to another tab and back.'),
+            title: const Text('Data Synced'),
+            content: const Text('CloudKit sync completed. The interface will refresh automatically.'),
             actions: [
               CupertinoDialogAction(
                 child: const Text('OK'),
@@ -462,10 +398,8 @@ Widget _buildSyncButton({
     }
   }
 
-Future<void> _downloadFromCloudKit(BuildContext context) async {
-  // Check CloudKit availability
+Future<void> _syncWithCloudKit(BuildContext context) async {
   final isAvailable = await CloudKitService.isAccountAvailable();
-  
   if (!isAvailable) {
     if (context.mounted) {
       showCupertinoDialog(
@@ -495,7 +429,7 @@ Future<void> _downloadFromCloudKit(BuildContext context) async {
           children: [
             CupertinoActivityIndicator(),
             SizedBox(height: 16),
-            Text('Downloading from CloudKit...\nThis may take a few moments.'),
+            Text('Syncing with CloudKit...\nThis may take a few moments.'),
           ],
         ),
       ),
@@ -503,17 +437,11 @@ Future<void> _downloadFromCloudKit(BuildContext context) async {
   }
 
   try {
-    developer.log('📥 Starting CloudKit download sync...');
-    
-    // Perform full CloudKit sync to get latest data
     await CloudKitService.handleNotification();
     
     if (context.mounted) {
       Navigator.of(context).pop();
-      
-      // Always reload ViewModels after sync attempt
       await _reloadAllViewModelsAfterSync(context);
-      
       if (context.mounted) {
         showCupertinoDialog(
           context: context,
@@ -531,136 +459,14 @@ Future<void> _downloadFromCloudKit(BuildContext context) async {
       }
     }
   } catch (e) {
-    developer.log('❌ CloudKit download failed: $e');
+    developer.log('❌ CloudKit sync failed: $e');
     if (context.mounted) {
       Navigator.of(context).pop();
-      
       showCupertinoDialog(
         context: context,
         builder: (context) => CupertinoAlertDialog(
           title: const Text('Error'),
-          content: Text('Failed to download from CloudKit: $e'),
-          actions: [
-            CupertinoDialogAction(
-              child: const Text('OK'),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-          ],
-        ),
-      );
-    }
-  }
-}
-
-Future<void> _uploadToCloudKit(BuildContext context) async {
-  // Check CloudKit availability
-  final isAvailable = await CloudKitService.isAccountAvailable();
-  
-  if (!isAvailable) {
-    if (context.mounted) {
-      showCupertinoDialog(
-        context: context,
-        builder: (context) => CupertinoAlertDialog(
-          title: const Text('CloudKit Not Available'),
-          content: const Text('Please ensure you are signed into iCloud and CloudKit is enabled for this app.'),
-          actions: [
-            CupertinoDialogAction(
-              child: const Text('OK'),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-          ],
-        ),
-      );
-    }
-    return;
-  }
-
-  if (context.mounted) {
-    showCupertinoDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const CupertinoAlertDialog(
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CupertinoActivityIndicator(),
-            SizedBox(height: 16),
-            Text('Uploading to CloudKit...\nThis may take a few moments.'),
-          ],
-        ),
-      ),
-    );
-  }
-
-  try {
-    developer.log('📤 ===== CLOUDKIT SYNC STARTED =====');
-    developer.log('📤 Upload started at: ${DateTime.now().toIso8601String()}');
-    
-    if (context.mounted) {
-      // Get current app data for upload
-      final editItemsViewModel = Provider.of<EditItemsViewModel>(context, listen: false);
-      final routinesViewModel = Provider.of<RoutinesViewModel>(context, listen: false);
-      
-      developer.log('📤 Found ${editItemsViewModel.areas.length} practice areas to upload');
-      
-      // Upload practice areas to CloudKit using the public method
-      await StorageService.savePracticeAreas(editItemsViewModel.areas);
-      developer.log('📤 Practice areas uploaded to CloudKit');
-      
-      // Upload routines to CloudKit - convert to schedule format and sync
-      final weeklySchedule = <String, List<String>>{};
-      routinesViewModel.routines.forEach((dayOfWeek, routinesList) {
-        weeklySchedule[dayOfWeek.toString()] = routinesList.map((routine) => routine.recordName).toList();
-        developer.log('📤 Prepared ${routinesList.length} routines for ${dayOfWeek.toString()}');
-      });
-      
-      developer.log('📤 Found weekly schedule with ${weeklySchedule.length} days');
-      
-      // Actually upload the weekly schedule to CloudKit
-      await StorageService.saveWeeklySchedule(weeklySchedule);
-      developer.log('📤 Weekly schedule uploaded to CloudKit');
-      
-      // Get books and check for PDF upload needs
-      final books = await StorageService.loadBooks();
-      final customSongs = await StorageService.loadCustomSongs();
-      
-      developer.log('📤 ⚠️ IMPORTANT: PDF FILES NOT UPLOADED!');
-      developer.log('📤 Found ${books.length} books in local storage');
-      developer.log('📤 Found ${customSongs.length} custom songs in local storage');
-      developer.log('📤 Current upload only syncs practice metadata, NOT PDF files');
-      developer.log('📤 To upload PDFs, use StorageService.savePDFWithAsset() method');
-      
-      developer.log('✅ CLOUDKIT METADATA SYNC COMPLETED');
-      developer.log('📤 ===== CLOUDKIT SYNC FINISHED =====');
-    }
-
-    if (context.mounted) {
-      Navigator.of(context).pop();
-      
-      showCupertinoDialog(
-        context: context,
-        builder: (context) => CupertinoAlertDialog(
-          title: const Text('Success'),
-          content: const Text('Successfully uploaded practice schedules to CloudKit.\n\nNote: PDF books and songs are not uploaded yet. Only practice metadata is synced.'),
-          actions: [
-            CupertinoDialogAction(
-              child: const Text('OK'),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-          ],
-        ),
-      );
-    }
-  } catch (e) {
-    developer.log('❌ CloudKit upload failed: $e');
-    if (context.mounted) {
-      Navigator.of(context).pop();
-      
-      showCupertinoDialog(
-        context: context,
-        builder: (context) => CupertinoAlertDialog(
-          title: const Text('Error'),
-          content: Text('Failed to upload to CloudKit: $e'),
+          content: Text('Failed to sync with CloudKit: $e'),
           actions: [
             CupertinoDialogAction(
               child: const Text('OK'),
@@ -724,26 +530,23 @@ Future<void> _showDebugInfo(BuildContext context) async {
 
 
 Widget _buildBottomSection(BuildContext context, TodayViewModel viewModel, VoidCallback? onStatsPressed, bool isTabletOrDesktop) {
-  // Calculate bottom area height based on device type
-  final bottomAreaHeight = (isTabletOrDesktop ?350.0: 510.0); // Reduced from ~30% to ~23% (25% reduction)
+  final bottomAreaHeight = (isTabletOrDesktop ?350.0: 510.0);
   
   return SizedBox(
     height: bottomAreaHeight,
     child: isTabletOrDesktop 
       ? Row(
           children: [
-            // Left side: Goal ring and Active session banner (centered)
             Expanded(
               flex: 1,
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const ActiveSessionBanner(isTabletOrDesktop: true),
-                  buildGoalRing(context, viewModel, isLarge: true), // Large goal ring for tablets/desktop, small on iOS
+                  buildGoalRing(context, viewModel, isLarge: true),
                 ],
               ),
             ),
-            // Right side: Calendar
             PracticeCalendar(
                 calendarSize: CalendarSize.medium,
                 onStatsPressed: onStatsPressed,
@@ -755,7 +558,7 @@ Widget _buildBottomSection(BuildContext context, TodayViewModel viewModel, VoidC
             
             Expanded(
               flex: 0,
-              child: buildGoalRing(context, viewModel, isLarge: false), // Small size for phones
+              child: buildGoalRing(context, viewModel, isLarge: false),
             ),
             const Expanded(flex: 0, child: ActiveSessionBanner(isTabletOrDesktop: false)),
             PracticeCalendar(

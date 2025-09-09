@@ -32,10 +32,9 @@ class GetRecordsByTypeHandler {
         }
         
         let predicate = NSPredicate(value: true);
-        // TODO: make sort to be custom
-        let sort = NSSortDescriptor(key: "creationDate", ascending: true);
         let query = CKQuery(recordType: recordType, predicate: predicate);
-        query.sortDescriptors = [sort];
+        // Remove sorting to avoid schema configuration requirements
+        // query.sortDescriptors = [sort];
         
         // TODO: add pagination
         // TODO: add ability to specify desired keys

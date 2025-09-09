@@ -10,6 +10,7 @@ import 'package:practice_pad/models/practice_area.dart';
 import 'package:practice_pad/services/storage/storage_service.dart';
 import 'package:pdf_to_image_converter/pdf_to_image_converter.dart';
 import 'package:image_painter/image_painter.dart';
+import 'package:flutter_cloud_kit/types/cloud_kit_asset.dart';
 
 // Import transcription viewer
 import '../transcription_viewer.dart';
@@ -84,11 +85,28 @@ class _PDFViewerState extends State<PDFViewer>
         final savedFileName = await file.readAsString();
         debugPrint('Loaded PDF filename from file: $savedFileName');
         
-        // Reconstruct full path using current Documents directory
+        // Reconstruct full path using current Documents directory with subdirectory
         final directory = await getApplicationDocumentsDirectory();
-        savedPath = '${directory.path}/$savedFileName';
+        savedPath = '${directory.path}/song_pdfs/$savedFileName';
         debugPrint('Reconstructed PDF path: $savedPath');
         debugPrint('Checking if file exists: ${File(savedPath).existsSync()}');
+        
+        // Fallback to old location for backward compatibility
+        if (!File(savedPath).existsSync()) {
+          final legacyPath = '${directory.path}/$savedFileName';
+          if (File(legacyPath).existsSync()) {
+            debugPrint('Found PDF in legacy location, migrating: $legacyPath');
+            // Create new directory if needed
+            final songPdfsDir = Directory('${directory.path}/song_pdfs');
+            if (!await songPdfsDir.exists()) {
+              await songPdfsDir.create(recursive: true);
+            }
+            // Move file to new location
+            await File(legacyPath).copy(savedPath);
+            await File(legacyPath).delete();
+            debugPrint('Migrated PDF to new location: $savedPath');
+          }
+        }
       } else {
         debugPrint('PDF path file does not exist at: ${file.path}');
       }
@@ -96,10 +114,8 @@ class _PDFViewerState extends State<PDFViewer>
         debugPrint('Found saved PDF path: $savedPath');
         await _loadPDF(savedPath);
       } else {
-        debugPrint('PDF was not found');
-        setState(() {
-          _isLoading = false;
-        });
+        debugPrint('PDF was not found, checking CloudKit');
+        await _tryLoadFromCloudKit();
       }
     } catch (e) {
       debugPrint('Error loading saved PDF: $e');
@@ -109,8 +125,57 @@ class _PDFViewerState extends State<PDFViewer>
     }
   }
 
+  /// Try to load PDF from CloudKit for this song
+  Future<void> _tryLoadFromCloudKit() async {
+    try {
+      final songPdf = await StorageService.loadSongPdf(widget.songAssetPath);
+      if (songPdf != null && songPdf['pdfAsset'] != null) {
+        debugPrint('Found song PDF in CloudKit, downloading...');
+        
+        final pdfAsset = songPdf['pdfAsset'];
+        CloudKitAsset asset;
+        if (pdfAsset is Map<String, dynamic>) {
+          asset = CloudKitAsset.fromMap(pdfAsset);
+        } else if (pdfAsset is CloudKitAsset) {
+          asset = pdfAsset;
+        } else {
+          debugPrint('Invalid PDF asset format for song');
+          setState(() {
+            _isLoading = false;
+          });
+          return;
+        }
+        
+        final safeFilename = _getSafeFilename(widget.songAssetPath);
+        final fileName = '${safeFilename}_pdf.pdf';
+        
+        final downloadedPath = await StorageService.downloadAsset(
+          asset: asset,
+          localFileName: fileName,
+          subdirectory: 'song_pdfs',
+        );
+        
+        if (downloadedPath != null) {
+          debugPrint('Successfully downloaded song PDF from CloudKit');
+          await _loadPDF(downloadedPath);
+          return;
+        }
+      }
+      
+      debugPrint('No song PDF found in CloudKit');
+      setState(() {
+        _isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('Error loading PDF from CloudKit: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
   /// Save PDF path to storage
-  Future<void> _savePDFPath(String path) async {
+  Future<void> _savePDF(String path) async {
     try {
       final file = await _getPDFPathFile();
       // Save only the filename, not the full path
@@ -118,6 +183,11 @@ class _PDFViewerState extends State<PDFViewer>
       await file.writeAsString(fileName);
       debugPrint('Saved PDF filename to file: $fileName');
       debugPrint('File location: ${file.path}');
+      
+      // Also save the PDF to CloudKit using the song asset path as identifier
+      final songId = widget.songAssetPath;
+      await StorageService.saveSongPdf(songId, path);
+      debugPrint('PDF saved to CloudKit for song: $songId');
     } catch (e) {
       debugPrint('Error saving PDF path: $e');
     }
@@ -164,7 +234,7 @@ class _PDFViewerState extends State<PDFViewer>
       await _loadCurrentPageImage();
       
       // Save permanent PDF path
-      await _savePDFPath(permanentPdfPath);
+      await _savePDF(permanentPdfPath);
       
       setState(() {
         _pdfPath = permanentPdfPath;
@@ -198,13 +268,44 @@ class _PDFViewerState extends State<PDFViewer>
     final directory = await getApplicationDocumentsDirectory();
     final safeFilename = _getSafeFilename(widget.songAssetPath);
     final fileName = '${safeFilename}_pdf.pdf';
-    final permanentFile = File('${directory.path}/$fileName');
+    
+    // Create subdirectory for song PDFs if it doesn't exist
+    final songPdfsDir = Directory('${directory.path}/song_pdfs');
+    if (!await songPdfsDir.exists()) {
+      await songPdfsDir.create(recursive: true);
+    }
+    
+    final permanentFile = File('${songPdfsDir.path}/$fileName');
     
     // Copy original file to documents directory
     final originalFile = File(originalPath);
     await originalFile.copy(permanentFile.path);
     
     debugPrint('Copied PDF to permanent location: ${permanentFile.path}');
+    return permanentFile.path;
+  }
+
+  /// Copy book PDF to app documents directory with proper subdirectory structure
+  Future<String> _copyBookToDocuments(String originalPath, String bookName) async {
+    final directory = await getApplicationDocumentsDirectory();
+    final safeFilename = bookName
+        .replaceAll(RegExp(r'[/\\:*?"<>|\s]'), '_')
+        .toLowerCase();
+    final fileName = '${safeFilename}_book.pdf';
+    
+    // Create subdirectory for books if it doesn't exist
+    final booksDir = Directory('${directory.path}/books');
+    if (!await booksDir.exists()) {
+      await booksDir.create(recursive: true);
+    }
+    
+    final permanentFile = File('${booksDir.path}/$fileName');
+    
+    // Copy original file to documents directory
+    final originalFile = File(originalPath);
+    await originalFile.copy(permanentFile.path);
+    
+    debugPrint('Copied book to permanent location: ${permanentFile.path}');
     return permanentFile.path;
   }
 
@@ -851,7 +952,7 @@ class _PDFViewerState extends State<PDFViewer>
         .replaceAll('|', '_');
   }
 
-  /// Get the full path for a book from its filename
+  /// Get the full path for a book from its filename, with CloudKit asset download fallback
   Future<String?> _getBookPath(Map<String, dynamic> book) async {
     try {
       final fileName = book['fileName'] as String?;
@@ -868,7 +969,6 @@ class _PDFViewerState extends State<PDFViewer>
             final updatedBook = Map<String, dynamic>.from(book);
             updatedBook['fileName'] = legacyFileName;
             updatedBook.remove('path');
-            await StorageService.updateBook(book['id'], updatedBook);
             return fullPath;
           }
         }
@@ -876,16 +976,79 @@ class _PDFViewerState extends State<PDFViewer>
       }
       
       final directory = await getApplicationDocumentsDirectory();
-      final fullPath = '${directory.path}/$fileName';
+      final fullPath = '${directory.path}/books/$fileName';
       
       if (File(fullPath).existsSync()) {
         return fullPath;
       } else {
-        debugPrint('Book file not found: $fullPath');
-        return null;
+        debugPrint('Book file not found locally: $fullPath');
+        
+        // Try to download from CloudKit if not found locally
+        return await _downloadBookFromCloudKit(book);
       }
     } catch (e) {
       debugPrint('Error getting book path: $e');
+      return null;
+    }
+  }
+
+  /// Download book PDF from CloudKit assets
+  Future<String?> _downloadBookFromCloudKit(Map<String, dynamic> book) async {
+    try {
+      final bookId = book['id'] as String?;
+      if (bookId == null) {
+        debugPrint('Book missing ID for CloudKit lookup');
+        return null;
+      }
+      
+      debugPrint('Attempting to download book from CloudKit: $bookId');
+      
+      // Load book data from CloudKit storage
+      final cloudKitBook = await StorageService.loadBook(bookId);
+      if (cloudKitBook == null) {
+        debugPrint('Book not found in CloudKit: $bookId');
+        return null;
+      }
+      
+      // Check if book has a CloudKit asset
+      final pdfAsset = cloudKitBook['pdfAsset'];
+      if (pdfAsset == null) {
+        debugPrint('Book has no PDF asset in CloudKit: $bookId');
+        return null;
+      }
+      
+      // Convert to CloudKitAsset if needed
+      CloudKitAsset asset;
+      if (pdfAsset is Map<String, dynamic>) {
+        asset = CloudKitAsset.fromMap(pdfAsset);
+      } else if (pdfAsset is CloudKitAsset) {
+        asset = pdfAsset;
+      } else {
+        debugPrint('Invalid PDF asset format in book: $bookId');
+        return null;
+      }
+      
+      // Download the asset to local storage
+      final fileName = book['fileName'] as String? ?? '${bookId}_book.pdf';
+      final downloadedPath = await StorageService.downloadAsset(
+        asset: asset,
+        localFileName: fileName,
+        subdirectory: 'books',
+        onProgress: (received, total) {
+          final percentage = (received / total * 100).toInt();
+          debugPrint('Downloading book: $percentage%');
+        },
+      );
+      
+      if (downloadedPath != null) {
+        debugPrint('Successfully downloaded book from CloudKit: $downloadedPath');
+        return downloadedPath;
+      } else {
+        debugPrint('Failed to download book from CloudKit');
+        return null;
+      }
+    } catch (e) {
+      debugPrint('Error downloading book from CloudKit: $e');
       return null;
     }
   }
@@ -970,7 +1133,43 @@ class _PDFViewerState extends State<PDFViewer>
                             child: ListTile(
                               leading: const Icon(Icons.menu_book),
                               title: Text(book['name'] ?? 'Unknown Book'),
-                              subtitle: Text('${book['pageCount'] ?? 0} pages'),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text('${book['pageCount'] ?? 0} pages'),
+                                  FutureBuilder<bool>(
+                                    future: _isBookAvailableLocally(book),
+                                    builder: (context, snapshot) {
+                                      if (snapshot.connectionState == ConnectionState.waiting) {
+                                        return const SizedBox.shrink();
+                                      }
+                                      
+                                      final isLocal = snapshot.data ?? false;
+                                      if (!isLocal) {
+                                        return Row(
+                                          children: [
+                                            Icon(
+                                              Icons.cloud_download,
+                                              size: 14,
+                                              color: Theme.of(context).colorScheme.primary,
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              'Available in iCloud',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: Theme.of(context).colorScheme.primary,
+                                              ),
+                                            ),
+                                          ],
+                                        );
+                                      }
+                                      return const SizedBox.shrink();
+                                    },
+                                  ),
+                                ],
+                              ),
                               trailing: IconButton(
                                 icon: const Icon(Icons.more_vert),
                                 onPressed: () => _showBookOptions(book),
@@ -1007,10 +1206,32 @@ class _PDFViewerState extends State<PDFViewer>
   }
 
 
-  /// Load registered books from local storage
+  /// Load registered books from local storage and CloudKit
   Future<List<Map<String, dynamic>>> _loadBooks() async {
     try {
-      final books = await StorageService.loadBooks();
+      // Load books from local storage
+      final localBooks = await StorageService.loadBooks();
+      
+      // Load books from CloudKit (merge with local)
+      final cloudKitBooks = await StorageService.loadBooksFromCloudKit();
+      
+      // Merge books, preferring CloudKit data for sync updates
+      final mergedBooks = <String, Map<String, dynamic>>{};
+      
+      // Add local books first
+      for (final book in localBooks) {
+        final bookId = book['id'] as String;
+        mergedBooks[bookId] = book;
+      }
+      
+      // Overlay CloudKit books (they may have newer sync data)
+      for (final cloudBook in cloudKitBooks) {
+        final bookId = cloudBook['id'] as String;
+        mergedBooks[bookId] = cloudBook;
+      }
+      
+      final books = mergedBooks.values.toList();
+      
       // Clean up any books whose files no longer exist
       await _cleanupMissingBooks(books);
       return books;
@@ -1020,30 +1241,35 @@ class _PDFViewerState extends State<PDFViewer>
     }
   }
 
+  /// Check if a book is available locally (not requiring CloudKit download)
+  Future<bool> _isBookAvailableLocally(Map<String, dynamic> book) async {
+    try {
+      final fileName = book['fileName'] as String?;
+      if (fileName == null) return false;
+      
+      final directory = await getApplicationDocumentsDirectory();
+      final fullPath = '${directory.path}/books/$fileName';
+      
+      return File(fullPath).existsSync();
+    } catch (e) {
+      return false;
+    }
+  }
+
   /// Clean up books whose files no longer exist
   Future<void> _cleanupMissingBooks(List<Map<String, dynamic>> books) async {
     final directory = await getApplicationDocumentsDirectory();
-    final booksToRemove = <String>[];
     
     for (final book in books) {
       final fileName = book['fileName'] as String? ?? 
                      (book['path'] as String?)?.split('/').last;
       
       if (fileName != null) {
-        final fullPath = '${directory.path}/$fileName';
+        final fullPath = '${directory.path}/books/$fileName';
         if (!File(fullPath).existsSync()) {
-          debugPrint('Removing orphaned book: ${book['name']} (file not found)');
-          booksToRemove.add(book['id']);
+          // Don't remove books that might be in CloudKit, just locally missing
+          debugPrint('Book not found locally: ${book['name']} (may be in CloudKit)');
         }
-      }
-    }
-    
-    // Remove orphaned books
-    for (final bookId in booksToRemove) {
-      try {
-        await StorageService.deleteBook(bookId);
-      } catch (e) {
-        debugPrint('Error removing orphaned book $bookId: $e');
       }
     }
   }
@@ -1155,7 +1381,7 @@ class _PDFViewerState extends State<PDFViewer>
         final pdfPath = result.files.single.path!;
         
         // Copy to permanent storage and get page count
-        final permanentPath = await _copyPDFToDocuments(pdfPath);
+        final permanentPath = await _copyBookToDocuments(pdfPath, bookName.trim());
         
         // Get page count by temporarily loading the PDF
         int pageCount = await _getPDFPageCount(permanentPath);
@@ -1196,7 +1422,17 @@ class _PDFViewerState extends State<PDFViewer>
       debugPrint('Selecting from book: ${book['name']}');
       Navigator.of(context).pop(); // Close books dialog
       
-      final bookPath = await _getBookPath(book);
+      // Check if book is available locally first
+      final isLocallyAvailable = await _isBookAvailableLocally(book);
+      
+      String? bookPath;
+      if (!isLocallyAvailable) {
+        // Show download progress dialog
+        bookPath = await _showDownloadProgressDialog(book);
+      } else {
+        bookPath = await _getBookPath(book);
+      }
+      
       final pageCount = book['pageCount'] as int? ?? 1;
       
       debugPrint('Book path: $bookPath, Page count: $pageCount');
@@ -1208,15 +1444,15 @@ class _PDFViewerState extends State<PDFViewer>
         await Future.delayed(const Duration(milliseconds: 200));
         _showPageSelector(book);
       } else {
-        // Book file not found
-        debugPrint('Book file not found: ${book['name']}');
+        // Book file not found or download failed
+        debugPrint('Book file not found or download failed: ${book['name']}');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Book "${book['name']}" file not found. It may have been deleted.'),
+              content: Text('Book "${book['name']}" could not be loaded. Check your iCloud connection.'),
               action: SnackBarAction(
-                label: 'Remove',
-                onPressed: () => _deleteBook(book),
+                label: 'Retry',
+                onPressed: () => _selectFromBook(book),
               ),
             ),
           );
@@ -1230,6 +1466,150 @@ class _PDFViewerState extends State<PDFViewer>
         );
       }
     }
+  }
+
+  /// Show download progress dialog for CloudKit book download
+  Future<String?> _showDownloadProgressDialog(Map<String, dynamic> book) async {
+    String? downloadedPath;
+    
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 400),
+            padding: const EdgeInsets.all(20),
+            child: StatefulBuilder(
+              builder: (context, setState) {
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.cloud_download,
+                      size: 48,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Downloading Book',
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '"${book['name'] ?? 'Unknown Book'}" from iCloud',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Colors.grey[600],
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 20),
+                    // Progress will be shown here when download starts
+                    FutureBuilder<String?>(
+                      future: _downloadBookFromCloudKit(book),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return Column(
+                            children: [
+                              const CircularProgressIndicator(),
+                              const SizedBox(height: 12),
+                              Text(
+                                'Connecting to iCloud...',
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ],
+                          );
+                        } else if (snapshot.hasError) {
+                          return Column(
+                            children: [
+                              Icon(
+                                Icons.error_outline,
+                                size: 32,
+                                color: Colors.red[400],
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Download failed',
+                                style: TextStyle(color: Colors.red[400]),
+                              ),
+                              const SizedBox(height: 16),
+                              ElevatedButton(
+                                onPressed: () {
+                                  downloadedPath = null;
+                                  if (mounted) {
+                                    Navigator.of(context).pop();
+                                  }
+                                },
+                                child: const Text('Close'),
+                              ),
+                            ],
+                          );
+                        } else if (snapshot.hasData && snapshot.data != null) {
+                          // Download completed successfully
+                          downloadedPath = snapshot.data;
+                          // Auto-close dialog after brief success display
+                          final navigator = Navigator.of(context);
+                          Future.delayed(const Duration(milliseconds: 800), () {
+                            if (mounted && navigator.canPop()) {
+                              navigator.pop();
+                            }
+                          });
+                          return Column(
+                            children: [
+                              Icon(
+                                Icons.check_circle,
+                                size: 32,
+                                color: Colors.green[400],
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Download complete!',
+                                style: TextStyle(color: Colors.green[400]),
+                              ),
+                            ],
+                          );
+                        } else {
+                          // Download completed but returned null (failed)
+                          return Column(
+                            children: [
+                              Icon(
+                                Icons.error_outline,
+                                size: 32,
+                                color: Colors.orange[400],
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Book not found in iCloud',
+                                style: TextStyle(color: Colors.orange[400]),
+                              ),
+                              const SizedBox(height: 16),
+                              ElevatedButton(
+                                onPressed: () {
+                                  downloadedPath = null;
+                                  if (mounted) {
+                                    Navigator.of(context).pop();
+                                  }
+                                },
+                                child: const Text('Close'),
+                              ),
+                            ],
+                          );
+                        }
+                      },
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        );
+      },
+    );
+    
+    return downloadedPath;
   }
 
   /// Show page selector dialog with actual page previews
@@ -1326,7 +1706,7 @@ class _PDFViewerState extends State<PDFViewer>
       await _loadCurrentPageImage();
       
       // Save the permanent PDF path (book path is already permanent)
-      await _savePDFPath(bookPath.split('/').last);
+      await _savePDF(bookPath.split('/').last);
       
       setState(() {
         _pdfPath = bookPath;
@@ -1415,7 +1795,6 @@ class _PDFViewerState extends State<PDFViewer>
                   try {
                     final updatedBook = Map<String, dynamic>.from(book);
                     updatedBook['name'] = newName;
-                    await StorageService.updateBook(book['id'], updatedBook);
                     
                     if (mounted) {
                       navigator.pop();

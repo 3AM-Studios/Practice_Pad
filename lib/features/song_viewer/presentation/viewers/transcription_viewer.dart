@@ -248,7 +248,7 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
 
   Future<void> _loadSavedLoops() async {
     try {
-      final loops = await StorageService.loadSavedLoopsForSong(_getStorageKey());
+      final loops = await StorageService.loadSavedLoopsForPage(_getStorageKey());
       setState(() {
         _savedLoops = loops;
       });
@@ -259,7 +259,7 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
 
   Future<void> _saveSavedLoops() async {
     try {
-      await StorageService.saveSavedLoopsForSong(_getStorageKey(), _savedLoops);
+      await StorageService.saveSavedLoopsForPage(_getStorageKey(), _savedLoops);
     } catch (e) {
       debugPrint('Error saving loops: $e');
     }

@@ -55,8 +55,13 @@ class SaveRecordWithAssetsHandler {
         
         // Set asset values
         for (key, assetData) in assets {
-            if let assetInfo = assetData as? Dictionary<String, Any>,
-               let filePath = assetInfo["filePath"] as? String {
+            if let assetInfo = assetData as? Dictionary<String, Any> {
+                // Support both localFilePath (new format) and filePath (legacy)
+                let filePath = assetInfo["localFilePath"] as? String ?? assetInfo["filePath"] as? String
+                
+                guard let filePath = filePath else {
+                    return result(createFlutterError(message: "Asset missing filePath or localFilePath: \(key)"))
+                }
                 
                 let fileURL = URL(fileURLWithPath: filePath);
                 
