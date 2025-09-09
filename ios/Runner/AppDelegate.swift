@@ -1,6 +1,5 @@
 import UIKit
 import Flutter
-import CloudKit
 import WidgetKit
 import WebKit
 
@@ -8,12 +7,10 @@ import WebKit
 @objc class AppDelegate: FlutterAppDelegate {
     
     private let WIDGET_CHANNEL_NAME = "com.3amstudios.jazzpad/widget"
-    private let CLOUDKIT_CHANNEL_NAME = "practice_pad_cloudkit"
     private let USER_DEFAULTS_SUITE = "group.com.3amstudios.jazzpad"
     
     private var widgetMethodChannel: FlutterMethodChannel?
     private var userDefaults: UserDefaults?
-    private let cloudKitHandler = CloudKitHandler()
     
     // Timer for polling widget actions
     private var widgetActionTimer: Timer?
@@ -29,13 +26,6 @@ import WebKit
         
         userDefaults = UserDefaults(suiteName: USER_DEFAULTS_SUITE)
         
-        // --- Set up CloudKit Channel ---
-        let cloudKitChannel = FlutterMethodChannel(name: CLOUDKIT_CHANNEL_NAME,
-                                                   binaryMessenger: controller.binaryMessenger)
-        cloudKitChannel.setMethodCallHandler { [weak self] (call, result) in
-            self?.cloudKitHandler.handle(call, result: result)
-        }
-
         // --- Set up Widget Channel ---
         widgetMethodChannel = FlutterMethodChannel(name: WIDGET_CHANNEL_NAME,
                                                    binaryMessenger: controller.binaryMessenger)

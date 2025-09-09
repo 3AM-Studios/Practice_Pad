@@ -13,7 +13,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:practice_pad/widgets/wooden_border_wrapper.dart';
 
-import 'package:practice_pad/services/storage/cloud_kit_service.dart';
+import 'package:practice_pad/services/storage/cloudkit_service.dart';
 import 'package:practice_pad/services/storage/storage_service.dart';
 import 'package:practice_pad/features/edit_items/presentation/pages/edit_items_screen.dart';
 import 'package:practice_pad/features/routines/presentation/pages/edit_routines_screen.dart';
@@ -24,8 +24,6 @@ import 'package:practice_pad/services/widget/home_widget_service.dart';
 import 'package:practice_pad/services/widget/widget_update_service.dart';
 import 'package:practice_pad/services/widget/widget_action_handler.dart';
 import 'package:practice_pad/services/widget/widget_integration.dart';
-import 'package:practice_pad/services/automatic_sync_manager.dart';
-import 'package:practice_pad/services/sync_integration_service.dart';
 import 'package:practice_pad/onboarding.dart';
 import 'dart:math' as math;
 
@@ -59,28 +57,28 @@ void main() async {
     });
   }
   
+  // Initialize CloudKit sync service
   try {
-    await CloudKitService.initialize(icloudContainerId);
-    print(
-        "CloudKitService initialized successfully with container: $icloudContainerId");
-  } catch (e) {
-    print("FATAL: CloudKitService initialization failed: $e");
-  }
-
-  // Initialize iCloud Documents sync service
-  try {
-    print("🔄 Initializing iCloud Documents sync service...");
-    await StorageService.initializeICloudSync();
+    print("🔄 Initializing CloudKit sync service...");
+    final isAvailable = await CloudKitService.isAccountAvailable();
     
-    if (StorageService.isICloudSyncEnabled) {
-      print("✅ iCloud Documents sync service initialized and available");
+    if (isAvailable) {
+      print("✅ CloudKit account is available and ready for sync");
+      
+      // Set up database subscription for real-time updates (if supported in future)
+      try {
+        await CloudKitService.setupDatabaseSubscription();
+        print("📡 CloudKit database subscription configured");
+      } catch (e) {
+        print("⚠️ CloudKit subscription setup failed (this is normal): $e");
+      }
     } else {
-      print("⚠️ iCloud Documents sync service initialized but not available");
+      print("⚠️ CloudKit account not available");
       print("   This is normal on simulators or if iCloud is not configured");
     }
   } catch (e) {
-    print("❌ iCloud Documents sync initialization failed: $e");
-    print("   Sync functionality will be disabled");
+    print("❌ CloudKit initialization failed: $e");
+    print("   CloudKit sync functionality will be disabled");
   }
 
   // Initialize home widget service
@@ -91,16 +89,6 @@ void main() async {
     // Clear any stale widget data on startup to ensure fresh data
     await WidgetActionHandler.clearAllWidgetData();
     print('Main: Cleared all widget data on startup');
-
-  // Initialize automatic sync manager
-  try {
-    print("🤖 Initializing AutomaticSyncManager...");
-    await AutomaticSyncManager.instance.initialize();
-    print("✅ AutomaticSyncManager initialized successfully");
-  } catch (e) {
-    print("⚠️ AutomaticSyncManager initialization failed: $e");
-    print("   Automatic sync will not be available");
-  }
 
 
   runApp(const PracticeLoverApp());
@@ -216,8 +204,6 @@ class MainAppScaffoldState extends State<MainAppScaffold> {
       },
     );
     
-    // Initialize sync integration service for automatic background sync
-    SyncIntegrationService.instance.initialize(context);
     
     // Force initial widget update after initialization
     print('Main: Forcing initial widget update after setup');
@@ -227,7 +213,6 @@ class MainAppScaffoldState extends State<MainAppScaffold> {
   @override
   void dispose() {
     WidgetUpdateService.instance.dispose();
-    SyncIntegrationService.instance.dispose();
     super.dispose();
   }
 

@@ -384,7 +384,6 @@ class _PDFViewerState extends State<PDFViewer>
         _currentPage,
         _imagePainterController.labels,
       );
-      debugPrint('Labels: Saved ${_imagePainterController.labels.length} labels for page $_currentPage');
     } catch (e) {
       debugPrint('Error saving labels: $e');
     }
@@ -443,7 +442,6 @@ class _PDFViewerState extends State<PDFViewer>
       
       // Add loaded labels to controller
       _imagePainterController.labels.addAll(imagePainterLabels);
-      debugPrint('Labels: Loaded ${imagePainterLabels.length} labels for page $_currentPage');
     } catch (e) {
       debugPrint('Error loading labels: $e');
       _imagePainterController.clearExtensionLabels();

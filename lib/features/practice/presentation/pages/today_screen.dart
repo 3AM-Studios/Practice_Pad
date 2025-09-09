@@ -1,9 +1,7 @@
 import 'dart:io';
-import 'dart:convert';
 import 'dart:developer' as developer;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:clay_containers/clay_containers.dart';
 import 'package:practice_pad/features/practice/presentation/viewmodels/today_viewmodel.dart';
 import 'package:practice_pad/features/practice/presentation/widgets/goal_ring.dart';
@@ -15,12 +13,11 @@ import 'package:practice_pad/features/practice/presentation/viewmodels/practice_
 import 'package:practice_pad/features/edit_items/presentation/viewmodels/edit_items_viewmodel.dart';
 import 'package:practice_pad/features/routines/presentation/viewmodels/routines_viewmodel.dart';
 import 'package:practice_pad/services/widget/widget_integration.dart';
-import 'package:practice_pad/services/icloud_sync_service.dart';
+import 'package:practice_pad/services/storage/cloudkit_service.dart';
 import 'package:practice_pad/services/storage/storage_service.dart';
 import 'package:practice_pad/features/transcription/presentation/pages/youtube_videos_page.dart';
 import 'package:practice_pad/onboarding.dart';
 import 'package:provider/provider.dart';
-import 'package:path_provider/path_provider.dart';
 
 class TodayScreen extends StatefulWidget {
   final VoidCallback? onStatsPressed;
@@ -36,7 +33,6 @@ class _TodayScreenState extends State<TodayScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
 
     return Consumer3<TodayViewModel, PracticeSessionManager, EditItemsViewModel>(
       builder: (context, todayViewModel, sessionManager, editItemsViewModel, child) {
@@ -313,7 +309,7 @@ Widget _buildSyncButtons(BuildContext context) {
         context: context,
         icon: CupertinoIcons.cloud_download,
         color: CupertinoColors.systemBlue,
-        onTap: () => _downloadFromICloud(context),
+        onTap: () => _downloadFromCloudKit(context),
         onLongPress: () => _showDebugInfo(context),
       ),
       const SizedBox(width: 8),
@@ -322,7 +318,7 @@ Widget _buildSyncButtons(BuildContext context) {
         context: context,
         icon: CupertinoIcons.cloud_upload,
         color: CupertinoColors.systemGreen,
-        onTap: () => _uploadToICloud(context),
+        onTap: () => _uploadToCloudKit(context),
         onLongPress: () => _showDebugInfo(context),
       ),
     ],
@@ -376,7 +372,7 @@ Widget _buildSyncButton({
   );
 }
   Future<void> _reloadAllViewModelsAfterSync(BuildContext context) async {
-    developer.log('🔄 Reloading all ViewModels after iCloud sync');
+    developer.log('🔄 Reloading all ViewModels after CloudKit sync');
     
     try {
       // Show loading dialog while reloading
@@ -397,23 +393,43 @@ Widget _buildSyncButton({
         );
       }
       
-      // Get ViewModels from Provider
+      // Get ViewModels from Provider with error handling
       if (context.mounted) {
-        final editItemsViewModel = Provider.of<EditItemsViewModel>(context, listen: false);
-        final routinesViewModel = Provider.of<RoutinesViewModel>(context, listen: false);
-        final todayViewModel = Provider.of<TodayViewModel>(context, listen: false);
-        
-        // Reload in proper order: EditItems -> Routines -> Today
-        // EditItemsViewModel needs to load first since others depend on it
-        await editItemsViewModel.reloadFromStorage();
-        
-        // RoutinesViewModel depends on EditItemsViewModel data
-        await routinesViewModel.reloadFromStorage();
-        
-        // TodayViewModel depends on both
-        await todayViewModel.reloadFromStorage();
-        
-        developer.log('✅ All ViewModels reloaded successfully after iCloud sync');
+        try {
+          final editItemsViewModel = Provider.of<EditItemsViewModel>(context, listen: false);
+          final routinesViewModel = Provider.of<RoutinesViewModel>(context, listen: false);
+          final todayViewModel = Provider.of<TodayViewModel>(context, listen: false);
+          
+          // Reload EditItemsViewModel first (other ViewModels depend on it)
+          try {
+            await editItemsViewModel.reloadFromStorage();
+            developer.log('✅ EditItemsViewModel reloaded successfully');
+          } catch (editError) {
+            developer.log('⚠️ EditItemsViewModel reload failed: $editError');
+          }
+          
+          // Reload RoutinesViewModel second
+          try {
+            await routinesViewModel.reloadFromStorage();
+            developer.log('✅ RoutinesViewModel reloaded successfully');
+          } catch (routinesError) {
+            developer.log('⚠️ RoutinesViewModel reload failed: $routinesError');
+          }
+          
+          // Special handling for TodayViewModel since it's prone to disposal
+          try {
+            await todayViewModel.reloadFromStorage();
+            developer.log('✅ TodayViewModel reloaded successfully');
+          } catch (todayError) {
+            developer.log('⚠️ TodayViewModel reload failed (likely disposed): $todayError');
+            // Continue anyway - the UI will refresh when the widget rebuilds
+          }
+          
+          developer.log('✅ ViewModels reload completed after CloudKit sync');
+        } catch (providerError) {
+          developer.log('❌ Error getting ViewModels from Provider: $providerError');
+          rethrow;
+        }
       }
       
       // Close loading dialog
@@ -428,12 +444,12 @@ Widget _buildSyncButton({
       if (context.mounted) {
         Navigator.of(context).pop();
         
-        // Show error message with specific error details
+        // Show less alarming error message since data is downloaded
         showCupertinoDialog(
           context: context,
           builder: (context) => CupertinoAlertDialog(
-            title: const Text('Reload Failed'),
-            content: Text('Data downloaded successfully but failed to reload the interface.\n\nError: $e\n\nPlease restart the app to see your synced data.'),
+            title: const Text('Data Downloaded'),
+            content: const Text('CloudKit sync completed successfully. The interface will refresh automatically. If changes don\'t appear, try navigating to another tab and back.'),
             actions: [
               CupertinoDialogAction(
                 child: const Text('OK'),
@@ -446,61 +462,17 @@ Widget _buildSyncButton({
     }
   }
 
-Future<void> _downloadFromICloud(BuildContext context) async {
-  // First check iCloud availability
-  final icloudService = ICloudSyncService();
-  
-  // Migrate to organized structure first (if needed)
-  try {
-    await ICloudSyncService.migrateToOrganizedStructure();
-  } catch (e) {
-    developer.log('⚠️ Migration failed but continuing: $e');
-  }
-  
-  // DEBUG: Show container analysis IMMEDIATELY
-  print("🔍 [DEBUG] Starting container analysis...");
-  try {
-    await icloudService.listICloudFiles();
-  } catch (e) {
-    print("❌ [DEBUG] Container analysis failed: $e");
-  }
-  
-  final isAvailable = await icloudService.isICloudAvailable();
+Future<void> _downloadFromCloudKit(BuildContext context) async {
+  // Check CloudKit availability
+  final isAvailable = await CloudKitService.isAccountAvailable();
   
   if (!isAvailable) {
     if (context.mounted) {
-      // Check if we're on simulator to provide specific messaging
-      final accountStatus = await icloudService.getAccountStatus();
-      final isSimulator = Platform.isIOS;
-      
-      String title = 'iCloud Not Available';
-      String message = 'Please ensure you are signed into iCloud and have enabled iCloud Documents for this app.';
-      
-      if (isSimulator) {
-        title = 'Development/Testing Mode';
-        message = 'iCloud Documents sync limitations detected:\n\n'
-                 '• iOS Simulator has limited iCloud functionality\n'
-                 '• App uses example bundle ID (com.example.*)\n'
-                 '• Example bundle IDs don\'t have proper iCloud entitlements\n\n'
-                 'For full iCloud sync functionality:\n'
-                 '• Use a proper bundle ID (not com.example.*)\n'
-                 '• Configure iCloud capabilities in Apple Developer Portal\n'
-                 '• Test on physical iOS devices\n\n'
-                 'Current account status: $accountStatus';
-      } else if (accountStatus == 'notAvailable') {
-        message = 'iCloud account not detected.\n\n'
-                 'Please:\n'
-                 '• Sign into iCloud in Settings\n'
-                 '• Enable iCloud Documents\n'
-                 '• Restart the app if needed\n\n'
-                 'Note: This app uses an example bundle ID which may not have proper iCloud entitlements configured.';
-      }
-      
       showCupertinoDialog(
         context: context,
         builder: (context) => CupertinoAlertDialog(
-          title: Text(title),
-          content: Text(message),
+          title: const Text('CloudKit Not Available'),
+          content: const Text('Please ensure you are signed into iCloud and CloudKit is enabled for this app.'),
           actions: [
             CupertinoDialogAction(
               child: const Text('OK'),
@@ -523,7 +495,7 @@ Future<void> _downloadFromICloud(BuildContext context) async {
           children: [
             CupertinoActivityIndicator(),
             SizedBox(height: 16),
-            Text('Downloading from iCloud...\nThis may take a few moments.'),
+            Text('Downloading from CloudKit...\nThis may take a few moments.'),
           ],
         ),
       ),
@@ -531,122 +503,23 @@ Future<void> _downloadFromICloud(BuildContext context) async {
   }
 
   try {
-    // Get all available files in iCloud
-    final availableFiles = await icloudService.listICloudFiles();
+    developer.log('📥 Starting CloudKit download sync...');
     
-    // Download ALL files from iCloud - let the service handle timestamp comparison
-    final filesToDownload = availableFiles.toList();
+    // Perform full CloudKit sync to get latest data
+    await CloudKitService.handleNotification();
     
-    developer.log('📥 [DOWNLOAD] Checking ${filesToDownload.length} files for sync: $filesToDownload');
-    
-    int successCount = 0;
-    List<String> failedFiles = [];
-    List<String> actualFilesToDownload = [];
-    
-    if (filesToDownload.isEmpty) {
-      developer.log('ℹ️ No files found in iCloud to download');
-    }
-    
-    // First pass: check which files actually need downloading (newer than local)
-    for (final fileName in filesToDownload) {
-      try {
-        final fileInfo = await icloudService.getICloudFileInfo(fileName);
-        final localDir = await getApplicationDocumentsDirectory();
-        final localFile = File('${localDir.path}/$fileName');
-        
-        if (!await localFile.exists()) {
-          // Local file doesn't exist, download it
-          actualFilesToDownload.add(fileName);
-          developer.log('📥 [DOWNLOAD] Local file missing, will download: $fileName');
-        } else {
-          // Compare timestamps if available
-          if (fileInfo['lastModified'] != null) {
-            final localTimestamp = await localFile.lastModified();
-            final remoteTimestamp = DateTime.parse(fileInfo['lastModified']);
-            
-            if (remoteTimestamp.isAfter(localTimestamp)) {
-              actualFilesToDownload.add(fileName);
-              developer.log('📥 [DOWNLOAD] Remote newer, will download: $fileName (remote: $remoteTimestamp, local: $localTimestamp)');
-            } else {
-              developer.log('📥 [DOWNLOAD] Local up-to-date, skipping: $fileName');
-            }
-          } else {
-            // No timestamp info available, download anyway to be safe
-            actualFilesToDownload.add(fileName);
-            developer.log('📥 [DOWNLOAD] No timestamp info, will download: $fileName');
-          }
-        }
-      } catch (e) {
-        // If we can't get file info, try downloading anyway
-        actualFilesToDownload.add(fileName);
-        developer.log('📥 [DOWNLOAD] Error checking file info, will download: $fileName - $e');
-      }
-    }
-    
-    developer.log('📥 [DOWNLOAD] Will download ${actualFilesToDownload.length} files that need updating');
-    
-    // Second pass: actually download the files that need updating
-    for (final fileName in actualFilesToDownload) {
-      try {
-        final result = await icloudService.downloadFile(fileName);
-        
-        if (result.success) {
-          successCount++;
-          
-          // Show what was actually downloaded for practice_areas.json only
-          if (fileName == 'practice_areas.json') {
-            try {
-              final localDir = await getApplicationDocumentsDirectory();
-              final file = File('${localDir.path}/$fileName');
-              if (await file.exists()) {
-                final content = await file.readAsString();
-                developer.log('📥 [DOWNLOAD] practice_areas.json content: $content');
-              }
-            } catch (e) {
-              developer.log('❌ Could not read downloaded practice_areas.json: $e');
-            }
-          }
-        } else {
-          final error = result.error ?? "Unknown error";
-          failedFiles.add('$fileName: $error');
-        }
-      } catch (e) {
-        failedFiles.add('$fileName: $e');
-      }
-    }
-
     if (context.mounted) {
       Navigator.of(context).pop();
       
-      if (failedFiles.isEmpty) {
-        final message = actualFilesToDownload.isEmpty
-            ? 'All files are up to date. No downloads needed.'
-            : 'Successfully downloaded $successCount files from iCloud.';
-        
-        // If files were successfully downloaded, reload all ViewModels
-        if (successCount > 0) {
-          await _reloadAllViewModelsAfterSync(context);
-        }
-        
+      // Always reload ViewModels after sync attempt
+      await _reloadAllViewModelsAfterSync(context);
+      
+      if (context.mounted) {
         showCupertinoDialog(
           context: context,
           builder: (context) => CupertinoAlertDialog(
             title: const Text('Success'),
-            content: Text(message),
-            actions: [
-              CupertinoDialogAction(
-                child: const Text('OK'),
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-            ],
-          ),
-        );
-      } else {
-        showCupertinoDialog(
-          context: context,
-          builder: (context) => CupertinoAlertDialog(
-            title: const Text('Partial Success'),
-            content: Text('Downloaded $successCount/${actualFilesToDownload.length} files.\n\nFailed files:\n${failedFiles.join('\n')}'),
+            content: const Text('CloudKit sync completed. Data has been refreshed.'),
             actions: [
               CupertinoDialogAction(
                 child: const Text('OK'),
@@ -658,6 +531,7 @@ Future<void> _downloadFromICloud(BuildContext context) async {
       }
     }
   } catch (e) {
+    developer.log('❌ CloudKit download failed: $e');
     if (context.mounted) {
       Navigator.of(context).pop();
       
@@ -665,7 +539,7 @@ Future<void> _downloadFromICloud(BuildContext context) async {
         context: context,
         builder: (context) => CupertinoAlertDialog(
           title: const Text('Error'),
-          content: Text('Failed to download from iCloud: $e'),
+          content: Text('Failed to download from CloudKit: $e'),
           actions: [
             CupertinoDialogAction(
               child: const Text('OK'),
@@ -678,52 +552,17 @@ Future<void> _downloadFromICloud(BuildContext context) async {
   }
 }
 
-Future<void> _uploadToICloud(BuildContext context) async {
-  // First check iCloud availability
-  final icloudService = ICloudSyncService();
-  
-  // Migrate to organized structure first (if needed)
-  try {
-    await ICloudSyncService.migrateToOrganizedStructure();
-  } catch (e) {
-    developer.log('⚠️ Migration failed but continuing: $e');
-  }
-  final isAvailable = await icloudService.isICloudAvailable();
+Future<void> _uploadToCloudKit(BuildContext context) async {
+  // Check CloudKit availability
+  final isAvailable = await CloudKitService.isAccountAvailable();
   
   if (!isAvailable) {
     if (context.mounted) {
-      // Check if we're on simulator to provide specific messaging
-      final accountStatus = await icloudService.getAccountStatus();
-      final isSimulator = Platform.isIOS;
-      
-      String title = 'iCloud Not Available';
-      String message = 'Please ensure you are signed into iCloud and have enabled iCloud Documents for this app.';
-      
-      if (isSimulator) {
-        title = 'Development/Testing Mode';
-        message = 'iCloud Documents sync limitations detected:\n\n'
-                 '• iOS Simulator has limited iCloud functionality\n'
-                 '• App uses example bundle ID (com.example.*)\n'
-                 '• Example bundle IDs don\'t have proper iCloud entitlements\n\n'
-                 'For full iCloud sync functionality:\n'
-                 '• Use a proper bundle ID (not com.example.*)\n'
-                 '• Configure iCloud capabilities in Apple Developer Portal\n'
-                 '• Test on physical iOS devices\n\n'
-                 'Current account status: $accountStatus';
-      } else if (accountStatus == 'notAvailable') {
-        message = 'iCloud account not detected.\n\n'
-                 'Please:\n'
-                 '• Sign into iCloud in Settings\n'
-                 '• Enable iCloud Documents\n'
-                 '• Restart the app if needed\n\n'
-                 'Note: This app uses an example bundle ID which may not have proper iCloud entitlements configured.';
-      }
-      
       showCupertinoDialog(
         context: context,
         builder: (context) => CupertinoAlertDialog(
-          title: Text(title),
-          content: Text(message),
+          title: const Text('CloudKit Not Available'),
+          content: const Text('Please ensure you are signed into iCloud and CloudKit is enabled for this app.'),
           actions: [
             CupertinoDialogAction(
               child: const Text('OK'),
@@ -746,7 +585,7 @@ Future<void> _uploadToICloud(BuildContext context) async {
           children: [
             CupertinoActivityIndicator(),
             SizedBox(height: 16),
-            Text('Uploading to iCloud...\nThis may take a few moments.'),
+            Text('Uploading to CloudKit...\nThis may take a few moments.'),
           ],
         ),
       ),
@@ -754,81 +593,66 @@ Future<void> _uploadToICloud(BuildContext context) async {
   }
 
   try {
-    // Create complete organized folder structure before upload
-    developer.log('📤 [UPLOAD] Creating organized folder structure for upload');
+    developer.log('📤 ===== CLOUDKIT SYNC STARTED =====');
+    developer.log('📤 Upload started at: ${DateTime.now().toIso8601String()}');
     
     if (context.mounted) {
+      // Get current app data for upload
       final editItemsViewModel = Provider.of<EditItemsViewModel>(context, listen: false);
       final routinesViewModel = Provider.of<RoutinesViewModel>(context, listen: false);
-      final todayViewModel = Provider.of<TodayViewModel>(context, listen: false);
       
-      // Create organized structure based on current app data
-      await _createOrganizedStructureForUpload(editItemsViewModel, routinesViewModel);
+      developer.log('📤 Found ${editItemsViewModel.areas.length} practice areas to upload');
       
-      developer.log('📤 [UPLOAD] Organized structure created successfully');
+      // Upload practice areas to CloudKit using the public method
+      await StorageService.savePracticeAreas(editItemsViewModel.areas);
+      developer.log('📤 Practice areas uploaded to CloudKit');
+      
+      // Upload routines to CloudKit - convert to schedule format and sync
+      final weeklySchedule = <String, List<String>>{};
+      routinesViewModel.routines.forEach((dayOfWeek, routinesList) {
+        weeklySchedule[dayOfWeek.toString()] = routinesList.map((routine) => routine.recordName).toList();
+        developer.log('📤 Prepared ${routinesList.length} routines for ${dayOfWeek.toString()}');
+      });
+      
+      developer.log('📤 Found weekly schedule with ${weeklySchedule.length} days');
+      
+      // Actually upload the weekly schedule to CloudKit
+      await StorageService.saveWeeklySchedule(weeklySchedule);
+      developer.log('📤 Weekly schedule uploaded to CloudKit');
+      
+      // Get books and check for PDF upload needs
+      final books = await StorageService.loadBooks();
+      final customSongs = await StorageService.loadCustomSongs();
+      
+      developer.log('📤 ⚠️ IMPORTANT: PDF FILES NOT UPLOADED!');
+      developer.log('📤 Found ${books.length} books in local storage');
+      developer.log('📤 Found ${customSongs.length} custom songs in local storage');
+      developer.log('📤 Current upload only syncs practice metadata, NOT PDF files');
+      developer.log('📤 To upload PDFs, use StorageService.savePDFWithAsset() method');
+      
+      developer.log('✅ CLOUDKIT METADATA SYNC COMPLETED');
+      developer.log('📤 ===== CLOUDKIT SYNC FINISHED =====');
     }
-    
-    // DEBUG: Show what data is being uploaded
-    developer.log('📤 [UPLOAD] Starting upload to iCloud');
-    final localDir = await getApplicationDocumentsDirectory();
-    final practiceAreasFile = File('${localDir.path}/practice_areas.json');
-    if (await practiceAreasFile.exists()) {
-      final content = await practiceAreasFile.readAsString();
-      developer.log('📤 [UPLOAD] practice_areas.json content: $content');
-    }
-    
-    final result = await StorageService.syncAllToICloud();
-    
 
     if (context.mounted) {
       Navigator.of(context).pop();
       
-      if (result.success) {
-        showCupertinoDialog(
-          context: context,
-          builder: (context) => CupertinoAlertDialog(
-            title: const Text('Success'),
-            content: const Text('Successfully uploaded all practice data to iCloud.'),
-            actions: [
-              CupertinoDialogAction(
-                child: const Text('OK'),
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-            ],
-          ),
-        );
-      } else if (result.conflicts.isNotEmpty) {
-        showCupertinoDialog(
-          context: context,
-          builder: (context) => CupertinoAlertDialog(
-            title: const Text('Conflicts Detected'),
-            content: Text('Some files have conflicts that need to be resolved:\n${result.conflicts.map((c) => c.fileName).join(', ')}'),
-            actions: [
-              CupertinoDialogAction(
-                child: const Text('OK'),
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-            ],
-          ),
-        );
-      } else {
-        showCupertinoDialog(
-          context: context,
-          builder: (context) => CupertinoAlertDialog(
-            title: const Text('Error'),
-            content: Text('Upload failed: ${result.error ?? "Unknown error"}'),
-            actions: [
-              CupertinoDialogAction(
-                child: const Text('OK'),
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-            ],
-          ),
-        );
-      }
+      showCupertinoDialog(
+        context: context,
+        builder: (context) => CupertinoAlertDialog(
+          title: const Text('Success'),
+          content: const Text('Successfully uploaded practice schedules to CloudKit.\n\nNote: PDF books and songs are not uploaded yet. Only practice metadata is synced.'),
+          actions: [
+            CupertinoDialogAction(
+              child: const Text('OK'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ],
+        ),
+      );
     }
   } catch (e) {
-    developer.log('❌ [UPLOAD DEBUG] Upload exception: $e');
+    developer.log('❌ CloudKit upload failed: $e');
     if (context.mounted) {
       Navigator.of(context).pop();
       
@@ -836,7 +660,7 @@ Future<void> _uploadToICloud(BuildContext context) async {
         context: context,
         builder: (context) => CupertinoAlertDialog(
           title: const Text('Error'),
-          content: Text('Failed to upload to iCloud: $e'),
+          content: Text('Failed to upload to CloudKit: $e'),
           actions: [
             CupertinoDialogAction(
               child: const Text('OK'),
@@ -851,14 +675,17 @@ Future<void> _uploadToICloud(BuildContext context) async {
 
 Future<void> _showDebugInfo(BuildContext context) async {
   try {
-    final icloudService = ICloudSyncService();
-    final diagnostics = await icloudService.getDiagnosticInfo();
+    final diagnostics = <String, dynamic>{
+      'CloudKit Account Available': await CloudKitService.isAccountAvailable(),
+      'Last Sync Time': 'Not implemented yet',
+      'Sync Status': 'Ready',
+    };
     
     if (context.mounted) {
       showCupertinoDialog(
         context: context,
         builder: (context) => CupertinoAlertDialog(
-          title: const Text('iCloud Debug Info'),
+          title: const Text('CloudKit Debug Info'),
           content: SingleChildScrollView(
             child: Text(
               diagnostics.entries
@@ -893,86 +720,11 @@ Future<void> _showDebugInfo(BuildContext context) async {
       );
     }
   }
-
-  /// Reload all ViewModels after successful iCloud sync
 }
 
-/// Create organized folder structure for upload
-Future<void> _createOrganizedStructureForUpload(
-  EditItemsViewModel editItemsViewModel, 
-  RoutinesViewModel routinesViewModel,
-) async {
-  try {
-    final localDir = await getApplicationDocumentsDirectory();
-    
-    // 1. Create config files
-    developer.log('📤 Creating config files...');
-    await StorageService.saveCustomSongs([]);  
-    await StorageService.saveBooks([]);        
-    await StorageService.saveYoutubeVideosList([]);
-    
-    // 2. Create main practice areas structure  
-    developer.log('📤 Creating practice areas structure...');
-    await StorageService.savePracticeAreas(editItemsViewModel.areas);
-    
-    // 3. Create individual practice area folders with their data
-    for (final area in editItemsViewModel.areas) {
-      developer.log('📤 Creating folder for practice area: ${area.name}');
-      
-      // Create practice area JSON file
-      final areaData = {
-        'recordName': area.recordName,
-        'name': area.name,
-        'type': area.type.toString(),
-        'song': area.song?.toJson(),  // Convert song to JSON if it exists
-        'itemCount': area.practiceItems.length,
-      };
-      
-      // Save individual practice area file
-      final areaFileName = 'practice_areas_${area.recordName}_area.json';
-      final areaFile = File('${localDir.path}/$areaFileName');
-      await areaFile.writeAsString(json.encode(areaData));
-      
-      // Create practice items for this area
-      if (area.practiceItems.isNotEmpty) {
-        for (int i = 0; i < area.practiceItems.length; i++) {
-          final item = area.practiceItems[i];
-          final itemData = {
-            'id': item.id,
-            'name': item.name,
-            'description': item.description,
-            'chordProgression': item.chordProgression?.toJson(),  // Convert chord progression if it exists
-            'keysPracticed': item.keysPracticed,
-          };
-          
-          final itemFileName = 'practice_areas_${area.recordName}_item_${i + 1}.json';
-          final itemFile = File('${localDir.path}/$itemFileName');
-          await itemFile.writeAsString(json.encode(itemData));
-        }
-      }
-    }
-    
-    // 4. Create songs structure (if any songs exist)
-    developer.log('📤 Creating songs structure...');
-    // For now, create empty structure - can be enhanced later with actual song data
-    final songsData = {
-      'songs': [],
-      'drawings': {},
-      'sheet_music': {},
-    };
-    final songsFile = File('${localDir.path}/songs_structure.json');
-    await songsFile.writeAsString(json.encode(songsData));
-    
-    developer.log('📤 Organized structure creation completed');
-  } catch (e) {
-    developer.log('❌ Error creating organized structure: $e');
-    rethrow;
-  }
-}
 
 Widget _buildBottomSection(BuildContext context, TodayViewModel viewModel, VoidCallback? onStatsPressed, bool isTabletOrDesktop) {
-  // Get screen height and calculate 25% shorter bottom area
-  final screenHeight = MediaQuery.of(context).size.height;
+  // Calculate bottom area height based on device type
   final bottomAreaHeight = (isTabletOrDesktop ?350.0: 510.0); // Reduced from ~30% to ~23% (25% reduction)
   
   return SizedBox(

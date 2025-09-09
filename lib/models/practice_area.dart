@@ -9,6 +9,7 @@ class PracticeArea {
   PracticeAreaType type; // NEW: 'song' or 'exercise'
   List<PracticeItem> practiceItems; // NEW: embedded practice items
   Song? song; // NEW: Optional song reference for song-type practice areas
+  String? recordChangeTag; // CloudKit record change tag for sync
 
   PracticeArea({
     required this.recordName,
@@ -16,6 +17,7 @@ class PracticeArea {
     required this.type,
     List<PracticeItem>? practiceItems,
     this.song,
+    this.recordChangeTag,
   }) : practiceItems = practiceItems ?? [];
 
   // Factory constructor to create a PracticeArea from a CloudKit record map

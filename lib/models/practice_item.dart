@@ -6,6 +6,7 @@ class PracticeItem {
   String description;
   ChordProgression? chordProgression; // Optional chord progression
   Map<String, int> keysPracticed; // Track reps for each of the 12 keys
+  String? recordChangeTag; // CloudKit record change tag for sync
   // TODO: Consider fields for tracking (lastPracticed, priority, etc.) later
   // REMOVED: practiceAreaRecordName (now embedded in PracticeArea)
 
@@ -15,6 +16,7 @@ class PracticeItem {
     this.description = '',
     this.chordProgression,
     Map<String, int>? keysPracticed,
+    this.recordChangeTag,
   }) : name = _resolveName(name, chordProgression),
        keysPracticed = keysPracticed ?? _initializeKeysPracticed();
 
@@ -48,6 +50,7 @@ class PracticeItem {
     String? description,
     ChordProgression? chordProgression,
     Map<String, int>? keysPracticed,
+    String? recordChangeTag,
   }) {
     return PracticeItem(
       id: id ?? this.id,
@@ -55,6 +58,7 @@ class PracticeItem {
       description: description ?? this.description,
       chordProgression: chordProgression ?? this.chordProgression,
       keysPracticed: keysPracticed ?? Map.from(this.keysPracticed),
+      recordChangeTag: recordChangeTag ?? this.recordChangeTag,
     );
   }
 }
