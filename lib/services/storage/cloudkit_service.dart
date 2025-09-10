@@ -31,12 +31,6 @@ class CloudKitService {
     'Labels',
   ];
   
-  // Core record types that we know exist and are essential for sync
-  static const _coreRecordTypes = [
-    'PracticeArea',
-    'WeeklySchedule',
-    'SongPdf',
-  ];
 
   static String _sanitizeRecordKey(String key) {
     return key.replaceAll(RegExp(r'[/\:*?"<>| .\-]'), '_');
@@ -231,56 +225,6 @@ class CloudKitService {
     }
   }
 
-  /// Get records using only core record types to avoid schema issues
-  static Future<List<Map<String, dynamic>>> getCoreRecords() async {
-    if (!await isAccountAvailable()) return [];
-
-    final allRecords = <Map<String, dynamic>>[];
-    print('🔍 Using core record types to avoid schema issues: $_coreRecordTypes');
-    
-    for (final recordType in _coreRecordTypes) {
-      try {
-        print('🔍 Fetching core records of type: $recordType');
-        final records = await _cloudKit.getRecordsByType(
-          scope: CloudKitDatabaseScope.private,
-          recordType: recordType,
-        );
-        print('   Found ${records.length} $recordType records');
-        for (final record in records) {
-          print('   Processing record: ${record.recordName}');
-          final recordData = <String, dynamic>{};
-          record.values.forEach((key, value) {
-            try {
-              // Try to decode as JSON first
-              recordData[key] = json.decode(value);
-            } catch (_) {
-              // If it's not JSON, check if it might be an asset
-              if (_isAssetField(key, value)) {
-                recordData[key] = _parseCloudKitAsset(value, key, record.recordName);
-              } else {
-                recordData[key] = value;
-              }
-            }
-          });
-          recordData['recordName'] = record.recordName;
-          recordData['recordType'] = record.recordType;
-          allRecords.add(recordData);
-        }
-      } catch (e) {
-        final errorMessage = e.toString();
-        if (errorMessage.contains('Did not find record type')) {
-          print('ℹ️ Core record type $recordType does not exist in CloudKit schema - skipping');
-        } else if (errorMessage.contains('not marked sortable') || errorMessage.contains('not marked queryable')) {
-          print('⚠️ Schema configuration issue for core type $recordType: $e');
-          print('   This can be fixed in CloudKit Console by updating field indexes');
-        } else {
-          print('⚠️ Error fetching core records of type $recordType: $e');
-        }
-      }
-    }
-    return allRecords;
-  }
-
   static Future<List<Map<String, dynamic>>> getAllRecords() async {
     if (!await isAccountAvailable()) return [];
 
@@ -380,9 +324,9 @@ class CloudKitService {
   }
 
   static Future<List<Map<String, dynamic>>> _fetchDatabaseChanges() async {
-    print('📥 Fetching core records from CloudKit to avoid schema issues...');
-    final allCloudRecords = await getCoreRecords();
-    print('📥 Retrieved ${allCloudRecords.length} total core records from CloudKit');
+    print('📥 Fetching all records from CloudKit...');
+    final allCloudRecords = await getAllRecords();
+    print('📥 Retrieved ${allCloudRecords.length} total records from CloudKit');
     
     final changedRecords = <Map<String, dynamic>>[];
     final recordTypeCounts = <String, int>{};

@@ -38,19 +38,33 @@ class SaveRecordHandler {
         }
         
         let recordId = getRecordIdFromArgsOrDefault(arguments: arguments);
-        let record = CKRecord(recordType: recordType, recordID: recordId);
         
-        // TODO: handle ObjectiveC exceptions
-        record.setValuesForKeys(recordValues);
-        
-        database.save(record) { (record, error) in
-            if (error != nil) {
-                return result(createFlutterError(message: error!.localizedDescription));
+        // First, try to fetch existing record for upsert logic
+        database.fetch(withRecordID: recordId) { (existingRecord, fetchError) in
+            let recordToSave: CKRecord
+            
+            if let existing = existingRecord, fetchError == nil {
+                // Record exists - update it
+                recordToSave = existing
+            } else {
+                // Record doesn't exist - create new one
+                recordToSave = CKRecord(recordType: recordType, recordID: recordId)
             }
-            if (record == nil) {
-                return result(createFlutterError(message: "Got nil while saving the record"));
+            
+            // Set the new values
+            // TODO: handle ObjectiveC exceptions
+            recordToSave.setValuesForKeys(recordValues)
+            
+            // Save the record
+            database.save(recordToSave) { (savedRecord, saveError) in
+                if (saveError != nil) {
+                    return result(createFlutterError(message: saveError!.localizedDescription));
+                }
+                if (savedRecord == nil) {
+                    return result(createFlutterError(message: "Got nil while saving the record"));
+                }
+                return result(true);
             }
-            return result(true);
         }
     }
 }

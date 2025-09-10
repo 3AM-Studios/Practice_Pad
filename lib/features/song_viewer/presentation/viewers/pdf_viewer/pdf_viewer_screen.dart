@@ -60,6 +60,9 @@ class _PDFViewerState extends State<PDFViewer>
   String? _pdfPath;
   bool _isDisposed = false;
   
+  // Debounce timer for auto-save
+  Timer? _saveDebounceTimer;
+  
 
   @override
   void initState() {
@@ -562,9 +565,12 @@ class _PDFViewerState extends State<PDFViewer>
     
     // Debounce auto-save to avoid excessive saves
     if (_pdfPath != null) {
-      // Use a small delay to batch rapid changes
-      Future.delayed(const Duration(milliseconds: 500), () {
-        if (mounted && _pdfPath != null) {
+      // Cancel any pending save
+      _saveDebounceTimer?.cancel();
+      
+      // Start a new debounced save
+      _saveDebounceTimer = Timer(const Duration(milliseconds: 1000), () {
+        if (mounted && _pdfPath != null && !_isDisposed) {
           _saveDrawingData();
           _saveLabels(); // Also save labels when drawing changes
         }
@@ -913,6 +919,9 @@ class _PDFViewerState extends State<PDFViewer>
   void dispose() {
     // Mark as disposed to prevent further usage
     _isDisposed = true;
+    
+    // Cancel any pending debounced save
+    _saveDebounceTimer?.cancel();
     
     // Save current drawing and labels before disposing
     if (_isReady && _pdfPath != null) {

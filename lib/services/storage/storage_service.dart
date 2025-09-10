@@ -402,14 +402,81 @@ class StorageService {
 
   static Future<void> updatePDFDrawingsFromCloud(Map<String, dynamic> record) async {
     try {
-      final songId = record['songId'] as String;
-      final pageNumber = record['pageNumber'] as int;
+      // Parse songId and pageNumber from recordName
+      // Format: PDFDrawings_{songId}_page_{pageNumber}
+      final recordName = record['recordName'] as String;
+      print('📝 Processing PDFDrawings record: $recordName');
+      
+      // Remove the "PDFDrawings_" prefix
+      final withoutPrefix = recordName.replaceFirst('PDFDrawings_', '');
+      
+      // Find the last occurrence of "_page_" to split correctly
+      final pageIndex = withoutPrefix.lastIndexOf('_page_');
+      if (pageIndex == -1) {
+        print('❌ Invalid PDFDrawings record name format: $recordName');
+        return;
+      }
+      
+      final extractedSongId = withoutPrefix.substring(0, pageIndex);
+      final pageNumberStr = withoutPrefix.substring(pageIndex + '_page_'.length);
+      final pageNumber = int.tryParse(pageNumberStr);
+      
+      if (pageNumber == null) {
+        print('❌ Invalid page number in record name: $recordName');
+        return;
+      }
+      
+      // Transform songId to match PDF viewer's _getSafeFilename format
+      // CloudKit: "assets_songs_a_lovely_way_to_spend_an_evening_musicxml"  
+      // PDF viewer expects: "assets_songs_a-lovely-way-to-spend-an-evening.musicxml"
+      String songId;
+      if (extractedSongId.contains('_songs_')) {
+        // Convert back to PDF viewer's safe filename format
+        // CloudKit format: assets_songs_a_lovely_way_to_spend_an_evening_musicxml
+        // Original path: assets/songs/a-lovely-way-to-spend-an-evening.musicxml
+        // PDF viewer result: assets_songs_a-lovely-way-to-spend-an-evening.musicxml
+        
+        // Step 1: Convert underscores back to path structure
+        final pathLike = extractedSongId.replaceAll('_', '/');
+        // Result: assets/songs/a/lovely/way/to/spend/an/evening/musicxml
+        
+        // Step 2: Try to reconstruct the original filename
+        // We know the pattern: assets/songs/{filename}.musicxml
+        final parts = pathLike.split('/');
+        if (parts.length >= 3 && parts[0] == 'assets' && parts[1] == 'songs') {
+          // Take everything after assets/songs/ and reconstruct with hyphens and .musicxml
+          final filenameParts = parts.sublist(2);
+          final baseName = filenameParts.take(filenameParts.length - 1).join('-'); // All but 'musicxml'
+          final originalFilename = '$baseName.musicxml';
+          
+          // Apply PDF viewer's _getSafeFilename transformation
+          songId = 'assets/songs/$originalFilename'
+            .replaceAll('/', '_')
+            .replaceAll('\\', '_')
+            .replaceAll(':', '_')
+            .replaceAll('*', '_')
+            .replaceAll('?', '_')
+            .replaceAll('"', '_')
+            .replaceAll('<', '_')
+            .replaceAll('>', '_')
+            .replaceAll('|', '_');
+        } else {
+          songId = extractedSongId; // Fallback to original
+        }
+      } else {
+        songId = extractedSongId; // Fallback to original
+      }
+      
+      print('   Extracted songId: $extractedSongId → Transformed: $songId, pageNumber: $pageNumber');
+      
       final drawingsData = record['drawingsData'] as List?
         ?? [];
       final paintHistory = drawingsData.map((json) => paintInfoFromJson(json)).toList();
       await savePDFDrawingsForSongPage(songId, pageNumber, paintHistory, syncToCloud: false);
+      
+      print('✅ Successfully updated PDF drawings for $songId page $pageNumber');
     } catch (e) {
-      print('Error updating PDF drawings from cloud: $e');
+      print('❌ Error updating PDF drawings from cloud: $e');
     }
   }
 
@@ -748,7 +815,14 @@ class StorageService {
   static Future<List<PaintInfo>> loadPDFDrawingsForSongPage(String songId, int pageNumber) async {
     final allPDFDrawings = await loadAllPDFDrawings();
     final songPageKey = '${songId}_page_$pageNumber';
+    print('🎨🔍 DRAWING_LOAD_DEBUG: Looking for key: "$songPageKey"');
+    print('🎨🔍 DRAWING_LOAD_DEBUG: Available keys: ${allPDFDrawings.keys.toList()}');
     final drawingData = allPDFDrawings[songPageKey] ?? [];
+    print('🎨🔍 DRAWING_LOAD_DEBUG: Found ${drawingData.length} drawing items for key "$songPageKey"');
+    if (allPDFDrawings.containsKey(songPageKey)) {
+      print('🎨🔍 DRAWING_LOAD_DEBUG: Raw data under key: ${allPDFDrawings[songPageKey]}');
+      print('🎨🔍 DRAWING_LOAD_DEBUG: Data type: ${allPDFDrawings[songPageKey].runtimeType}');
+    }
     return (drawingData as List).map((json) => paintInfoFromJson(json)).toList();
   }
 
@@ -1340,19 +1414,32 @@ class StorageService {
   static Future<void> _syncPDFDrawingsToCloudKit(String songId, int pageNumber, List<PaintInfo> paintHistory) async {
     try {
       final recordName = '${songId}_page_$pageNumber';
+      print('🎨💾 DRAWING_SAVE_DEBUG: Syncing drawings to CloudKit');
+      print('🎨💾 DRAWING_SAVE_DEBUG: songId: $songId, pageNumber: $pageNumber');
+      print('🎨💾 DRAWING_SAVE_DEBUG: paintHistory length: ${paintHistory.length}');
+      print('🎨💾 DRAWING_SAVE_DEBUG: recordName: $recordName');
+      
+      final drawingsData = paintHistory.map((p) => paintInfoToJson(p)).toList();
+      print('🎨💾 DRAWING_SAVE_DEBUG: serialized drawingsData: $drawingsData');
+      
       final record = {
         'recordType': 'PDFDrawings',
         'recordName': recordName,
         'songId': songId,
         'pageNumber': pageNumber,
-        'drawingsData': paintHistory.map((p) => paintInfoToJson(p)).toList(),
+        'drawingsData': drawingsData,
       };
+      print('🎨💾 DRAWING_SAVE_DEBUG: Complete record: $record');
+      
       final changeTag = await CloudKitService.saveRecord(record);
       if (changeTag != null) {
         await saveLocalChangeTag('PDFDrawings', recordName, changeTag);
+        print('🎨💾 DRAWING_SAVE_DEBUG: Successfully saved with changeTag: $changeTag');
+      } else {
+        print('🎨💾 DRAWING_SAVE_DEBUG: Failed to save - no changeTag returned');
       }
     } catch (e) {
-      print('Error syncing PDF drawings: $e');
+      print('🎨💾 DRAWING_SAVE_DEBUG: Error syncing PDF drawings: $e');
     }
   }
 
