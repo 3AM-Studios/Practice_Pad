@@ -176,9 +176,9 @@ class StorageService {
           
           if (localPdfPath != null) {
             bookData['fileName'] = fileName;
-            developer.log('✅ Downloaded book asset: $fileName');
+            print('✅ Downloaded book asset: $fileName');
           } else {
-            developer.log('❌ Failed to download book asset for book: $bookId');
+            print('❌ Failed to download book asset for book: $bookId');
           }
         }
         
@@ -188,7 +188,7 @@ class StorageService {
       
       await saveBooks(books, syncToCloud: false);
     } catch (e) {
-      developer.log('Error updating book from cloud: $e');
+      print('Error updating book from cloud: $e');
     }
   }
 
@@ -214,29 +214,29 @@ class StorageService {
           );
           
           if (localPdfPath != null) {
-            developer.log('✅ Downloaded song PDF from CloudKit staging: $fileName');
+            print('✅ Downloaded song PDF from CloudKit staging: $fileName');
             // You might want to trigger a reload of the PDF viewer here or 
             // notify the app that a new PDF is available
           } else {
-            developer.log('❌ Failed to download song PDF from CloudKit staging for song: $songId');
+            print('❌ Failed to download song PDF from CloudKit staging for song: $songId');
           }
         } else {
-          developer.log('ℹ️ Received song PDF record from cloud: $songId, asset: $pdfAsset');
+          print('ℹ️ Received song PDF record from cloud: $songId, asset: $pdfAsset');
         }
         
         // You might want to trigger a reload of the PDF viewer here or notify other parts of the app
         // that a PDF has been updated from the cloud
       }
     } catch (e) {
-      developer.log('Error updating song PDF from cloud: $e');
+      print('Error updating song PDF from cloud: $e');
     }
   }
 
   static Future<void> saveSongPdf(String songId, String pdfPath) async {
     try {
-      developer.log('📄 Saving song PDF to CloudKit');
-      developer.log('   Song ID: $songId');
-      developer.log('   PDF Path: $pdfPath');
+      print('📄 Saving song PDF to CloudKit');
+      print('   Song ID: $songId');
+      print('   PDF Path: $pdfPath');
       
       // Verify the file exists before trying to upload
       final pdfFile = File(pdfPath);
@@ -245,8 +245,8 @@ class StorageService {
       }
       
       final fileSize = await pdfFile.length();
-      developer.log('   File exists: ${pdfFile.path}');
-      developer.log('   File size: $fileSize bytes');
+      print('   File exists: ${pdfFile.path}');
+      print('   File size: $fileSize bytes');
       
       // Prepare the record fields
       final recordFields = <String, String>{
@@ -254,7 +254,7 @@ class StorageService {
         'lastModified': DateTime.now().toIso8601String(),
       };
       
-      developer.log('   Record fields: $recordFields');
+      print('   Record fields: $recordFields');
 
       // Prepare the asset map with the PDF file
       final pdfAsset = CloudKitAsset.forUpload(
@@ -268,11 +268,11 @@ class StorageService {
         'pdfFile': pdfAsset,
       };
       
-      developer.log('   Created asset: $pdfAsset');
-      developer.log('   Assets map: ${assets.keys.toList()}');
+      print('   Created asset: $pdfAsset');
+      print('   Assets map: ${assets.keys.toList()}');
 
       // Save the record with its PDF asset
-      developer.log('   Calling CloudKitService.saveRecordWithAssets...');
+      print('   Calling CloudKitService.saveRecordWithAssets...');
       final changeTag = await CloudKitService.saveRecordWithAssets(
         recordType: 'SongPdf',
         recordName: songId,
@@ -280,11 +280,11 @@ class StorageService {
         assets: assets,
       );
       
-      developer.log('✅ Successfully synced song PDF to CloudKit: $songId');
-      developer.log('   Change tag: $changeTag');
+      print('✅ Successfully synced song PDF to CloudKit: $songId');
+      print('   Change tag: $changeTag');
     } catch (e, stackTrace) {
-      developer.log('❌ Error syncing song PDF to CloudKit: $e');
-      developer.log('   Stack trace: $stackTrace');
+      print('❌ Error syncing song PDF to CloudKit: $e');
+      print('   Stack trace: $stackTrace');
       rethrow;
     }
   }
@@ -309,7 +309,7 @@ class StorageService {
       
       await savePracticeItems(itemsByArea, syncToCloud: false);
     } catch (e) {
-      developer.log('Error updating practice item from cloud: $e');
+      print('Error updating practice item from cloud: $e');
     }
   }
 
@@ -321,7 +321,7 @@ class StorageService {
       final measures = measuresData.map((json) => measureFromJson(json)).toList();
       await saveSheetMusicForSong(songId, measures, syncToCloud: false);
     } catch (e) {
-      developer.log('Error updating sheet music from cloud: $e');
+      print('Error updating sheet music from cloud: $e');
     }
   }
 
@@ -373,7 +373,7 @@ class StorageService {
         ?? {};
       await saveSongChanges(songId, changesData, syncToCloud: false);
     } catch (e) {
-      developer.log('Error updating song changes from cloud: $e');
+      print('Error updating song changes from cloud: $e');
     }
   }
 
@@ -384,7 +384,7 @@ class StorageService {
         ?? {};
       await saveChordKeys(songId, chordKeysData, syncToCloud: false);
     } catch (e) {
-      developer.log('Error updating chord keys from cloud: $e');
+      print('Error updating chord keys from cloud: $e');
     }
   }
 
@@ -396,7 +396,7 @@ class StorageService {
       final drawings = List<Map<String, dynamic>>.from(drawingsData);
       await saveDrawingsForSong(songId, drawings, syncToCloud: false);
     } catch (e) {
-      developer.log('Error updating drawings from cloud: $e');
+      print('Error updating drawings from cloud: $e');
     }
   }
 
@@ -409,7 +409,7 @@ class StorageService {
       final paintHistory = drawingsData.map((json) => paintInfoFromJson(json)).toList();
       await savePDFDrawingsForSongPage(songId, pageNumber, paintHistory, syncToCloud: false);
     } catch (e) {
-      developer.log('Error updating PDF drawings from cloud: $e');
+      print('Error updating PDF drawings from cloud: $e');
     }
   }
 
@@ -423,7 +423,7 @@ class StorageService {
         await saveYoutubeLinkForSong(songId, youtubeData, syncToCloud: false);
       }
     } catch (e) {
-      developer.log('Error updating YouTube links from cloud: $e');
+      print('Error updating YouTube links from cloud: $e');
     }
   }
 
@@ -435,7 +435,7 @@ class StorageService {
       final loops = List<Map<String, dynamic>>.from(loopsData);
       await saveSavedLoopsForPage(pageId, loops, syncToCloud: false);
     } catch (e) {
-      developer.log('Error updating saved loops from cloud: $e');
+      print('Error updating saved loops from cloud: $e');
     }
   }
 
@@ -446,7 +446,7 @@ class StorageService {
       final songs = List<Map<String, dynamic>>.from(songsData);
       await saveCustomSongs(songs, syncToCloud: false);
     } catch (e) {
-      developer.log('Error updating custom songs from cloud: $e');
+      print('Error updating custom songs from cloud: $e');
     }
   }
 
@@ -457,7 +457,7 @@ class StorageService {
       final videos = List<Map<String, dynamic>>.from(videosData);
       await saveYoutubeVideosList(videos, syncToCloud: false);
     } catch (e) {
-      developer.log('Error updating YouTube videos from cloud: $e');
+      print('Error updating YouTube videos from cloud: $e');
     }
   }
 
@@ -469,7 +469,7 @@ class StorageService {
         ?? [];
       await saveLabelsForPage(songAssetPath, page, labelsData, syncToCloud: false);
     } catch (e) {
-      developer.log('Error updating labels from cloud: $e');
+      print('Error updating labels from cloud: $e');
     }
   }
   // =============================================================================
@@ -718,13 +718,13 @@ class StorageService {
             content = Eraser.fromJson(json);
             break;
           default:
-            developer.log('Unsupported paint content type: $type');
+            print('Unsupported paint content type: $type');
             continue;
         }
 
         contents.add(content);
       } catch (e) {
-        developer.log('Error deserializing paint content: $e');
+        print('Error deserializing paint content: $e');
         // Continue with other items even if one fails
       }
     }
@@ -894,7 +894,7 @@ class StorageService {
       
       return null;
     } catch (e) {
-      developer.log('Error loading book $bookId: $e');
+      print('Error loading book $bookId: $e');
       return null;
     }
   }
@@ -923,7 +923,7 @@ class StorageService {
       
       return books;
     } catch (e) {
-      developer.log('Error loading books from CloudKit: $e');
+      print('Error loading books from CloudKit: $e');
       return [];
     }
   }
@@ -931,11 +931,15 @@ class StorageService {
   /// Load a specific song PDF by song ID
   static Future<Map<String, dynamic>?> loadSongPdf(String songId) async {
     try {
+      print('🔍🔍 PDF_DEBUG_123: loadSongPdf called with songId: "$songId"');
       // Try to get from CloudKit first
       final sanitizedKey = songId.replaceAll(RegExp(r'[/\\:*?"<>|\s]'), '_');
+      print('🔍🔍 PDF_DEBUG_123: Sanitized key: "$sanitizedKey"');
       final recordKey = 'SongPdf_$sanitizedKey';
+      print('🔍🔍 PDF_DEBUG_123: Looking for CloudKit record: "$recordKey"');
       
       final cloudRecord = await CloudKitService.getRecord(recordKey);
+      print('🔍🔍 PDF_DEBUG_123: CloudKit record result: $cloudRecord');
       if (cloudRecord != null) {
         final songPdf = <String, dynamic>{
           'songId': songId,
@@ -952,7 +956,7 @@ class StorageService {
       
       return null;
     } catch (e) {
-      developer.log('Error loading song PDF $songId: $e');
+      print('Error loading song PDF $songId: $e');
       return null;
     }
   }
@@ -1234,7 +1238,7 @@ class StorageService {
         await saveLocalChangeTag('PracticeArea', area.recordName, changeTag);
       }
     } catch (e) {
-      developer.log('Error syncing practice area: $e');
+      print('Error syncing practice area: $e');
     }
   }
 
@@ -1249,7 +1253,7 @@ class StorageService {
         await saveLocalChangeTag('PracticeItem', item.id, changeTag);
       }
     } catch (e) {
-      developer.log('Error syncing practice item: $e');
+      print('Error syncing practice item: $e');
     }
   }
 
@@ -1265,7 +1269,7 @@ class StorageService {
         await saveLocalChangeTag('WeeklySchedule', 'main_schedule', changeTag);
       }
     } catch (e) {
-      developer.log('Error syncing weekly schedule: $e');
+      print('Error syncing weekly schedule: $e');
     }
   }
 
@@ -1281,7 +1285,7 @@ class StorageService {
         await saveLocalChangeTag('SongChanges', songId, changeTag);
       }
     } catch (e) {
-      developer.log('Error syncing song changes: $e');
+      print('Error syncing song changes: $e');
     }
   }
 
@@ -1297,7 +1301,7 @@ class StorageService {
         await saveLocalChangeTag('ChordKeys', songId, changeTag);
       }
     } catch (e) {
-      developer.log('Error syncing chord keys: $e');
+      print('Error syncing chord keys: $e');
     }
   }
 
@@ -1313,7 +1317,7 @@ class StorageService {
         await saveLocalChangeTag('SheetMusic', songId, changeTag);
       }
     } catch (e) {
-      developer.log('Error syncing sheet music: $e');
+      print('Error syncing sheet music: $e');
     }
   }
 
@@ -1329,7 +1333,7 @@ class StorageService {
         await saveLocalChangeTag('Drawings', songId, changeTag);
       }
     } catch (e) {
-      developer.log('Error syncing drawings: $e');
+      print('Error syncing drawings: $e');
     }
   }
 
@@ -1348,7 +1352,7 @@ class StorageService {
         await saveLocalChangeTag('PDFDrawings', recordName, changeTag);
       }
     } catch (e) {
-      developer.log('Error syncing PDF drawings: $e');
+      print('Error syncing PDF drawings: $e');
     }
   }
 
@@ -1358,7 +1362,7 @@ class StorageService {
       // Assuming the youtubeData map contains a unique 'videoId'.
       final recordName = youtubeData['videoId'] as String?;
       if (recordName == null) {
-        developer.log('Error syncing YouTube link: videoId is missing from youtubeData');
+        print('Error syncing YouTube link: videoId is missing from youtubeData');
         return;
       }
 
@@ -1374,7 +1378,7 @@ class StorageService {
         await saveLocalChangeTag('YoutubeLinks', recordName, changeTag);
       }
     } catch (e) {
-      developer.log('Error syncing YouTube links: $e');
+      print('Error syncing YouTube links: $e');
     }
   }
 
@@ -1390,7 +1394,7 @@ class StorageService {
         await saveLocalChangeTag('SavedLoops', songId, changeTag);
       }
     } catch (e) {
-      developer.log('Error syncing saved loops: $e');
+      print('Error syncing saved loops: $e');
     }
   }
 
@@ -1432,10 +1436,10 @@ static Future<void> _syncBooksToCloudKit(List<Map<String, dynamic>> books) async
       // Note: The concept of a 'changeTag' is often handled differently for asset uploads.
       // The native CloudKit API returns a full CKRecord object on success.
       // You may need to adapt your CloudKitService or change tag logic if necessary.
-      developer.log('Successfully synced book with PDF asset: $recordName');
+      print('Successfully synced book with PDF asset: $recordName');
 
     } catch (e) {
-      developer.log('Error syncing book with PDF asset: $e');
+      print('Error syncing book with PDF asset: $e');
     }
   }
 }
@@ -1452,7 +1456,7 @@ static Future<void> _syncBooksToCloudKit(List<Map<String, dynamic>> books) async
         await saveLocalChangeTag('CustomSongs', 'all_custom_songs', changeTag);
       }
     } catch (e) {
-      developer.log('Error syncing custom songs: $e');
+      print('Error syncing custom songs: $e');
     }
   }
 
@@ -1468,7 +1472,7 @@ static Future<void> _syncBooksToCloudKit(List<Map<String, dynamic>> books) async
         await saveLocalChangeTag('YoutubeVideos', 'all_youtube_videos', changeTag);
       }
     } catch (e) {
-      developer.log('Error syncing YouTube videos: $e');
+      print('Error syncing YouTube videos: $e');
     }
   }
 
@@ -1487,7 +1491,7 @@ static Future<void> _syncBooksToCloudKit(List<Map<String, dynamic>> books) async
         await saveLocalChangeTag('Labels', recordName, changeTag);
       }
     } catch (e) {
-      developer.log('Error syncing labels: $e');
+      print('Error syncing labels: $e');
     }
   }
 
@@ -1517,8 +1521,8 @@ static Future<void> _syncBooksToCloudKit(List<Map<String, dynamic>> books) async
     required String localFileName,
     String? subdirectory,
   }) async {
-    if (!asset.isForDownload || asset.fileURL == null) {
-      developer.log('❌ Asset is not configured for download or missing fileURL');
+    if (asset.fileURL == null) {
+      print('❌ Asset is not configured for download or missing fileURL');
       return null;
     }
 
@@ -1537,20 +1541,24 @@ static Future<void> _syncBooksToCloudKit(List<Map<String, dynamic>> books) async
       final permanentPath = '${targetDir.path}/$localFileName';
       
       // Check if the staging file exists and copy it to permanent storage
-      final stagingFile = File(asset.fileURL!);
+      String filePath = asset.fileURL!;
+      if (filePath.startsWith('file://')) {
+        filePath = filePath.substring(7); // Remove 'file://' prefix
+      }
+      final stagingFile = File(filePath);
       
       if (await stagingFile.exists()) {
         // Copy from CloudKit staging area to permanent app storage
         await stagingFile.copy(permanentPath);
-        developer.log('✅ CloudKit asset copied to permanent storage: $permanentPath');
-        developer.log('📂 Staging URL was: ${asset.fileURL}');
+        print('✅ CloudKit asset copied to permanent storage: $permanentPath');
+        print('📂 Staging URL was: ${asset.fileURL}');
         return permanentPath;
       } else {
-        developer.log('❌ CloudKit staging file not found: ${asset.fileURL}');
+        print('❌ CloudKit staging file not found: ${asset.fileURL}');
         return null;
       }
     } catch (e) {
-      developer.log('❌ Error downloading CloudKit asset: $e');
+      print('❌ Error downloading CloudKit asset: $e');
       return null;
     }
   }
@@ -1579,7 +1587,7 @@ static Future<void> _syncBooksToCloudKit(List<Map<String, dynamic>> books) async
       final permanentPath = '${targetDir.path}/$localFileName';
       
       // Download using HTTP client
-      developer.log('🔄 Starting HTTP download from: $httpUrl');
+      print('🔄 Starting HTTP download from: $httpUrl');
       
       final request = http.Request('GET', Uri.parse(httpUrl));
       final streamedResponse = await request.send();
@@ -1601,15 +1609,15 @@ static Future<void> _syncBooksToCloudKit(List<Map<String, dynamic>> books) async
         
         await fileSink.close();
         
-        developer.log('✅ HTTP asset downloaded successfully: $permanentPath');
-        developer.log('📊 Downloaded $downloadedBytes bytes');
+        print('✅ HTTP asset downloaded successfully: $permanentPath');
+        print('📊 Downloaded $downloadedBytes bytes');
         return permanentPath;
       } else {
-        developer.log('❌ HTTP download failed with status: ${streamedResponse.statusCode}');
+        print('❌ HTTP download failed with status: ${streamedResponse.statusCode}');
         return null;
       }
     } catch (e) {
-      developer.log('❌ Error downloading asset via HTTP: $e');
+      print('❌ Error downloading asset via HTTP: $e');
       return null;
     }
   }
@@ -1622,8 +1630,8 @@ static Future<void> _syncBooksToCloudKit(List<Map<String, dynamic>> books) async
     String? subdirectory,
     Function(int received, int total)? onProgress,
   }) async {
-    if (!asset.isForDownload || asset.fileURL == null) {
-      developer.log('❌ Asset is not configured for download or missing fileURL');
+    if (asset.fileURL == null) {
+      print('❌ Asset missing fileURL');
       return null;
     }
 
@@ -1670,7 +1678,7 @@ static Future<void> _syncBooksToCloudKit(List<Map<String, dynamic>> books) async
     try {
       final sourceFile = File(temporaryPath);
       if (!await sourceFile.exists()) {
-        developer.log('❌ Temporary asset file not found: $temporaryPath');
+        print('❌ Temporary asset file not found: $temporaryPath');
         return null;
       }
 
@@ -1689,10 +1697,10 @@ static Future<void> _syncBooksToCloudKit(List<Map<String, dynamic>> books) async
       // Move the file (this is more efficient than copy + delete)
       final targetFile = await sourceFile.rename(targetPath);
       
-      developer.log('✅ Asset moved to permanent storage: ${targetFile.path}');
+      print('✅ Asset moved to permanent storage: ${targetFile.path}');
       return targetFile.path;
     } catch (e) {
-      developer.log('❌ Error moving asset to permanent storage: $e');
+      print('❌ Error moving asset to permanent storage: $e');
       return null;
     }
   }
@@ -1726,16 +1734,16 @@ static Future<void> _syncBooksToCloudKit(List<Map<String, dynamic>> books) async
             await entity.delete();
             cleanedCount++;
             totalSize += fileSize;
-            developer.log('🗑️ Cleaned up old asset: ${entity.path}');
+            print('🗑️ Cleaned up old asset: ${entity.path}');
           }
         }
       }
 
       if (cleanedCount > 0) {
-        developer.log('✨ Asset cleanup completed: removed $cleanedCount files (${(totalSize / 1024 / 1024).toStringAsFixed(1)} MB)');
+        print('✨ Asset cleanup completed: removed $cleanedCount files (${(totalSize / 1024 / 1024).toStringAsFixed(1)} MB)');
       }
     } catch (e) {
-      developer.log('❌ Error during asset cleanup: $e');
+      print('❌ Error during asset cleanup: $e');
     }
   }
 
@@ -1781,7 +1789,7 @@ static Future<void> _syncBooksToCloudKit(List<Map<String, dynamic>> books) async
         'lastChecked': DateTime.now().toIso8601String(),
       };
     } catch (e) {
-      developer.log('❌ Error getting asset storage info: $e');
+      print('❌ Error getting asset storage info: $e');
       return {
         'error': e.toString(),
         'totalFiles': 0,

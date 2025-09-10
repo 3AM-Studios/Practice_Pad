@@ -238,7 +238,7 @@ class WidgetActionHandler {
       
       if (practiceAreas != null) {
         updateData['practice_areas'] = json.encode(practiceAreas);
-        print('WidgetActionHandler: Updated practice areas');
+        print('cctice areas');
       }
       
       if (activeSession != null) {

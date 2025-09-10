@@ -128,11 +128,16 @@ class _PDFViewerState extends State<PDFViewer>
   /// Try to load PDF from CloudKit for this song
   Future<void> _tryLoadFromCloudKit() async {
     try {
+      print('🔍🔍 PDF_DEBUG_123: Trying to load PDF from CloudKit for song: "${widget.songAssetPath}"');
+      print('🔍🔍 PDF_DEBUG_123: Song asset path length: ${widget.songAssetPath.length}');
+      print('🔍🔍 PDF_DEBUG_123: Song asset path characters: ${widget.songAssetPath.codeUnits}');
       final songPdf = await StorageService.loadSongPdf(widget.songAssetPath);
-      if (songPdf != null && songPdf['pdfAsset'] != null) {
+      print('🔍🔍 PDF_DEBUG_123: CloudKit lookup result: $songPdf');
+      
+      if (songPdf != null && songPdf['pdfFile'] != null) {
         debugPrint('Found song PDF in CloudKit, downloading...');
         
-        final pdfAsset = songPdf['pdfAsset'];
+        final pdfAsset = songPdf['pdfFile'];
         CloudKitAsset asset;
         if (pdfAsset is Map<String, dynamic>) {
           asset = CloudKitAsset.fromMap(pdfAsset);
@@ -154,7 +159,8 @@ class _PDFViewerState extends State<PDFViewer>
           localFileName: fileName,
           subdirectory: 'song_pdfs',
         );
-        
+        debugPrint('Downloaded PDF path from CloudKit: $downloadedPath');
+        debugPrint('asset.fileURL: ${asset.fileURL}');
         if (downloadedPath != null) {
           debugPrint('Successfully downloaded song PDF from CloudKit');
           await _loadPDF(downloadedPath);
