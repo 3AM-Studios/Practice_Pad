@@ -96,14 +96,14 @@ class _DrawingModeScrollWrapperState extends State<_DrawingModeScrollWrapper> {
 /// Full sheet music viewer widget that contains ALL the original song viewer functionality
 /// This is essentially the entire content from song_viewer_screen_old.dart but with separate drawing keys
 class SimpleSheetMusicViewer extends StatefulWidget {
-  final String songAssetPath;
+  final String songPath;
   final int bpm;
   final PracticeArea? practiceArea;
   final VoidCallback? onStateChanged;
 
   const SimpleSheetMusicViewer({
     super.key,
-    required this.songAssetPath,
+    required this.songPath,
     this.bpm = 120,
     this.practiceArea,
     this.onStateChanged,
@@ -206,7 +206,7 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
     
     
     
-    final drawingKeyPath = '${widget.songAssetPath}_sheet';
+    final drawingKeyPath = '${widget.songPath}_sheet';
     final existingKey = _drawingGlobalKeys[drawingKeyPath];
     
     
@@ -232,7 +232,7 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
 
   /// Safely initialize the drawing controller, waiting for any pending disposal
   Future<void> _initializeControllerSafely() async {
-    final drawingKeyPath = '${widget.songAssetPath}_sheet';
+    final drawingKeyPath = '${widget.songPath}_sheet';
     
     // Wait for any pending disposal of previous controller for this song
     if (_controllerDisposalLocks.containsKey(drawingKeyPath)) {
@@ -267,7 +267,7 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
   Future<void> _loadSongViewerSettings() async {
     try {
       final songChanges =
-          await StorageService.loadSongChanges(widget.songAssetPath);
+          await StorageService.loadSongChanges(widget.songPath);
       if (songChanges.isNotEmpty) {
         setState(() {
           if (songChanges.containsKey('canvasScale')) {
@@ -280,7 +280,7 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
           }
         });
         developer
-            .log('Loaded song viewer settings for ${widget.songAssetPath}');
+            .log('Loaded song viewer settings for ${widget.songPath}');
       }
     } catch (e) {
       
@@ -295,7 +295,7 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
         'extensionNumbersRelativeToChords': _extensionNumbersRelativeToChords,
         'lastModified': DateTime.now().toIso8601String(),
       };
-      await StorageService.saveSongChanges(widget.songAssetPath, settings);
+      await StorageService.saveSongChanges(widget.songPath, settings);
       
     } catch (e) {
       
@@ -315,7 +315,7 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
         );
       }).toList();
       
-      await StorageService.saveSheetMusicForSong(widget.songAssetPath, measures);
+      await StorageService.saveSheetMusicForSong(widget.songPath, measures);
       developer.log('✅ Saved sheet music data: ${measures.length} measures');
     } catch (e) {
       developer.log('❌ Error saving sheet music data: $e');
@@ -327,7 +327,7 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
     try {
       if (!mounted) return;
       
-      final savedMeasures = await StorageService.loadSheetMusicForSong(widget.songAssetPath);
+      final savedMeasures = await StorageService.loadSheetMusicForSong(widget.songPath);
       
       if (savedMeasures.isNotEmpty && mounted) {
         // Apply saved modifications to existing measures
@@ -427,7 +427,7 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
       }
       
       if (chordKeys.isNotEmpty) {
-        await StorageService.saveChordKeys(widget.songAssetPath, chordKeys);
+        await StorageService.saveChordKeys(widget.songPath, chordKeys);
         developer.log('✅ Saved chord key modifications: ${chordKeys.length} chords');
       }
     } catch (e) {
@@ -440,7 +440,7 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
     try {
       if (!mounted) return;
       
-      final drawingKeyPath = '${widget.songAssetPath}_sheet';
+      final drawingKeyPath = '${widget.songPath}_sheet';
       
       
       
@@ -486,7 +486,7 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
     try {
       if (!mounted) return;
       
-      final drawingKeyPath = '${widget.songAssetPath}_sheet';
+      final drawingKeyPath = '${widget.songPath}_sheet';
       
       
       // Save the JSON data using LocalStorageService
@@ -506,7 +506,7 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
   Future<void> _loadAndParseSong() async {
     try {
       // --- 1. Load and Parse MusicXML ---
-      String xmlString = await rootBundle.loadString(widget.songAssetPath);
+      String xmlString = await rootBundle.loadString(widget.songPath);
       final doc = XmlDocument.parse(xmlString);
 
       // Extract basic song information
@@ -779,7 +779,7 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
   /// Load saved chord key modifications from storage
   Future<void> _loadChordKeys() async {
     try {
-      final chordKeys = await StorageService.loadChordKeys(widget.songAssetPath);
+      final chordKeys = await StorageService.loadChordKeys(widget.songPath);
       if (chordKeys.isNotEmpty) {
         // Apply saved chord modifications
         for (final entry in chordKeys.entries) {
@@ -967,6 +967,9 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
         }
       });
       
+      // Notify parent widget to rebuild toolbar when selection changes
+      widget.onStateChanged?.call();
+      
       developer.log('Chord ${globalChordIndex} (local: ${localIndex}) selection toggled. Selected: ${_selectedChordIndices.length}');
     }
   }
@@ -982,6 +985,9 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
         _selectedChordIndices.add(localIndex);
       });
       
+      // Notify parent widget to rebuild toolbar when selection changes
+      widget.onStateChanged?.call();
+      
       // Provide haptic feedback
       SystemSound.play(SystemSoundType.click);
       
@@ -994,6 +1000,9 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
     setState(() {
       _isLongPressing = false;
     });
+    
+    // Notify parent widget to rebuild toolbar when selection mode changes
+    widget.onStateChanged?.call();
     
     developer.log('Ended long press selection');
   }
@@ -1017,6 +1026,9 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
               _selectedChordIndices.add(i);
             }
           });
+          
+          // Notify parent widget to rebuild toolbar when selection changes during drag
+          widget.onStateChanged?.call();
         }
       }
     }
@@ -1595,7 +1607,7 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
           _currentMousePosition = event.position;
         },
         child: music_sheet.SimpleSheetMusic(
-          key: ValueKey('sheet_music_${widget.songAssetPath}'),
+          key: ValueKey('sheet_music_${widget.songPath}'),
           width: 1200, // Adequate width for proper sheet music rendering
           measures: _chordMeasures.cast<music_sheet.Measure>(),
           debug: false,
@@ -1713,9 +1725,22 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Transform.scale(
-          scale: 0.8,
-          child: _buildOriginalKeyButton(),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Transform.scale(
+              scale: 0.8,
+              child: _buildOriginalKeyButton(),
+            ),
+            // Show key modification button when chords are selected
+            if (hasSelectedChords()) ...[
+              const SizedBox(width: 8),
+              Transform.scale(
+                scale: 0.8,
+                child: _buildKeyModificationButton(),
+              ),
+            ],
+          ],
         ),
       ],
     );
@@ -1998,6 +2023,176 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
     );
   }
 
+  /// Builds the key modification button for selected chords
+  Widget _buildKeyModificationButton() {
+    final theme = Theme.of(context);
+    final isTabletOrDesktop = deviceType == DeviceType.tablet || deviceType == DeviceType.macOS;
+
+    return GestureDetector(
+      onTap: _showChordKeyModificationDialog,
+      behavior: HitTestBehavior.opaque,
+      child: ClayContainer(
+        color: theme.colorScheme.surface,
+        borderRadius: 18,
+        child: Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: isTabletOrDesktop ? 16 : 12, 
+            vertical: isTabletOrDesktop ? 12 : 8
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.transform,
+                color: theme.colorScheme.primary,
+                size: 16,
+              ),
+              SizedBox(width: isTabletOrDesktop ? 6 : 4),
+              Text(
+                'Modify Key',
+                style: TextStyle(
+                  fontSize: isTabletOrDesktop ? 14 : 12,
+                  fontWeight: FontWeight.w600,
+                  color: theme.colorScheme.primary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Shows dialog to select a key for modifying selected chord symbols
+  void _showChordKeyModificationDialog() {
+    // Major keys for outer ring
+    final majorKeys = [
+      'C', 'G', 'D', 'A', 'E', 'B', 'F#', 'Db', 'Ab', 'Eb', 'Bb', 'F'
+    ];
+    // Minor keys for inner ring
+    final minorKeys = [
+      'Am', 'Em', 'Bm', 'F#m', 'C#m', 'G#m', 'D#m', 'Bbm', 'Fm', 'Cm', 'Gm', 'Dm'
+    ];
+    
+    // Create dial items
+    final outerItems = majorKeys.map((key) => DialItem(label: key)).toList();
+    final innerItems = minorKeys.map((key) => DialItem(label: key)).toList();
+    
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: ConcentricDialMenu(
+            size: 350,
+            outerItems: outerItems,
+            innerItems: innerItems,
+            centerText: 'Modify\\nSelected Chords',
+            onSelectionChanged: (innerIndex, outerIndex) {
+              String? selectedKey;
+              if (outerIndex != null) {
+                selectedKey = majorKeys[outerIndex];
+              } else if (innerIndex != null) {
+                selectedKey = minorKeys[innerIndex];
+              }
+              if (selectedKey != null) {
+                _modifySelectedChordsKey(selectedKey);
+                Navigator.of(context).pop();
+              }
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  /// Modifies the key signature of all selected chord symbols
+  void _modifySelectedChordsKey(String newKey) {
+    if (_selectedChordIndices.isEmpty) return;
+
+    setState(() {
+      // Get the KeySignatureType for the new key
+      final newKeySignatureType = _stringToKeySignatureType(newKey);
+      
+      // Modify each selected chord symbol
+      for (final localIndex in _selectedChordIndices) {
+        if (localIndex < _chordSymbols.length) {
+          final chord = _chordSymbols[localIndex];
+          
+          // Create new chord symbol with modified key signature
+          final newChord = ChordSymbol(
+            chord.effectiveRootName,
+            chord.effectiveQuality,
+            position: chord.position,
+            originalKeySignature: chord.originalKeySignature,
+            modifiedKeySignature: newKeySignatureType,
+          );
+          
+          _chordSymbols[localIndex] = newChord;
+        }
+      }
+      
+      // Also update chord symbols in measures
+      for (int measureIndex = 0; measureIndex < _chordMeasures.length; measureIndex++) {
+        final measure = _chordMeasures[measureIndex];
+        final updatedChordSymbols = <ChordSymbol>[];
+        
+        for (int chordIndex = 0; chordIndex < measure.chordSymbols.length; chordIndex++) {
+          final chord = measure.chordSymbols[chordIndex];
+          
+          // Find the global index of this chord to see if it's selected
+          int globalIndex = 0;
+          bool found = false;
+          for (int i = 0; i < measureIndex; i++) {
+            globalIndex += _chordMeasures[i].chordSymbols.length;
+          }
+          globalIndex += chordIndex;
+          
+          // Check if this chord is selected by finding its local index
+          if (_globalToLocalIndexMap.containsKey(globalIndex)) {
+            final localIndex = _globalToLocalIndexMap[globalIndex]!;
+            if (_selectedChordIndices.contains(localIndex)) {
+              // This chord is selected, modify it
+              final newKeySignatureType = _stringToKeySignatureType(newKey);
+              final newChord = ChordSymbol(
+                chord.effectiveRootName,
+                chord.effectiveQuality,
+                position: chord.position,
+                originalKeySignature: chord.originalKeySignature,
+                modifiedKeySignature: newKeySignatureType,
+              );
+              updatedChordSymbols.add(newChord);
+              found = true;
+            }
+          }
+          
+          if (!found) {
+            updatedChordSymbols.add(chord);
+          }
+        }
+        
+        _chordMeasures[measureIndex] = ChordMeasure(
+          measure.musicalSymbols,
+          isNewLine: measure.isNewLine,
+          chordSymbols: updatedChordSymbols,
+        );
+      }
+      
+      // Invalidate sheet music cache since chord context changed
+      _cachedSheetMusicWidget = null;
+      _lastRenderedMeasures = null;
+    });
+    
+    // Save the key modifications
+    _saveChordKeyModifications();
+    
+    // Notify parent widget to rebuild toolbar
+    widget.onStateChanged?.call();
+    
+    developer.log('Modified ${_selectedChordIndices.length} selected chords to key: $newKey');
+  }
+
   // Stub methods - these would be fully implemented from the original file
   void _showSheetMusicHelp() {}
   void _zoomIn() {
@@ -2037,7 +2232,7 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
 
   /// Safely dispose controller with synchronization to prevent race conditions
   void _disposeControllerSafely() {
-    final drawingKeyPath = '${widget.songAssetPath}_sheet';
+    final drawingKeyPath = '${widget.songPath}_sheet';
     
     // Create a completer to track disposal completion
     final completer = Completer<void>();
@@ -2087,7 +2282,7 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
     final song = Song(
       title: widget.practiceArea?.name ?? 'Unknown Song',
       composer: 'Unknown Composer',
-      path: widget.songAssetPath,
+      path: widget.songPath,
     );
 
     Navigator.of(context).push(

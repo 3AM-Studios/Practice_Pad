@@ -14,13 +14,13 @@ import 'package:provider/provider.dart';
 enum ViewerMode { simpleSheetMusic, pdf }
 
 class SongViewerScreen extends StatefulWidget {
-  final String songAssetPath;
+  final String songPath;
   final int bpm;
   final PracticeArea? practiceArea;
 
   const SongViewerScreen({
     super.key,
-    required this.songAssetPath,
+    required this.songPath,
     this.bpm = 120,
     this.practiceArea,
   });
@@ -45,7 +45,7 @@ class _SongViewerScreenState extends State<SongViewerScreen> {
     super.initState();
     
     // Check if this is a PDF-only song (custom song)
-    _isPdfOnly = widget.songAssetPath.startsWith('custom://pdf_only/');
+    _isPdfOnly = widget.songPath.startsWith('custom://pdf_only/');
     
     // Set initial mode based on song type
     _currentMode = _isPdfOnly ? ViewerMode.pdf : ViewerMode.simpleSheetMusic;
@@ -55,7 +55,7 @@ class _SongViewerScreenState extends State<SongViewerScreen> {
       // Initialize sheet music viewer for regular songs
       _sheetMusicViewer = SimpleSheetMusicViewer(
         key: _sheetMusicKey,
-        songAssetPath: widget.songAssetPath,
+        songPath: widget.songPath,
         bpm: widget.bpm,
         practiceArea: widget.practiceArea,
         onStateChanged: () {
@@ -71,7 +71,7 @@ class _SongViewerScreenState extends State<SongViewerScreen> {
     // Always initialize PDF viewer with fullscreen callback
     _pdfViewer = PDFViewer(
       key: _pdfKey,
-      songAssetPath: widget.songAssetPath,
+      songPath: widget.songPath,
       bpm: widget.bpm,
       practiceArea: widget.practiceArea,
       onFullscreenChanged: (isFullscreen) {

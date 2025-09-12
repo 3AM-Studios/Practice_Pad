@@ -160,8 +160,15 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
 
   Future<void> _saveYoutubeData() async {
     try {
+      // Extract videoId from URL for CloudKit sync
+      String? videoId;
+      if (_urlController.text.isNotEmpty) {
+        videoId = YoutubePlayer.convertUrlToId(_urlController.text);
+      }
+      
       final youtubeData = {
         'url': _urlController.text,
+        'videoId': videoId ?? '', // Include videoId for CloudKit sync
         'loopStartTime': _loopStartTime,
         'loopEndTime': _loopEndTime,
         'isAutoLoop': _isAutoLoop,

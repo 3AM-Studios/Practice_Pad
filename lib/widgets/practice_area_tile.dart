@@ -82,7 +82,7 @@ class _PracticeAreaTileState extends State<PracticeAreaTile> {
                       Navigator.of(context).push(
                         CupertinoPageRoute(
                           builder: (context) => SongViewerScreen(
-                            songAssetPath: widget.area.song!.path,
+                            songPath: widget.area.song!.path,
                             practiceArea: widget.area,
                           ),
                         ),

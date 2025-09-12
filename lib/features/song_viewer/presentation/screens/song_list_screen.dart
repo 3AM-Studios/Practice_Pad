@@ -117,7 +117,7 @@ class _SongListScreenState extends State<SongListScreen> {
       } else {
         // Navigate directly to the song viewer
         Navigator.of(context).push(MaterialPageRoute(
-          builder: (_) => SongViewerScreen(songAssetPath: newSong.path),
+          builder: (_) => SongViewerScreen(songPath: newSong.path),
         ));
       }
     } catch (e) {
@@ -177,7 +177,7 @@ class _SongListScreenState extends State<SongListScreen> {
                       // Navigate to chord player screen (original behavior)
                       Navigator.of(context).push(MaterialPageRoute(
                         builder: (_) =>
-                            SongViewerScreen(songAssetPath: song.path),
+                            SongViewerScreen(songPath: song.path),
                       ));
                     }
                   },

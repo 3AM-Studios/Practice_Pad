@@ -8,7 +8,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: SongViewerScreen(
-          songAssetPath: 'assets/songs/test_song.xml',
+          songPath: 'assets/songs/test_song.xml',
           bpm: 120,
         ),
       ),

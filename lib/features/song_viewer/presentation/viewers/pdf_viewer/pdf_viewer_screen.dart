@@ -23,14 +23,14 @@ import 'fullscreen_pdf_viewer.dart';
 
 /// PDF viewer widget with drawing functionality using PDF-to-image conversion
 class PDFViewer extends StatefulWidget {
-  final String songAssetPath;
+  final String songPath;
   final int bpm;
   final PracticeArea? practiceArea;
   final Function(bool)? onFullscreenChanged;
 
   const PDFViewer({
     super.key,
-    required this.songAssetPath,
+    required this.songPath,
     this.bpm = 120,
     this.practiceArea,
     this.onFullscreenChanged,
@@ -131,10 +131,10 @@ class _PDFViewerState extends State<PDFViewer>
   /// Try to load PDF from CloudKit for this song
   Future<void> _tryLoadFromCloudKit() async {
     try {
-      print('🔍🔍 PDF_DEBUG_123: Trying to load PDF from CloudKit for song: "${widget.songAssetPath}"');
-      print('🔍🔍 PDF_DEBUG_123: Song asset path length: ${widget.songAssetPath.length}');
-      print('🔍🔍 PDF_DEBUG_123: Song asset path characters: ${widget.songAssetPath.codeUnits}');
-      final songPdf = await StorageService.loadSongPdf(widget.songAssetPath);
+      print('🔍🔍 PDF_DEBUG_123: Trying to load PDF from CloudKit for song: "${widget.songPath}"');
+      print('🔍🔍 PDF_DEBUG_123: Song asset path length: ${widget.songPath.length}');
+      print('🔍🔍 PDF_DEBUG_123: Song asset path characters: ${widget.songPath.codeUnits}');
+      final songPdf = await StorageService.loadSongPdf(widget.songPath);
       print('🔍🔍 PDF_DEBUG_123: CloudKit lookup result: $songPdf');
       
       if (songPdf != null && songPdf['pdfFile'] != null) {
@@ -154,7 +154,7 @@ class _PDFViewerState extends State<PDFViewer>
           return;
         }
         
-        final safeFilename = _getSafeFilename(widget.songAssetPath);
+        final safeFilename = _getSafeFilename(widget.songPath);
         final fileName = '${safeFilename}_pdf.pdf';
         
         final downloadedPath = await StorageService.downloadAsset(
@@ -194,7 +194,7 @@ class _PDFViewerState extends State<PDFViewer>
       debugPrint('File location: ${file.path}');
       
       // Also save the PDF to CloudKit using the song asset path as identifier
-      final songId = widget.songAssetPath;
+      final songId = widget.songPath;
       await StorageService.saveSongPdf(songId, path);
       debugPrint('PDF saved to CloudKit for song: $songId');
     } catch (e) {
@@ -275,7 +275,7 @@ class _PDFViewerState extends State<PDFViewer>
   /// Copy PDF file to app documents directory for permanent storage
   Future<String> _copyPDFToDocuments(String originalPath) async {
     final directory = await getApplicationDocumentsDirectory();
-    final safeFilename = _getSafeFilename(widget.songAssetPath);
+    final safeFilename = _getSafeFilename(widget.songPath);
     final fileName = '${safeFilename}_pdf.pdf';
     
     // Create subdirectory for song PDFs if it doesn't exist
@@ -440,7 +440,7 @@ class _PDFViewerState extends State<PDFViewer>
       if (_isDisposed) return;
       
       // Save PaintInfo data using LocalStorageService
-      final safeFilename = _getSafeFilename(widget.songAssetPath);
+      final safeFilename = _getSafeFilename(widget.songPath);
       await StorageService.savePDFDrawingsForSongPage(
         safeFilename,
         _currentPage,
@@ -461,7 +461,7 @@ class _PDFViewerState extends State<PDFViewer>
       if (_isDisposed) return;
       
       // Load PaintInfo data using LocalStorageService
-      final safeFilename = _getSafeFilename(widget.songAssetPath);
+      final safeFilename = _getSafeFilename(widget.songPath);
       final paintHistory = await StorageService.loadPDFDrawingsForSongPage(
         safeFilename,
         _currentPage,
@@ -490,7 +490,7 @@ class _PDFViewerState extends State<PDFViewer>
     
     try {
       await StorageService.saveLabelsForPage(
-        widget.songAssetPath,
+        widget.songPath,
         _currentPage,
         _imagePainterController.labels,
       );
@@ -505,7 +505,7 @@ class _PDFViewerState extends State<PDFViewer>
     
     try {
       final labelsData = await StorageService.loadLabelsForPage(
-        widget.songAssetPath,
+        widget.songPath,
         _currentPage,
       );
       
@@ -902,7 +902,7 @@ class _PDFViewerState extends State<PDFViewer>
     final song = Song(
       title: widget.practiceArea?.name ?? 'Unknown Song',
       composer: 'Unknown Composer',
-      path: widget.songAssetPath,
+      path: widget.songPath,
     );
 
     Navigator.of(context).push(
@@ -947,7 +947,7 @@ class _PDFViewerState extends State<PDFViewer>
   /// Get file for storing PDF path
   Future<File> _getPDFPathFile() async {
     final directory = await getApplicationDocumentsDirectory();
-    final safeFilename = _getSafeFilename(widget.songAssetPath);
+    final safeFilename = _getSafeFilename(widget.songPath);
     return File('${directory.path}/${safeFilename}_pdf_path.txt');
   }
 
@@ -1401,12 +1401,13 @@ class _PDFViewerState extends State<PDFViewer>
         // Get page count by temporarily loading the PDF
         int pageCount = await _getPDFPageCount(permanentPath);
         
-        // Save book to storage (store only filename, not full path)
+        // Save book to storage (store both filename and full path for CloudKit sync)
         final fileName = permanentPath.split('/').last;
         final book = {
           'id': DateTime.now().millisecondsSinceEpoch.toString(),
           'name': bookName.trim(),
-          'fileName': fileName, // Store filename instead of full path
+          'fileName': fileName,
+          'path': permanentPath, // Store full path for CloudKit PDF upload
           'pageCount': pageCount,
           'registeredDate': DateTime.now().toIso8601String(),
         };
@@ -1448,7 +1449,7 @@ class _PDFViewerState extends State<PDFViewer>
         bookPath = await _getBookPath(book);
       }
       
-      final pageCount = book['pageCount'] as int? ?? 1;
+      final pageCount = int.tryParse(book['pageCount']) ?? 1;
       
       debugPrint('Book path: $bookPath, Page count: $pageCount');
       
@@ -1631,7 +1632,7 @@ class _PDFViewerState extends State<PDFViewer>
   void _showPageSelector(Map<String, dynamic> book) async {
     try {
       debugPrint('_showPageSelector called for book: ${book['name']}');
-      final pageCount = book['pageCount'] as int? ?? 1;
+      final pageCount = int.tryParse(book['pageCount']) ?? 1;
       final bookPath = await _getBookPath(book);
       
       debugPrint('Page selector - pageCount: $pageCount, bookPath: $bookPath');

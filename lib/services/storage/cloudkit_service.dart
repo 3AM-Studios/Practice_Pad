@@ -103,12 +103,30 @@ class CloudKitService {
     Map<String, CloudKitAsset> assets = const {},
   }) async {
     try {
+      print('🔧 CloudKitService.saveRecordWithAssets called:');
+      print('   recordType: $recordType');
+      print('   recordName: $recordName');
+      print('   record fields: ${record.keys.toList()}');
+      print('   assets: ${assets.keys.toList()}');
+      
+      for (final entry in assets.entries) {
+        final assetKey = entry.key;
+        final asset = entry.value;
+        print('   Asset "$assetKey":');
+        print('     localFilePath: ${asset.localFilePath}');
+        print('     fileName: ${asset.fileName}');
+        print('     size: ${asset.size}');
+        print('     mimeType: ${asset.mimeType}');
+        print('     isForUpload: ${asset.isForUpload}');
+      }
+      
       if (!await isAccountAvailable()) {
         throw Exception('User must be logged in to iCloud to save data');
       }
 
       // Sanitize the record name to create a unique, safe key for CloudKit.
       final recordKey = _sanitizeRecordKey('${recordType}_$recordName');
+      print('   sanitized recordKey: $recordKey');
 
       // Filter out reserved CloudKit field names and create a mutable copy
       final filteredRecord = Map<String, String>.from(record);
@@ -119,8 +137,10 @@ class CloudKitService {
       );
       
       final recordToSave = Map<String, String>.from(filteredRecord);
+      print('   final record to save: $recordToSave');
 
       // Call the existing CloudKit method to upload the record and its assets.
+      print('   Calling _cloudKit.saveRecordWithAssets...');
       await _cloudKit.saveRecordWithAssets(
         scope: CloudKitDatabaseScope.private,
         recordType: recordType,
@@ -134,6 +154,7 @@ class CloudKitService {
       return 'local_${DateTime.now().millisecondsSinceEpoch}';
     } catch (e) {
       developer.log('❌ Error saving record with assets to CloudKit: $e');
+      print('❌ DETAILED ERROR: $e');
       // Rethrow the error to be handled by the calling function in StorageService.
       rethrow;
     }

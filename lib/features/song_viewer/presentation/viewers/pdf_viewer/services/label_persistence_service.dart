@@ -53,9 +53,9 @@ class LabelPersistenceService {
   }
   
   /// Get file path for labels for a specific page
-  static Future<String> getLabelsFilePath(String songAssetPath, int page, {String? labelType}) async {
+  static Future<String> getLabelsFilePath(String songPath, int page, {String? labelType}) async {
     final directory = await getApplicationDocumentsDirectory();
-    final safeFilename = _getSafeFilename(songAssetPath);
+    final safeFilename = _getSafeFilename(songPath);
     final suffix = labelType != null ? '_${labelType}_labels' : '_labels';
     return '${directory.path}/${safeFilename}_pdf_page_${page}$suffix.json';
   }
@@ -70,26 +70,26 @@ class LabelPersistenceService {
   }
   
   /// Save labels for a specific page and song
-  static Future<void> saveLabelsForPage(String songAssetPath, int page, List<Label> labels) async {
-    final filePath = await getLabelsFilePath(songAssetPath, page);
+  static Future<void> saveLabelsForPage(String songPath, int page, List<Label> labels) async {
+    final filePath = await getLabelsFilePath(songPath, page);
     await saveLabels(filePath, labels);
   }
   
   /// Load labels for a specific page and song
-  static Future<List<Label>> loadLabelsForPage(String songAssetPath, int page) async {
-    final filePath = await getLabelsFilePath(songAssetPath, page);
+  static Future<List<Label>> loadLabelsForPage(String songPath, int page) async {
+    final filePath = await getLabelsFilePath(songPath, page);
     return await loadLabels(filePath);
   }
   
   /// Check if labels file exists for a page
-  static Future<bool> labelsExistForPage(String songAssetPath, int page) async {
-    final filePath = await getLabelsFilePath(songAssetPath, page);
+  static Future<bool> labelsExistForPage(String songPath, int page) async {
+    final filePath = await getLabelsFilePath(songPath, page);
     return await File(filePath).exists();
   }
   
   /// Delete labels file for a page
-  static Future<void> deleteLabelsForPage(String songAssetPath, int page) async {
-    final filePath = await getLabelsFilePath(songAssetPath, page);
+  static Future<void> deleteLabelsForPage(String songPath, int page) async {
+    final filePath = await getLabelsFilePath(songPath, page);
     final file = File(filePath);
     if (await file.exists()) {
       await file.delete();

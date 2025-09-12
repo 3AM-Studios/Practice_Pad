@@ -12,9 +12,12 @@ import 'package:practice_pad/features/song_viewer/data/models/song.dart';
 import 'package:music_sheet/index.dart';
 import 'package:flutter_drawing_board/paint_contents.dart';
 import 'dart:developer' as developer;
-import 'package:image_painter/image_painter.dart';
+import 'package:image_painter/image_painter.dart' as image_painter;
 import 'package:practice_pad/services/storage/cloudkit_service.dart';
 import 'package:http/http.dart' as http;
+import 'package:practice_pad/features/song_viewer/presentation/viewers/pdf_viewer/models/label_base.dart';
+import 'package:practice_pad/features/song_viewer/presentation/viewers/pdf_viewer/models/extension_label.dart';
+import 'package:practice_pad/features/song_viewer/presentation/viewers/pdf_viewer/models/roman_numeral_label.dart';
 
 /// Local storage service for persisting app data
 class StorageService {
@@ -142,7 +145,8 @@ class StorageService {
  
   static Future<void> updateBookFromCloud(Map<String, dynamic> record) async {
     try {
-      final bookId = record['recordName'] as String;
+      // Use originalBookId if available (new format), otherwise fallback to recordName (old format)
+      final bookId = record['originalBookId']?.toString() ?? record['recordName']?.toString() ?? '';
       final books = await loadBooks();
       final index = books.indexWhere((book) => book['id'] == bookId);
       
@@ -153,8 +157,10 @@ class StorageService {
       
       // Copy all non-asset fields from the record
       record.forEach((key, value) {
-        if (key != 'recordType' && key != 'recordName' && key != 'recordChangeTag' && key != 'pdfFile') {
-          bookData[key] = value;
+        if (key != 'recordType' && key != 'recordName' && key != 'recordChangeTag' && 
+            key != 'pdfFile' && key != 'fileName' && key != 'originalBookId') {
+          // Convert integers to strings if needed for consistency
+          bookData[key] = value is int ? value.toString() : value;
         }
       });
       
@@ -163,22 +169,23 @@ class StorageService {
         books[index] = {...books[index], ...bookData};
       } else {
         // Book doesn't exist locally, create it and download asset if present
-        final pdfAsset = record['pdfFile'] as CloudKitAsset?;
+        final pdfAsset = record['pdfFile'] as CloudKitAsset? ?? record['fileName'] as CloudKitAsset?;
         
         if (pdfAsset != null) {
-          // Download the PDF asset using the new asset download helper
+          // Download the PDF asset using the CloudKit asset download helper
           final fileName = '${bookId}_book.pdf';
-          final localPdfPath = await downloadAsset(
+          final localPdfPath = await downloadCloudKitAsset(
             asset: pdfAsset,
             localFileName: fileName,
             subdirectory: 'books',
           );
           
           if (localPdfPath != null) {
+            bookData['path'] = localPdfPath; // Store the local path
             bookData['fileName'] = fileName;
-            print('✅ Downloaded book asset: $fileName');
+            print('✅ Downloaded book PDF asset: $fileName to $localPdfPath');
           } else {
-            print('❌ Failed to download book asset for book: $bookId');
+            print('❌ Failed to download book PDF asset for book: $bookId');
           }
         }
         
@@ -315,7 +322,8 @@ class StorageService {
 
   static Future<void> updateSheetMusicFromCloud(Map<String, dynamic> record) async {
     try {
-      final songId = record['recordName'] as String;
+      // Use originalSongId if available, otherwise fall back to recordName for backward compatibility
+      final songId = record['originalSongId'] as String? ?? record['recordName'] as String;
       final measuresData = record['measuresData'] as List?
         ?? [];
       final measures = measuresData.map((json) => measureFromJson(json)).toList();
@@ -368,7 +376,7 @@ class StorageService {
 
   static Future<void> updateSongChangesFromCloud(Map<String, dynamic> record) async {
     try {
-      final songId = record['recordName'] as String;
+      final songId = record['originalSongId'] as String? ?? record['recordName'] as String;
       final changesData = record['changesData'] as Map<String, dynamic>?
         ?? {};
       await saveSongChanges(songId, changesData, syncToCloud: false);
@@ -379,7 +387,7 @@ class StorageService {
 
   static Future<void> updateChordKeysFromCloud(Map<String, dynamic> record) async {
     try {
-      final songId = record['recordName'] as String;
+      final songId = record['originalSongId'] as String? ?? record['recordName'] as String;
       final chordKeysData = record['chordKeysData'] as Map<String, dynamic>?
         ?? {};
       await saveChordKeys(songId, chordKeysData, syncToCloud: false);
@@ -390,7 +398,7 @@ class StorageService {
 
   static Future<void> updateDrawingsFromCloud(Map<String, dynamic> record) async {
     try {
-      final songId = record['recordName'] as String;
+      final songId = record['originalSongId'] as String? ?? record['recordName'] as String;
       final drawingsData = record['drawingsData'] as List?
         ?? [];
       final drawings = List<Map<String, dynamic>>.from(drawingsData);
@@ -496,7 +504,7 @@ class StorageService {
 
   static Future<void> updateSavedLoopsFromCloud(Map<String, dynamic> record) async {
     try {
-      final pageId = record['recordName'] as String;
+      final pageId = record['originalSongId'] as String? ?? record['recordName'] as String;
       final loopsData = record['loopsData'] as List?
         ?? [];
       final loops = List<Map<String, dynamic>>.from(loopsData);
@@ -519,24 +527,103 @@ class StorageService {
 
   static Future<void> updateYoutubeVideosFromCloud(Map<String, dynamic> record) async {
     try {
-      final videosData = record['videosData'] as List?
-        ?? [];
-      final videos = List<Map<String, dynamic>>.from(videosData);
+      print('🎥📥 YOUTUBE_VIDEOS_UPDATE_DEBUG: Received record: $record');
+      
+      final videosData = record['videosData'];
+      print('🎥📥 YOUTUBE_VIDEOS_UPDATE_DEBUG: videosData type: ${videosData.runtimeType}');
+      print('🎥📥 YOUTUBE_VIDEOS_UPDATE_DEBUG: videosData value: $videosData');
+      
+      List<Map<String, dynamic>> videos;
+      
+      if (videosData is List) {
+        print('🎥📥 YOUTUBE_VIDEOS_UPDATE_DEBUG: videosData is already a List');
+        videos = List<Map<String, dynamic>>.from(videosData);
+      } else if (videosData is String) {
+        print('🎥📥 YOUTUBE_VIDEOS_UPDATE_DEBUG: videosData is a String, attempting to decode JSON');
+        try {
+          final decoded = json.decode(videosData);
+          if (decoded is List) {
+            videos = List<Map<String, dynamic>>.from(decoded);
+          } else {
+            print('🎥❌ YOUTUBE_VIDEOS_UPDATE_DEBUG: Decoded data is not a List: ${decoded.runtimeType}');
+            videos = [];
+          }
+        } catch (e) {
+          print('🎥❌ YOUTUBE_VIDEOS_UPDATE_DEBUG: Failed to decode JSON string: $e');
+          videos = [];
+        }
+      } else {
+        print('🎥❌ YOUTUBE_VIDEOS_UPDATE_DEBUG: videosData is unexpected type: ${videosData.runtimeType}');
+        videos = [];
+      }
+      
+      print('🎥📥 YOUTUBE_VIDEOS_UPDATE_DEBUG: Final parsed videos count: ${videos.length}');
+      if (videos.isNotEmpty) {
+        print('🎥📥 YOUTUBE_VIDEOS_UPDATE_DEBUG: Sample video: ${videos.first}');
+      }
+      
       await saveYoutubeVideosList(videos, syncToCloud: false);
+      print('🎥✅ YOUTUBE_VIDEOS_UPDATE_DEBUG: Successfully saved videos locally');
     } catch (e) {
-      print('Error updating YouTube videos from cloud: $e');
+      print('🎥❌ YOUTUBE_VIDEOS_UPDATE_DEBUG: Error updating YouTube videos from cloud: $e');
     }
   }
 
   static Future<void> updateLabelsFromCloud(Map<String, dynamic> record) async {
     try {
-      final songAssetPath = record['songAssetPath'] as String;
-      final page = record['page'] as int;
-      final labelsData = record['labelsData'] as List?
-        ?? [];
-      await saveLabelsForPage(songAssetPath, page, labelsData, syncToCloud: false);
+      print('🏷️📥 LABEL_DOWNLOAD_DEBUG: Receiving labels from CloudKit (DOWNLOAD scenario)');
+      print('🏷️📥 LABEL_DOWNLOAD_DEBUG: Raw record keys: ${record.keys.toList()}');
+      print('🏷️📥 LABEL_DOWNLOAD_DEBUG: page value type: ${record['page'].runtimeType}');
+      print('🏷️📥 LABEL_DOWNLOAD_DEBUG: labelsData value type: ${record['labelsData'].runtimeType}');
+      print('🏷️📥 LABEL_DOWNLOAD_DEBUG: songPath value type: ${record['songPath'] .runtimeType}');
+      final songPath = record['songPath'] as String;
+      
+      // Handle page field - CloudKit stores it as String, convert to int
+      final pageValue = record['page'];
+      final page = int.parse(pageValue.toString());
+      
+      final rawLabelsData = record['labelsData'];
+      print('🏷️📥 LABEL_DOWNLOAD_DEBUG: rawLabelsData type: ${rawLabelsData.runtimeType}');
+      
+      
+      final labelsData =  json.decode(rawLabelsData);
+      
+      // Convert dynamic label data to Label objects
+      final labels = <Label>[];
+      for (int i = 0; i < labelsData.length; i++) {
+        final labelMap = labelsData[i];
+        
+        try {
+          
+          if (labelMap != null) {
+            print('🏷️📥 LABEL_DOWNLOAD_DEBUG: Label $i keys: ${labelMap.keys.toList()}');
+            final labelType = labelMap['labelType'] as String?;
+            
+            Label? label;
+            if (labelType == 'extension' || labelType == null) {
+              // Handle old format without labelType (assume extension)
+              label = ExtensionLabel.fromJson(labelMap);
+            } else if (labelType == 'romanNumeral') {
+              label = RomanNumeralLabel.fromJson(labelMap);
+            }
+            
+            if (label != null) {
+              labels.add(label);
+            }
+          } 
+        } catch (e) {
+          print('🏷️📥 LABEL_DOWNLOAD_DEBUG: Error processing label $i: $e');
+        }
+      }
+      
+      print('🏷️📥 LABEL_DOWNLOAD_DEBUG: Converted ${labels.length} labels from CloudKit data');
+      print('🏷️📥 LABEL_DOWNLOAD_DEBUG: Saving to local storage with syncToCloud=false to prevent upload loop');
+      
+      await saveLabelsForPage(songPath, page, labels, syncToCloud: false);
+      
+      print('🏷️📥 LABEL_DOWNLOAD_DEBUG: Successfully downloaded and saved ${labels.length} labels from CloudKit');
     } catch (e) {
-      print('Error updating labels from cloud: $e');
+      print('🏷️📥 LABEL_DOWNLOAD_DEBUG: Error updating labels from cloud: $e');
     }
   }
   // =============================================================================
@@ -799,7 +886,7 @@ class StorageService {
     return contents;
   }
 
-  static Future<void> savePDFDrawingsForSongPage(String songId, int pageNumber, List<PaintInfo> paintHistory, {bool syncToCloud = true}) async {
+  static Future<void> savePDFDrawingsForSongPage(String songId, int pageNumber, List<image_painter.PaintInfo> paintHistory, {bool syncToCloud = true}) async {
     return _withSaveLock(() async {
       final allPDFDrawings = await loadAllPDFDrawings();
       final songPageKey = '${songId}_page_$pageNumber';
@@ -812,17 +899,10 @@ class StorageService {
     });
   }
 
-  static Future<List<PaintInfo>> loadPDFDrawingsForSongPage(String songId, int pageNumber) async {
+  static Future<List<image_painter.PaintInfo>> loadPDFDrawingsForSongPage(String songId, int pageNumber) async {
     final allPDFDrawings = await loadAllPDFDrawings();
     final songPageKey = '${songId}_page_$pageNumber';
-    print('🎨🔍 DRAWING_LOAD_DEBUG: Looking for key: "$songPageKey"');
-    print('🎨🔍 DRAWING_LOAD_DEBUG: Available keys: ${allPDFDrawings.keys.toList()}');
     final drawingData = allPDFDrawings[songPageKey] ?? [];
-    print('🎨🔍 DRAWING_LOAD_DEBUG: Found ${drawingData.length} drawing items for key "$songPageKey"');
-    if (allPDFDrawings.containsKey(songPageKey)) {
-      print('🎨🔍 DRAWING_LOAD_DEBUG: Raw data under key: ${allPDFDrawings[songPageKey]}');
-      print('🎨🔍 DRAWING_LOAD_DEBUG: Data type: ${allPDFDrawings[songPageKey].runtimeType}');
-    }
     return (drawingData as List).map((json) => paintInfoFromJson(json)).toList();
   }
 
@@ -949,19 +1029,42 @@ class StorageService {
         return localBook;
       }
       
-      // If not found locally, try CloudKit
-      final cloudRecord = await CloudKitService.getRecord('Book_$bookId');
+      // If not found locally, try CloudKit with sanitized record name
+      final sanitizedRecordName = _sanitizeForCloudKit(bookId);
+      final cloudRecord = await CloudKitService.getRecord(sanitizedRecordName);
       if (cloudRecord != null) {
         // Convert CloudKit record to book format
         final book = <String, dynamic>{
           'id': bookId,
         };
         
+        // Copy non-asset and non-internal fields
         cloudRecord.forEach((key, value) {
-          if (key != 'recordChangeTag' && key != 'recordName' && key != 'recordType') {
+          if (key != 'recordChangeTag' && key != 'recordName' && key != 'recordType' && 
+              key != 'pdfFile' && key != 'fileName' && key != 'originalBookId') {
             book[key] = value;
           }
         });
+        
+        // Handle PDF asset if present (could be either 'pdfFile' or 'fileName')
+        final pdfAsset = cloudRecord['pdfFile'] as CloudKitAsset? ?? cloudRecord['fileName'] as CloudKitAsset?;
+        if (pdfAsset != null) {
+          // Download the PDF asset using the CloudKit asset download helper
+          final fileName = '${bookId}_book.pdf';
+          final localPdfPath = await downloadCloudKitAsset(
+            asset: pdfAsset,
+            localFileName: fileName,
+            subdirectory: 'books',
+          );
+          
+          if (localPdfPath != null) {
+            book['path'] = localPdfPath; // Store the local path
+            book['fileName'] = fileName;
+            print('✅ Downloaded book PDF asset for single book load: $fileName to $localPdfPath');
+          } else {
+            print('❌ Failed to download book PDF asset for single book load: $bookId');
+          }
+        }
         
         return book;
       }
@@ -976,20 +1079,55 @@ class StorageService {
   /// Load all books from CloudKit
   static Future<List<Map<String, dynamic>>> loadBooksFromCloudKit() async {
     try {
+      print('📚 BOOK_DEBUG: Starting loadBooksFromCloudKit');
       final cloudRecords = await CloudKitService.getAllRecords();
+      print('📚 BOOK_DEBUG: Got ${cloudRecords.length} total records from CloudKit');
       final books = <Map<String, dynamic>>[];
       
       for (final record in cloudRecords) {
         if (record['recordType'] == 'Book') {
+          print('📚 BOOK_DEBUG: Processing Book record: ${record['recordName']}');
+          print('📚 BOOK_DEBUG: Record keys: ${record.keys.toList()}');
+          print('📚 BOOK_DEBUG: Record types: ${record.map((key, value) => MapEntry(key, value.runtimeType.toString()))}');
+          
+          // Use originalBookId if available (new format), otherwise extract from recordName (old format)
+          final bookId = record['originalBookId']?.toString() ?? 
+                        record['recordName']?.toString().replaceFirst('Book_', '') ?? '';
+          
+          print('📚 BOOK_DEBUG: Extracted bookId: $bookId');
+          
           final book = <String, dynamic>{
-            'id': record['recordName']?.toString().replaceFirst('Book_', '') ?? '',
+            'id': bookId,
           };
           
+          // Copy non-asset and non-internal fields
           record.forEach((key, value) {
-            if (key != 'recordChangeTag' && key != 'recordName' && key != 'recordType') {
-              book[key] = value;
+            if (key != 'recordChangeTag' && key != 'recordName' && key != 'recordType' && 
+                key != 'pdfFile' && key != 'fileName' && key != 'originalBookId') {
+              // Convert integers to strings if needed for consistency
+              book[key] = value is int ? value.toString() : value;
             }
           });
+          
+          // Handle PDF asset if present (could be either 'pdfFile' or 'fileName')
+          final pdfAsset = record['pdfFile'] as CloudKitAsset? ?? record['fileName'] as CloudKitAsset?;
+          if (pdfAsset != null) {
+            // Download the PDF asset using the CloudKit asset download helper
+            final fileName = '${bookId}_book.pdf';
+            final localPdfPath = await downloadCloudKitAsset(
+              asset: pdfAsset,
+              localFileName: fileName,
+              subdirectory: 'books',
+            );
+            
+            if (localPdfPath != null) {
+              book['path'] = localPdfPath; // Store the local path
+              book['fileName'] = fileName;
+              print('✅ Downloaded book PDF asset during load: $fileName to $localPdfPath');
+            } else {
+              print('❌ Failed to download book PDF asset during load for book: $bookId');
+            }
+          }
           
           books.add(book);
         }
@@ -1070,20 +1208,194 @@ class StorageService {
     // Also delete from cloudkit
   }
 
-  static Future<void> saveLabelsForPage(String songAssetPath, int page, List<dynamic> labels, {bool syncToCloud = true}) async {
+  /// Save labels for page - accepts either our Label objects or image_painter Label objects
+  static Future<void> saveLabelsForPage(String songPath, int page, List<dynamic> labels, {bool syncToCloud = true}) async {
     return _withSaveLock(() async {
-      final file = await _getLabelsFile(songAssetPath, page);
-      final labelsData = labels.map((label) => label.toJson()).toList();
+      print('🏷️💾 LABEL_SAVE_DEBUG: Starting saveLabelsForPage');
+      print('🏷️💾 LABEL_SAVE_DEBUG: songPath: $songPath');
+      print('🏷️💾 LABEL_SAVE_DEBUG: page: $page');
+      print('🏷️💾 LABEL_SAVE_DEBUG: labels count: ${labels.length}');
+      print('🏷️💾 LABEL_SAVE_DEBUG: syncToCloud: $syncToCloud');
+      
+      final file = await _getLabelsFile(songPath, page);
+      
+      // Convert labels to JSON - handle both our Label objects and image_painter Label objects
+      final labelsData = <Map<String, dynamic>>[];
+      for (int i = 0; i < labels.length; i++) {
+        final label = labels[i];
+        print('🏷️💾 LABEL_SAVE_DEBUG: Processing label $i: ${label.runtimeType}');
+        
+        if (label is Label) {
+          // Our custom Label objects
+          final labelJson = label.toJson();
+          labelsData.add(labelJson);
+          print('🏷️💾 LABEL_SAVE_DEBUG: Added custom Label: $labelJson');
+        } else if (label is image_painter.Label) {
+          // image_painter Label objects - convert to our format
+          final labelJson = _convertImagePainterLabelToJson(label);
+          labelsData.add(labelJson);
+          print('🏷️💾 LABEL_SAVE_DEBUG: Added image_painter Label: $labelJson');
+        } else {
+          print('🏷️💾 LABEL_SAVE_DEBUG: Unknown label type: ${label.runtimeType}');
+        }
+      }
+      
+      print('🏷️💾 LABEL_SAVE_DEBUG: Final labelsData count: ${labelsData.length}');
+      
       await file.writeAsString(json.encode(labelsData));
       if (syncToCloud) {
-        await _syncLabelsToCloudKit(songAssetPath, page, labels);
+        print('🏷️☁️ LABEL_SYNC_DEBUG: Preparing to sync to CloudKit');
+        
+        // CRITICAL: Prevent local data from overwriting more complete CloudKit data
+        try {
+          final existingCloudData = await _checkCloudKitForExistingLabels(songPath, page);
+          
+          if (labels.isEmpty && existingCloudData > 0) {
+            print('🏷️🛡️ LABEL_PROTECTION: Local labels are empty but CloudKit has $existingCloudData labels');
+            print('🏷️🛡️ LABEL_PROTECTION: BLOCKING empty sync to prevent data loss!');
+            print('🏷️🛡️ LABEL_PROTECTION: This prevents empty local state from overwriting valuable CloudKit data');
+            return; // Exit early, don't sync empty data over existing CloudKit data
+          } else if (labels.length < existingCloudData && existingCloudData > 5) {
+            // Also prevent syncing significantly fewer labels over many labels (possible partial load)
+            print('🏷️🛡️ LABEL_PROTECTION: Local has ${labels.length} labels but CloudKit has $existingCloudData labels');
+            print('🏷️🛡️ LABEL_PROTECTION: BLOCKING potentially incomplete sync to prevent data loss!');
+            print('🏷️🛡️ LABEL_PROTECTION: This prevents partial local state from overwriting more complete CloudKit data');
+            return; // Exit early to prevent data loss
+          } else if (existingCloudData == 0) {
+            print('🏷️🛡️ LABEL_PROTECTION: CloudKit is empty - allowing local sync (${labels.length} labels)');
+          } else {
+            print('🏷️🛡️ LABEL_PROTECTION: Local has ${labels.length} labels, CloudKit has $existingCloudData - allowing sync');
+          }
+        } catch (e) {
+          print('🏷️🛡️ LABEL_PROTECTION: Could not check CloudKit data: $e - allowing sync to proceed');
+          // If we can't check CloudKit, allow the sync to proceed to avoid blocking legitimate operations
+        }
+        
+        // Convert to our Label objects for CloudKit sync - only convert image_painter labels
+        final imagePainterLabels = <image_painter.Label>[];
+        final ourLabels = <Label>[];
+        
+        for (int i = 0; i < labels.length; i++) {
+          final label = labels[i];
+          if (label is Label) {
+            // Already our custom Label objects
+            ourLabels.add(label);
+            print('🏷️☁️ LABEL_SYNC_DEBUG: Added custom Label $i to sync list');
+          } else if (label is image_painter.Label) {
+            // Convert image_painter Label objects
+            imagePainterLabels.add(label);
+            print('🏷️☁️ LABEL_SYNC_DEBUG: Added image_painter Label $i to conversion list');
+          }
+        }
+        
+        // Convert image_painter labels to our format
+        if (imagePainterLabels.isNotEmpty) {
+          final converted = _convertImagePainterLabelsToOurLabels(imagePainterLabels);
+          ourLabels.addAll(converted);
+          print('🏷️☁️ LABEL_SYNC_DEBUG: Converted ${imagePainterLabels.length} image_painter labels to ${converted.length} custom labels');
+        }
+        
+        print('🏷️☁️ LABEL_SYNC_DEBUG: Total labels for CloudKit sync: ${ourLabels.length}');
+        
+        // Validate labels before syncing
+        if (ourLabels.isEmpty) {
+          print('🏷️⚠️ LABEL_VALIDATION_WARNING: No labels to sync to CloudKit');
+        } else {
+          // Validate each label has required data
+          bool allLabelsValid = true;
+          for (int i = 0; i < ourLabels.length; i++) {
+            final label = ourLabels[i];
+            try {
+              final testJson = label.toJson();
+              if (testJson['id'] == null || testJson['position'] == null) {
+                print('🏷️❌ LABEL_VALIDATION_ERROR: Label $i missing required fields: $testJson');
+                allLabelsValid = false;
+              }
+            } catch (e) {
+              print('🏷️❌ LABEL_VALIDATION_ERROR: Label $i failed toJson: $e');
+              allLabelsValid = false;
+            }
+          }
+          
+          if (allLabelsValid) {
+            print('🏷️✅ LABEL_VALIDATION_SUCCESS: All labels are valid for CloudKit sync');
+          } else {
+            print('🏷️❌ LABEL_VALIDATION_FAILED: Some labels are invalid, but proceeding with sync');
+          }
+        }
+        
+        await _syncLabelsToCloudKit(songPath, page, ourLabels);
+      } else {
+        print('🏷️💾 LABEL_SAVE_DEBUG: Skipping CloudKit sync (syncToCloud = false)');
       }
     });
   }
 
-  static Future<List<dynamic>> loadLabelsForPage(String songAssetPath, int page) async {
+  /// Convert image_painter Label to our JSON format
+  static Map<String, dynamic> _convertImagePainterLabelToJson(image_painter.Label imagePainterLabel) {
+    if (imagePainterLabel is image_painter.ExtensionLabel) {
+      return {
+        'id': imagePainterLabel.id,
+        'position': {'dx': imagePainterLabel.position.dx, 'dy': imagePainterLabel.position.dy},
+        'displayValue': imagePainterLabel.number,
+        'size': 25.0,
+        'color': 0xFF2196F3,
+        'labelType': 'extension',
+        'isSelected': false,
+        'accidental': '♮', // Default for image_painter labels
+        'number': imagePainterLabel.number,
+      };
+    } else if (imagePainterLabel is image_painter.RomanNumeralLabel) {
+      return {
+        'id': imagePainterLabel.id,
+        'position': {'dx': imagePainterLabel.position.dx, 'dy': imagePainterLabel.position.dy},
+        'displayValue': imagePainterLabel.romanNumeral,
+        'size': 25.0,
+        'color': 0xFF2196F3,
+        'labelType': 'romanNumeral',
+        'isSelected': false,
+        'romanNumeral': imagePainterLabel.romanNumeral,
+      };
+    }
+    // Fallback
+    return {
+      'id': imagePainterLabel.id,
+      'position': {'dx': imagePainterLabel.position.dx, 'dy': imagePainterLabel.position.dy},
+      'displayValue': '1',
+      'size': 25.0,
+      'color': 0xFF2196F3,
+      'labelType': 'extension',
+      'isSelected': false,
+      'accidental': '♮',
+      'number': '1',
+    };
+  }
+
+  /// Convert image_painter Labels to our Label objects
+  static List<Label> _convertImagePainterLabelsToOurLabels(List<image_painter.Label> imagePainterLabels) {
+    final ourLabels = <Label>[];
+    for (final imagePainterLabel in imagePainterLabels) {
+      if (imagePainterLabel is image_painter.ExtensionLabel) {
+        ourLabels.add(ExtensionLabel(
+          id: imagePainterLabel.id,
+          position: imagePainterLabel.position,
+          accidental: '♮', // Default
+          number: imagePainterLabel.number,
+        ));
+      } else if (imagePainterLabel is image_painter.RomanNumeralLabel) {
+        ourLabels.add(RomanNumeralLabel(
+          id: imagePainterLabel.id,
+          position: imagePainterLabel.position,
+          romanNumeral: imagePainterLabel.romanNumeral,
+        ));
+      }
+    }
+    return ourLabels;
+  }
+
+  static Future<List<dynamic>> loadLabelsForPage(String songPath, int page) async {
     try {
-      final file = await _getLabelsFile(songAssetPath, page);
+      final file = await _getLabelsFile(songPath, page);
       if (!await file.exists()) return [];
       final content = await file.readAsString();
       if (content.trim().isEmpty) return [];
@@ -1267,7 +1579,7 @@ class StorageService {
     }
   }
 
-  static Map<String, dynamic> paintInfoToJson(PaintInfo paintInfo) {
+  static Map<String, dynamic> paintInfoToJson(image_painter.PaintInfo paintInfo) {
     return {
       'mode': paintInfo.mode.toString(),
       'color': paintInfo.color.value,
@@ -1278,9 +1590,9 @@ class StorageService {
     };
   }
 
-  static PaintInfo paintInfoFromJson(Map<String, dynamic> json) {
+  static image_painter.PaintInfo paintInfoFromJson(Map<String, dynamic> json) {
     final modeString = json['mode'] as String;
-    final mode = PaintMode.values.firstWhere((e) => e.toString() == modeString, orElse: () => PaintMode.freeStyle);
+    final mode = image_painter.PaintMode.values.firstWhere((e) => e.toString() == modeString, orElse: () => image_painter.PaintMode.freeStyle);
     final colorValue = json['color'] as int;
     final color = Color(colorValue);
     final offsetsData = json['offsets'] as List;
@@ -1289,7 +1601,7 @@ class StorageService {
       final offsetMap = offsetJson as Map<String, dynamic>;
       return Offset(offsetMap['dx'] as double, offsetMap['dy'] as double);
     }).toList();
-    return PaintInfo(
+    return image_painter.PaintInfo(
       mode: mode,
       color: color,
       strokeWidth: (json['strokeWidth'] as num).toDouble(),
@@ -1349,14 +1661,16 @@ class StorageService {
 
   static Future<void> _syncSongChangesToCloudKit(String songId, Map<String, dynamic> changes) async {
     try {
+      final sanitizedRecordName = _sanitizeForCloudKit(songId);
       final record = {
         'recordType': 'SongChanges',
-        'recordName': songId,
+        'recordName': sanitizedRecordName,
+        'originalSongId': songId,
         'changesData': changes,
       };
       final changeTag = await CloudKitService.saveRecord(record);
       if (changeTag != null) {
-        await saveLocalChangeTag('SongChanges', songId, changeTag);
+        await saveLocalChangeTag('SongChanges', sanitizedRecordName, changeTag);
       }
     } catch (e) {
       print('Error syncing song changes: $e');
@@ -1365,14 +1679,16 @@ class StorageService {
 
   static Future<void> _syncChordKeysToCloudKit(String songId, Map<String, dynamic> chordKeys) async {
     try {
+      final sanitizedRecordName = _sanitizeForCloudKit(songId);
       final record = {
         'recordType': 'ChordKeys',
-        'recordName': songId,
+        'recordName': sanitizedRecordName,
+        'originalSongId': songId,
         'chordKeysData': chordKeys,
       };
       final changeTag = await CloudKitService.saveRecord(record);
       if (changeTag != null) {
-        await saveLocalChangeTag('ChordKeys', songId, changeTag);
+        await saveLocalChangeTag('ChordKeys', sanitizedRecordName, changeTag);
       }
     } catch (e) {
       print('Error syncing chord keys: $e');
@@ -1381,14 +1697,16 @@ class StorageService {
 
   static Future<void> _syncSheetMusicToCloudKit(String songId, List<Measure> measures) async {
     try {
+      final sanitizedRecordName = _sanitizeForCloudKit(songId);
       final record = {
         'recordType': 'SheetMusic',
-        'recordName': songId,
+        'recordName': sanitizedRecordName,
+        'originalSongId': songId, // Store original for retrieval
         'measuresData': measures.map((m) => measureToJson(m)).toList(),
       };
       final changeTag = await CloudKitService.saveRecord(record);
       if (changeTag != null) {
-        await saveLocalChangeTag('SheetMusic', songId, changeTag);
+        await saveLocalChangeTag('SheetMusic', sanitizedRecordName, changeTag);
       }
     } catch (e) {
       print('Error syncing sheet music: $e');
@@ -1397,72 +1715,84 @@ class StorageService {
 
   static Future<void> _syncDrawingsToCloudKit(String songId, List<Map<String, dynamic>> drawingData) async {
     try {
+      final sanitizedRecordName = _sanitizeForCloudKit(songId);
       final record = {
         'recordType': 'Drawings',
-        'recordName': songId,
+        'recordName': sanitizedRecordName,
+        'originalSongId': songId,
         'drawingsData': drawingData,
       };
       final changeTag = await CloudKitService.saveRecord(record);
       if (changeTag != null) {
-        await saveLocalChangeTag('Drawings', songId, changeTag);
+        await saveLocalChangeTag('Drawings', sanitizedRecordName, changeTag);
       }
     } catch (e) {
       print('Error syncing drawings: $e');
     }
   }
 
-  static Future<void> _syncPDFDrawingsToCloudKit(String songId, int pageNumber, List<PaintInfo> paintHistory) async {
+  static Future<void> _syncPDFDrawingsToCloudKit(String songId, int pageNumber, List<image_painter.PaintInfo> paintHistory) async {
     try {
-      final recordName = '${songId}_page_$pageNumber';
-      print('🎨💾 DRAWING_SAVE_DEBUG: Syncing drawings to CloudKit');
-      print('🎨💾 DRAWING_SAVE_DEBUG: songId: $songId, pageNumber: $pageNumber');
-      print('🎨💾 DRAWING_SAVE_DEBUG: paintHistory length: ${paintHistory.length}');
-      print('🎨💾 DRAWING_SAVE_DEBUG: recordName: $recordName');
+      final originalRecordName = '${songId}_page_$pageNumber';
+      final recordName = _sanitizeForCloudKit(originalRecordName);
       
       final drawingsData = paintHistory.map((p) => paintInfoToJson(p)).toList();
-      print('🎨💾 DRAWING_SAVE_DEBUG: serialized drawingsData: $drawingsData');
       
       final record = {
         'recordType': 'PDFDrawings',
         'recordName': recordName,
+        'originalRecordName': originalRecordName,
         'songId': songId,
         'pageNumber': pageNumber,
         'drawingsData': drawingsData,
       };
-      print('🎨💾 DRAWING_SAVE_DEBUG: Complete record: $record');
       
       final changeTag = await CloudKitService.saveRecord(record);
       if (changeTag != null) {
         await saveLocalChangeTag('PDFDrawings', recordName, changeTag);
-        print('🎨💾 DRAWING_SAVE_DEBUG: Successfully saved with changeTag: $changeTag');
-      } else {
-        print('🎨💾 DRAWING_SAVE_DEBUG: Failed to save - no changeTag returned');
       }
     } catch (e) {
-      print('🎨💾 DRAWING_SAVE_DEBUG: Error syncing PDF drawings: $e');
+      print('Error syncing PDF drawings: $e');
     }
   }
 
   static Future<void> _syncYoutubeLinksToCloudKit(String songId, Map<String, dynamic> youtubeData) async {
     try {
-      // The recordName should be a unique identifier for the link itself.
-      // Assuming the youtubeData map contains a unique 'videoId'.
-      final recordName = youtubeData['videoId'] as String?;
-      if (recordName == null) {
-        print('Error syncing YouTube link: videoId is missing from youtubeData');
-        return;
+      // Try to get videoId from youtubeData, or extract from URL if missing
+      String? originalVideoId = youtubeData['videoId'] as String?;
+      
+      // If videoId is missing or empty, try to extract from URL
+      if (originalVideoId == null || originalVideoId.isEmpty) {
+        final url = youtubeData['url'] as String?;
+        if (url != null && url.isNotEmpty) {
+          originalVideoId = _extractVideoIdFromUrl(url);
+          if (originalVideoId != null) {
+            print('YouTube link: Extracted videoId from URL: $originalVideoId');
+          } else {
+            // Fallback to using songId if URL parsing fails
+            originalVideoId = 'song_${_sanitizeForCloudKit(songId)}';
+            print('YouTube link: Could not extract videoId from URL, using fallback: $originalVideoId');
+          }
+        } else {
+          print('Error syncing YouTube link: both videoId and url are missing from youtubeData');
+          return;
+        }
       }
+
+      // Sanitize the video ID for CloudKit (YouTube IDs can contain hyphens)
+      final sanitizedRecordName = _sanitizeForCloudKit(originalVideoId);
 
       final record = {
         'recordType': 'YoutubeLinks',
-        'recordName': recordName,
+        'recordName': sanitizedRecordName,
+        'originalVideoId': originalVideoId, // Store original video ID
         'songId': songId, // Storing songId as a field, can be null
         'youtubeData': youtubeData,
       };
       final changeTag = await CloudKitService.saveRecord(record);
       if (changeTag != null) {
-        // Use the unique videoId for tracking the change tag
-        await saveLocalChangeTag('YoutubeLinks', recordName, changeTag);
+        // Use the sanitized recordName for tracking the change tag
+        await saveLocalChangeTag('YoutubeLinks', sanitizedRecordName, changeTag);
       }
     } catch (e) {
       print('Error syncing YouTube links: $e');
@@ -1471,14 +1801,16 @@ class StorageService {
 
   static Future<void> _syncSavedLoopsToCloudKit(String songId, List<Map<String, dynamic>> loops) async {
     try {
+      final sanitizedRecordName = _sanitizeForCloudKit(songId);
       final record = {
         'recordType': 'SavedLoops',
-        'recordName': songId,
+        'recordName': sanitizedRecordName,
+        'originalSongId': songId,
         'loopsData': loops,
       };
       final changeTag = await CloudKitService.saveRecord(record);
       if (changeTag != null) {
-        await saveLocalChangeTag('SavedLoops', songId, changeTag);
+        await saveLocalChangeTag('SavedLoops', sanitizedRecordName, changeTag);
       }
     } catch (e) {
       print('Error syncing saved loops: $e');
@@ -1488,45 +1820,73 @@ class StorageService {
 static Future<void> _syncBooksToCloudKit(List<Map<String, dynamic>> books) async {
   for (final book in books) {
     try {
+      print('📚 Syncing book to CloudKit');
+      // Get the original book ID and sanitize it for CloudKit
+      final originalBookId = book['id'] as String;
+      final sanitizedRecordName = _sanitizeForCloudKit(originalBookId);
+      print('   Book ID: $originalBookId');
+      print('   Record Name: $sanitizedRecordName');
+      
       // 1. Prepare the fields for the CloudKit record.
       // Exclude the 'path' field as it will be handled as an asset.
       final recordFields = <String, String>{};
       book.forEach((key, value) {
         if (key != 'path' && key != 'id' && value != null) {
-          // Convert all values to String for this example.
-          // Adjust as needed for your CloudKit schema (e.g., Numbers).
+          // Convert all values to String for CloudKit
           recordFields[key] = value.toString();
         }
       });
+      
+      // Add the original book ID for retrieval
+      recordFields['originalBookId'] = originalBookId;
+      print('   Record fields: $recordFields');
 
       // 2. Prepare the asset map.
       final assets = <String, CloudKitAsset>{};
       final pdfPath = book['path'] as String?;
+      print('   PDF Path: $pdfPath');
 
       if (pdfPath != null && pdfPath.isNotEmpty) {
-        // 'pdfFile' is the field name in your CloudKit 'Book' record type for the asset.
-        assets['pdfFile'] = CloudKitAsset.forUpload(filePath: pdfPath);
+        // Verify the file exists before trying to upload
+        final pdfFile = File(pdfPath);
+        if (await pdfFile.exists()) {
+          final fileSize = await pdfFile.length();
+          // Create CloudKitAsset with full parameters like SongPdf does
+          assets['pdfFile'] = CloudKitAsset.forUpload(
+            filePath: pdfPath,
+            fileName: pdfPath.split('/').last,
+            size: fileSize,
+            mimeType: 'application/pdf',
+          );
+          print('📚 Book asset prepared: ${pdfPath.split('/').last} (${fileSize} bytes)');
+        } else {
+          print('❌ Book PDF file not found: $pdfPath');
+        }
       }
 
-      // 3. Get the recordName (book ID).
-      final recordName = book['id'] as String;
+      print('   Assets map: ${assets.keys.toList()}');
 
-      // 4. Call the service to save the record with its PDF asset.
-      // Assuming you are using the private database.
-      await CloudKitService.saveRecordWithAssets(
+      // 3. Call the service to save the record with its PDF asset.
+      print('   Calling CloudKitService.saveRecordWithAssets...');
+      final changeTag = await CloudKitService.saveRecordWithAssets(
         recordType: 'Book',
-        recordName: recordName,
+        recordName: sanitizedRecordName,
         record: recordFields,
         assets: assets,
       );
 
-      // Note: The concept of a 'changeTag' is often handled differently for asset uploads.
-      // The native CloudKit API returns a full CKRecord object on success.
-      // You may need to adapt your CloudKitService or change tag logic if necessary.
-      print('Successfully synced book with PDF asset: $recordName');
+      // Save local change tag for sync tracking
+      if (changeTag != null) {
+        await saveLocalChangeTag('Book', sanitizedRecordName, changeTag);
+      }
 
-    } catch (e) {
-      print('Error syncing book with PDF asset: $e');
+      print('✅ Successfully synced book with PDF asset: $sanitizedRecordName (original: $originalBookId)');
+      print('   Change tag: $changeTag');
+
+    } catch (e, stackTrace) {
+      print('❌ Error syncing book with PDF asset: $e');
+      print('   Stack trace: $stackTrace');
+      rethrow;
     }
   }
 }
@@ -1549,47 +1909,135 @@ static Future<void> _syncBooksToCloudKit(List<Map<String, dynamic>> books) async
 
   static Future<void> _syncYoutubeVideosToCloudKit(List<Map<String, dynamic>> videos) async {
     try {
+      print('🎥📤 YOUTUBE_VIDEOS_SYNC_DEBUG: Syncing ${videos.length} videos to CloudKit');
+      print('🎥📤 YOUTUBE_VIDEOS_SYNC_DEBUG: Sample video data: ${videos.isNotEmpty ? videos.first : 'none'}');
+      
       final record = {
         'recordType': 'YoutubeVideos',
         'recordName': 'all_youtube_videos',
         'videosData': videos,
       };
+      
+      print('🎥📤 YOUTUBE_VIDEOS_SYNC_DEBUG: Record to save: $record');
+      
       final changeTag = await CloudKitService.saveRecord(record);
       if (changeTag != null) {
         await saveLocalChangeTag('YoutubeVideos', 'all_youtube_videos', changeTag);
+        print('🎥📤 YOUTUBE_VIDEOS_SYNC_DEBUG: Successfully saved with change tag: $changeTag');
       }
     } catch (e) {
-      print('Error syncing YouTube videos: $e');
+      print('🎥❌ YOUTUBE_VIDEOS_SYNC_DEBUG: Error syncing YouTube videos: $e');
     }
   }
 
-  static Future<void> _syncLabelsToCloudKit(String songAssetPath, int page, List<dynamic> labels) async {
+  static Future<void> _syncLabelsToCloudKit(String songPath, int page, List<Label> labels) async {
     try {
-      final recordName = '${songAssetPath}_page_$page';
+      print('🏷️☁️ CLOUDKIT_SYNC_DEBUG: Starting CloudKit sync');
+      print('🏷️☁️ CLOUDKIT_SYNC_DEBUG: songPath: $songPath');
+      print('🏷️☁️ CLOUDKIT_SYNC_DEBUG: page: $page');
+      print('🏷️☁️ CLOUDKIT_SYNC_DEBUG: labels count: ${labels.length}');
+      
+      final originalRecordName = '${songPath}_page_$page';
+      final sanitizedRecordName = _sanitizeForCloudKit(originalRecordName);
+      
+      print('🏷️☁️ CLOUDKIT_SYNC_DEBUG: originalRecordName: $originalRecordName');
+      print('🏷️☁️ CLOUDKIT_SYNC_DEBUG: sanitizedRecordName: $sanitizedRecordName');
+      
+      // Convert labels to JSON and log each one
+      final labelsDataForCloudKit = <Map<String, dynamic>>[];
+      for (int i = 0; i < labels.length; i++) {
+        final labelJson = labels[i].toJson();
+        labelsDataForCloudKit.add(labelJson);
+        print('🏷️☁️ CLOUDKIT_SYNC_DEBUG: Label $i JSON: $labelJson');
+      }
+      
+      print('🏷️☁️ CLOUDKIT_SYNC_DEBUG: Total labelsDataForCloudKit: ${labelsDataForCloudKit.length} items');
+      
       final record = {
         'recordType': 'Labels',
-        'recordName': recordName,
-        'songAssetPath': songAssetPath,
+        'recordName': sanitizedRecordName,
+        'originalRecordName': originalRecordName, // Store original record name
+        'songPath': songPath,
         'page': page,
-        'labelsData': labels.map((l) => l.toJson()).toList(),
+        'labelsData': labelsDataForCloudKit,
       };
+      
+      print('🏷️☁️ CLOUDKIT_SYNC_DEBUG: Complete record being sent to CloudKit: $record');
+      
       final changeTag = await CloudKitService.saveRecord(record);
       if (changeTag != null) {
-        await saveLocalChangeTag('Labels', recordName, changeTag);
+        await saveLocalChangeTag('Labels', sanitizedRecordName, changeTag);
+        print('🏷️☁️ CLOUDKIT_SYNC_DEBUG: Successfully synced to CloudKit with changeTag: $changeTag');
+      } else {
+        print('🏷️☁️ CLOUDKIT_SYNC_DEBUG: CloudKit sync failed - no changeTag returned');
       }
     } catch (e) {
-      print('Error syncing labels: $e');
+      print('🏷️☁️ CLOUDKIT_SYNC_DEBUG: Error syncing labels: $e');
     }
   }
 
-  static Future<File> _getLabelsFile(String songAssetPath, int page) async {
+  static Future<File> _getLabelsFile(String songPath, int page) async {
     final directory = await getApplicationDocumentsDirectory();
-    final safeFilename = _getSafeFilename(songAssetPath);
+    final safeFilename = _getSafeFilename(songPath);
     return File('${directory.path}/${safeFilename}_pdf_page_${page}_labels.json');
   }
 
   static String _getSafeFilename(String path) {
     return path.split('/').last.replaceAll(RegExp(r'[^a-zA-Z0-9\-_.]'), '_').replaceAll(RegExp(r'_{2,}'), '_');
+  }
+
+  /// Check if CloudKit has existing label data for a song page to prevent accidental overwrites
+  /// Returns the number of labels found in CloudKit, or 0 if none/error
+  static Future<int> _checkCloudKitForExistingLabels(String songPath, int page) async {
+    try {
+      final originalRecordName = '${songPath}_page_$page';
+      final sanitizedRecordName = _sanitizeForCloudKit(originalRecordName);
+      
+      print('🏷️🔍 LABEL_CHECK_DEBUG: Checking CloudKit for existing labels');
+      print('🏷️🔍 LABEL_CHECK_DEBUG: sanitizedRecordName: $sanitizedRecordName');
+      
+      // CloudKit records are stored with recordType prefix, so construct full record key
+      final fullRecordKey = 'Labels_$sanitizedRecordName';
+      print('🏷️🔍 LABEL_CHECK_DEBUG: fullRecordKey: $fullRecordKey');
+      
+      // Try to fetch the record from CloudKit using the full record key
+      final cloudKitRecord = await CloudKitService.getRecord(fullRecordKey);
+      
+      if (cloudKitRecord != null) {
+        final labelsData = cloudKitRecord['labelsData'] as List? ?? [];
+        print('🏷️🔍 LABEL_CHECK_DEBUG: Found CloudKit record with ${labelsData.length} labels');
+        return labelsData.length;
+      } else {
+        print('🏷️🔍 LABEL_CHECK_DEBUG: No CloudKit record found');
+        return 0;
+      }
+    } catch (e) {
+      print('🏷️🔍 LABEL_CHECK_DEBUG: Error checking CloudKit: $e');
+      return 0; // Return 0 on error to allow sync (fail-safe)
+    }
+  }
+
+  /// Sanitize record names for CloudKit compatibility
+  /// Converts invalid CloudKit characters to underscores
+  static String _sanitizeForCloudKit(String recordName) {
+    return recordName.replaceAll(RegExp(r'[/\:*?"<>| .\-]'), '_');
+  }
+
+  /// Extracts YouTube video ID from a YouTube URL
+  static String? _extractVideoIdFromUrl(String url) {
+    if (url.isEmpty) return null;
+    
+    // Remove whitespace
+    url = url.trim();
+    
+    // Handle different YouTube URL formats
+    final RegExp regExp = RegExp(
+      r'(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})',
+      caseSensitive: false,
+    );
+    
+    final match = regExp.firstMatch(url);
+    return match?.group(1);
   }
 
   // =============================================================================
