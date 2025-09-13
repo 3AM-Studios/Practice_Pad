@@ -1203,7 +1203,7 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
                       Row(
                         children: [
                           Flexible(
-                            flex: 1,
+                            flex: 0,
                             child: _buildKeyControls(),
                           ),
                           const SizedBox(width: 8),
@@ -1725,7 +1725,7 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Row(
+        Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Transform.scale(
@@ -1734,7 +1734,7 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
             ),
             // Show key modification button when chords are selected
             if (hasSelectedChords()) ...[
-              const SizedBox(width: 8),
+              
               Transform.scale(
                 scale: 0.8,
                 child: _buildKeyModificationButton(),
@@ -2036,7 +2036,7 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
         borderRadius: 18,
         child: Container(
           padding: EdgeInsets.symmetric(
-            horizontal: isTabletOrDesktop ? 16 : 12, 
+            horizontal: isTabletOrDesktop ? 16 : 8, 
             vertical: isTabletOrDesktop ? 12 : 8
           ),
           child: Row(
@@ -2045,17 +2045,18 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
               Icon(
                 Icons.transform,
                 color: theme.colorScheme.primary,
-                size: 16,
+                size: 20,
               ),
-              SizedBox(width: isTabletOrDesktop ? 6 : 4),
-              Text(
+              isTabletOrDesktop? SizedBox(width: isTabletOrDesktop ? 6 : 4): const SizedBox.shrink(), 
+              
+              isTabletOrDesktop?  Text(
                 'Modify Key',
                 style: TextStyle(
                   fontSize: isTabletOrDesktop ? 14 : 12,
                   fontWeight: FontWeight.w600,
                   color: theme.colorScheme.primary,
                 ),
-              ),
+              ): const SizedBox.shrink()
             ],
           ),
         ),

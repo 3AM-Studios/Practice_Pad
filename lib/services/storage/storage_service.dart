@@ -388,7 +388,7 @@ class StorageService {
   static Future<void> updateChordKeysFromCloud(Map<String, dynamic> record) async {
     try {
       final songId = record['originalSongId'] as String? ?? record['recordName'] as String;
-      final chordKeysData = record['chordKeysData'] as Map<String, dynamic>?
+      final chordKeysData = json.decode(record['chordKeysData']) as Map<String, dynamic>?
         ?? {};
       await saveChordKeys(songId, chordKeysData, syncToCloud: false);
     } catch (e) {
@@ -582,11 +582,10 @@ class StorageService {
       final pageValue = record['page'];
       final page = int.parse(pageValue.toString());
       
-      final rawLabelsData = record['labelsData'];
-      print('🏷️📥 LABEL_DOWNLOAD_DEBUG: rawLabelsData type: ${rawLabelsData.runtimeType}');
+      final labelsData = record['labelsData'];
+      //print('🏷️📥 LABEL_DOWNLOAD_DEBUG: rawLabelsData type: ${rawLabelsData.runtimeType}');
       
       
-      final labelsData =  json.decode(rawLabelsData);
       
       // Convert dynamic label data to Label objects
       final labels = <Label>[];
