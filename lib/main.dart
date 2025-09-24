@@ -998,18 +998,18 @@ class _AppRouterState extends State<AppRouter> {
 
   Future<void> _checkOnboardingStatus() async {
     // Development: Always show onboarding
-    final isCompleted = await OnboardingService.isOnboardingCompleted();
-    setState(() {
-      _showOnboarding = true; // Always show during development
-      _isCheckingOnboarding = false;
-    });
-    
-    // Production: Uncomment below and comment out above
     // final isCompleted = await OnboardingService.isOnboardingCompleted();
     // setState(() {
-    //   _showOnboarding = !isCompleted;
+    //   _showOnboarding = true; // Always show during development
     //   _isCheckingOnboarding = false;
     // });
+    
+    // Production: Uncomment below and comment out above
+    final isCompleted = await OnboardingService.isOnboardingCompleted();
+    setState(() {
+      _showOnboarding = !isCompleted;
+      _isCheckingOnboarding = false;
+    });
   }
 
   void _onOnboardingComplete() {

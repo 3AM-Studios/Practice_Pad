@@ -103,6 +103,13 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
   }
 
   @override
+  void deactivate() {
+    // Pauses video while navigating to another page.
+    _controller?.pause();
+    super.deactivate();
+  }
+
+  @override
   void dispose() {
     // Safely dispose of the YouTube controller
     _disposeController();
@@ -181,42 +188,64 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
   }
 
   Future<void> _loadVideoFromUrl(String url) async {
+    final oldController = _controller;
+
+    // Set loading state and remove the player from the widget tree
     setState(() {
       _isLoadingVideo = true;
       _videoError = null;
+      _controller = null;
     });
+
+    // Wait for the UI to rebuild, then dispose the old controller safely.
+    if (oldController != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        try {
+          oldController.removeListener(_videoListener);
+          oldController.dispose();
+        } catch (e) {
+          debugPrint("Error disposing old controller: $e");
+        }
+      });
+    }
+
+    // Give a moment for the post-frame callback to execute.
+    await Future.delayed(const Duration(milliseconds: 100));
+    if (!mounted) return;
 
     try {
       final videoId = YoutubePlayer.convertUrlToId(url);
       if (videoId != null) {
         _currentVideoId = videoId;
-        
-        // Dispose existing controller safely
-        _disposeController();
-        
-        // Small delay to ensure disposal is complete
-        await Future.delayed(const Duration(milliseconds: 100));
-        
-        // Create new controller only if widget is still mounted
-        if (mounted) {
-          _controller = YoutubePlayerController(
-            initialVideoId: videoId,
-            flags: const YoutubePlayerFlags(
-              autoPlay: false,
-              mute: false,
-              enableCaption: true,
-              loop: false,
-            ),
-          );
 
-          _controller!.addListener(_videoListener);
-          _updatePlaybackSpeed();
+        // Create the new controller
+        final newController = YoutubePlayerController(
+          initialVideoId: videoId,
+          flags: const YoutubePlayerFlags(
+            autoPlay: false,
+            mute: false,
+            enableCaption: true,
+            loop: false,
+          ),
+        );
+
+        newController.addListener(_videoListener);
+
+        if (!mounted) {
+          newController.dispose();
+          return;
         }
+
+        // Update state to show the new player
         setState(() {
+          _controller = newController;
           _isLoadingVideo = false;
         });
+
+        _updatePlaybackSpeed();
         await _saveYoutubeData();
       } else {
+        if (!mounted) return;
         setState(() {
           _isLoadingVideo = false;
           _videoError = 'Invalid YouTube URL';
@@ -225,6 +254,7 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
       }
     } catch (e) {
       debugPrint('Error loading YouTube video: $e');
+      if (!mounted) return;
       setState(() {
         _isLoadingVideo = false;
         _videoError = 'Platform error: ${e.toString()}';
@@ -1709,7 +1739,7 @@ class _TranscriptionViewerState extends State<TranscriptionViewer> {
                 ),
               ),
             ),
-          ],
+          ], 
           ),
         ),
       ),

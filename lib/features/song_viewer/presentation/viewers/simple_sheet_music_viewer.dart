@@ -27,6 +27,7 @@ import 'package:practice_pad/services/storage/storage_service.dart';
 
 // Import transcription viewer
 import 'transcription_viewer.dart';
+import 'fullscreen_sheet_music_viewer.dart';
 import '../../data/models/song.dart';
 
 /// Wrapper that allows two-finger scrolling but blocks single-finger panning in drawing mode
@@ -1147,6 +1148,29 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
                       ),
                     ),
                   ),
+                  // Fullscreen button in top right
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: ClayContainer(
+                      color: surfaceColor,
+                      borderRadius: 15,
+                      child: IconButton(
+                        icon: const Icon(
+                          Icons.fullscreen,
+                          size: 20,
+                          color: Colors.grey,
+                        ),
+                        onPressed: _openFullscreenSheetMusic,
+                        tooltip: 'Fullscreen View',
+                        constraints: const BoxConstraints(
+                          minWidth: 30,
+                          minHeight: 30,
+                        ),
+                        padding: const EdgeInsets.all(4),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -1532,6 +1556,7 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
       );
     }
   }
+  
   
   /// Calculates the transposition interval between two keys in semitones
   int _getTranspositionInterval(String fromKey, String toKey) {
@@ -2291,6 +2316,37 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
         builder: (context) => TranscriptionViewer(
           song: song,
           isSongMode: true,
+        ),
+      ),
+    );
+  }
+
+  void _openFullscreenSheetMusic() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => FullscreenSheetMusicViewer(
+          measures: _chordMeasures,
+          initialCanvasScale: _sheetMusicScale,
+          extensionNumbersRelativeToChords: _extensionNumbersRelativeToChords,
+          initialKeySignatureType: _getCurrentKeySignature(),
+          drawingController: _drawingController,
+          isDrawingModeNotifier: _isDrawingModeNotifier,
+          onSymbolAdd: _insertSymbolAtPosition,
+          onSymbolUpdate: _updateSymbolAtPosition,
+          onSymbolDelete: _deleteSymbolAtPosition,
+          onChordSymbolTap: _onChordSymbolTap,
+          onChordSymbolLongPress: _onChordSymbolLongPress,
+          onChordSymbolLongPressEnd: _onChordSymbolLongPressEnd,
+          onChordSymbolHover: _onChordSymbolHover,
+          isChordSelected: _isChordSelected,
+          onDrawingPointerUp: (details) {
+            _saveDrawingData();
+          },
+          onExit: () {
+            // Any cleanup when exiting fullscreen mode
+            _saveDrawingData();
+            _saveSongViewerSettings();
+          },
         ),
       ),
     );
