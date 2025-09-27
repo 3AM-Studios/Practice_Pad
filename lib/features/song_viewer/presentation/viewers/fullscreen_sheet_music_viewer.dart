@@ -55,6 +55,8 @@ class FullscreenSheetMusicViewer extends StatefulWidget {
 class _FullscreenSheetMusicViewerState extends State<FullscreenSheetMusicViewer> {
   late double _canvasScale;
   late List<ChordMeasure> _measures;
+  bool _showControls = false;
+
 
   @override
   void initState() {
@@ -189,30 +191,32 @@ class _FullscreenSheetMusicViewerState extends State<FullscreenSheetMusicViewer>
             ),
           ),
 
-          // Exit fullscreen button and zoom controls
+          // UI Controls Toggle
           Positioned(
-            top: MediaQuery.of(context).padding.top + 16,
-            right: 16,
+            top: MediaQuery.of(context).padding.top + 8,
+            left: 16,
             child: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Exit fullscreen button in clay container
+                // Trigger button
                 ClayContainer(
                   color: Colors.white,
-                  borderRadius: 15,
+                  borderRadius: 30,
                   depth: 10,
                   spread: 3,
                   child: IconButton(
                     icon: const Icon(
-                      Icons.fullscreen_exit,
+                      Icons.tune,
                       size: 20,
                       color: Colors.grey,
                     ),
                     onPressed: () {
-                      widget.onExit?.call();
-                      Navigator.of(context).pop();
+                      setState(() {
+                        _showControls = !_showControls;
+                      });
                     },
-                    tooltip: 'Exit Fullscreen',
+                    tooltip: 'Show Controls',
                     constraints: const BoxConstraints(
                       minWidth: 40,
                       minHeight: 40,
@@ -220,61 +224,69 @@ class _FullscreenSheetMusicViewerState extends State<FullscreenSheetMusicViewer>
                     padding: const EdgeInsets.all(8),
                   ),
                 ),
-                const SizedBox(height: 8),
-                // Canvas scale controls
-                ClayContainer(
-                  color: Colors.white,
-                  borderRadius: 15,
-                  depth: 10,
-                  spread: 3,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Zoom in button
-                      IconButton(
-                        icon: const Icon(
-                          Icons.zoom_in,
-                          size: 18,
-                          color: Colors.grey,
-                        ),
-                        onPressed: _zoomIn,
-                        tooltip: 'Zoom In',
-                        constraints: const BoxConstraints(
-                          minWidth: 36,
-                          minHeight: 36,
-                        ),
-                        padding: const EdgeInsets.all(6),
+                
+                // Conditionally visible controls
+                if (_showControls) ...[
+                  const SizedBox(height: 16),
+                  // Exit fullscreen button
+                  ClayContainer(
+                    color: Colors.white,
+                    borderRadius: 15,
+                    depth: 10,
+                    spread: 3,
+                    child: IconButton(
+                      icon: const Icon(
+                        Icons.fullscreen_exit,
+                        size: 20,
+                        color: Colors.grey,
                       ),
-                      // Scale indicator
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        child: Text(
-                          '${(_canvasScale * 100).round()}%',
-                          style: const TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey,
+                      onPressed: () {
+                        widget.onExit?.call();
+                        Navigator.of(context).pop();
+                      },
+                      tooltip: 'Exit Fullscreen',
+                      constraints: const BoxConstraints(
+                        minWidth: 40,
+                        minHeight: 40,
+                      ),
+                      padding: const EdgeInsets.all(8),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  // Canvas scale controls
+                  ClayContainer(
+                    color: Colors.white,
+                    borderRadius: 15,
+                    depth: 10,
+                    spread: 3,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.zoom_in, size: 18, color: Colors.grey),
+                          onPressed: _zoomIn,
+                          tooltip: 'Zoom In',
+                          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                          padding: const EdgeInsets.all(6),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          child: Text(
+                            '${(_canvasScale * 100).round()}%',
+                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.grey),
                           ),
                         ),
-                      ),
-                      // Zoom out button
-                      IconButton(
-                        icon: const Icon(
-                          Icons.zoom_out,
-                          size: 18,
-                          color: Colors.grey,
+                        IconButton(
+                          icon: const Icon(Icons.zoom_out, size: 18, color: Colors.grey),
+                          onPressed: _zoomOut,
+                          tooltip: 'Zoom Out',
+                          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                          padding: const EdgeInsets.all(6),
                         ),
-                        onPressed: _zoomOut,
-                        tooltip: 'Zoom Out',
-                        constraints: const BoxConstraints(
-                          minWidth: 36,
-                          minHeight: 36,
-                        ),
-                        padding: const EdgeInsets.all(6),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
