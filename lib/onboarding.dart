@@ -108,6 +108,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           duration: const Duration(milliseconds: 950),
           colors: onboardingScreens.map((screen) => screen.bgColor).toList(),
           radius: 30,
+          itemCount: onboardingScreens.length,
+          physics: _currentScreenIndex == onboardingScreens.length - 1
+              ? const NeverScrollableScrollPhysics()
+              : const BouncingScrollPhysics(),
           imagesPerScreen: onboardingScreens.map((screen) => screen.imagePaths.length).toList(),
           onImageChange: (screenIndex, imageIndex) {
             setState(() {
@@ -127,7 +131,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             widget.onComplete();
           },
           itemBuilder: (index) {
-            final screen = onboardingScreens[index % onboardingScreens.length];
+            final screen = onboardingScreens[index];
             return SafeArea(
               child: _OnboardingPage(
                 screen: screen,

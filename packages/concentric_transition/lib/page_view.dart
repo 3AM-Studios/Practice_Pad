@@ -68,14 +68,16 @@ class _ConcentricPageViewState extends State<ConcentricPageView> {
   int _prevPage = 0;
   Color? _prevColor;
   Color? _nextColor;
-  
+
   // Multi-image support
   int _currentScreenIndex = 0;
   int _currentImageIndex = 0;
-  
+
   // Debouncing
   bool _isProcessing = false;
   DateTime? _lastTapTime;
+
+  int _currentPage = 0;
 
   @override
   void initState() {
@@ -83,6 +85,7 @@ class _ConcentricPageViewState extends State<ConcentricPageView> {
     _nextColor = widget.colors[_prevPage + 1];
     _pageController = (widget.pageController ?? PageController(initialPage: 0))
       ..addListener(_onScroll);
+    _currentPage = _pageController.initialPage;
     super.initState();
   }
 
@@ -130,13 +133,21 @@ class _ConcentricPageViewState extends State<ConcentricPageView> {
       scrollDirection: widget.direction,
       controller: _pageController,
       reverse: widget.reverse,
-      physics: widget.physics,
-      itemCount: widget.itemCount,
+      physics: _currentPage == (widget.itemCount ?? widget.colors.length) - 1
+          ? const NeverScrollableScrollPhysics()
+          : widget.physics,
+      itemCount: widget.itemCount ?? widget.colors.length,
       pageSnapping: widget.pageSnapping,
       onPageChanged: (int page) {
         if (widget.onChange != null) {
           widget.onChange!(page);
         }
+        setState(() {
+          _currentPage = page;
+          _currentScreenIndex = page;
+          _currentImageIndex = 0;
+        });
+        widget.onImageChange?.call(page, 0);
       },
       itemBuilder: (context, index) {
         final child = widget.itemBuilder(index);
@@ -275,13 +286,7 @@ class _ConcentricPageViewState extends State<ConcentricPageView> {
       duration: widget.duration,
       curve: widget.curve,
     ).then((_) {
-      // Update the state AFTER the page transition completes
-      // This prevents showing the first image of the next screen during transition
-      setState(() {
-        _currentScreenIndex++;
-        _currentImageIndex = 0;
-      });
-      widget.onImageChange?.call(_currentScreenIndex, _currentImageIndex);
+      // State is now updated in onPageChanged to handle swipes correctly.
       _isProcessing = false;
     });
   }

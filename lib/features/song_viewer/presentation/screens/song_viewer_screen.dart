@@ -15,12 +15,14 @@ enum ViewerMode { simpleSheetMusic, pdf }
 
 class SongViewerScreen extends StatefulWidget {
   final String songPath;
+  final String songTitle;
   final int bpm;
   final PracticeArea? practiceArea;
 
   const SongViewerScreen({
     super.key,
     required this.songPath,
+    required this.songTitle,
     this.bpm = 120,
     this.practiceArea,
   });
@@ -35,6 +37,7 @@ class _SongViewerScreenState extends State<SongViewerScreen> {
   late PDFViewer _pdfViewer;
   late bool _isPdfOnly;
   bool _isFullscreen = false; // Track fullscreen state
+  bool _isSheetMusicInteracting = false; // Track sheet music interaction
   
   // Keys to maintain state across mode switches
   final GlobalKey _sheetMusicKey = GlobalKey();
@@ -62,6 +65,13 @@ class _SongViewerScreenState extends State<SongViewerScreen> {
           setState(() {
             // Rebuild the parent to update toolbar
           });
+        },
+        onSheetMusicInteraction: (isInteracting) {
+          if (mounted && _isSheetMusicInteracting != isInteracting) {
+            setState(() {
+              _isSheetMusicInteracting = isInteracting;
+            });
+          }
         },
       );
     } else {
@@ -238,7 +248,7 @@ class _SongViewerScreenState extends State<SongViewerScreen> {
       backgroundColor: Colors.white,
       appBar: AppBar(
         title: Text(
-          'Song Viewer',
+          widget.songTitle,
           style: TextStyle(
             fontSize: 18,
             color: onSurfaceColor,
@@ -257,6 +267,9 @@ class _SongViewerScreenState extends State<SongViewerScreen> {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0),
           child: SingleChildScrollView(
+            physics: _isSheetMusicInteracting
+                ? const NeverScrollableScrollPhysics()
+                : const AlwaysScrollableScrollPhysics(),
             child: Column(
               children: [
                 const SizedBox(height: 16),

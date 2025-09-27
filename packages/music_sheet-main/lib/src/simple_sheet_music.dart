@@ -51,6 +51,7 @@ class SimpleSheetMusic extends StatefulWidget {
     this.drawingController,
     this.isDrawingModeNotifier,
     this.onDrawingPointerUp,
+    this.onInteractionStateChanged,
   });
 
   /// The list of measures to be displayed.
@@ -143,6 +144,9 @@ class SimpleSheetMusic extends StatefulWidget {
   /// Callback when drawing pointer is released
   final Function(PointerUpEvent)? onDrawingPointerUp;
 
+  /// Callback for interaction state changes
+  final void Function(bool)? onInteractionStateChanged;
+
   @override
   SimpleSheetMusicState createState() => SimpleSheetMusicState();
 }
@@ -174,6 +178,8 @@ class SimpleSheetMusicState extends State<SimpleSheetMusic>
   MusicalSymbol? _selectedSymbol;
 
   bool _isAddingNewSymbol = false;
+
+  bool _isInteracting = false;
 
   FontType get fontType => widget.fontType;
 
@@ -287,6 +293,9 @@ MusicalSymbol? _getSymbolAtWithSmartHitTesting(MeasureRenderer measureRenderer, 
   // Define a reasonable hit radius around each symbol (smaller than the full bounds)
   final hitRadius = closestBounds.width * 0.3; // Only 30% of symbol width for hit area
   
+
+
+  
   // Check if we're close enough to the symbol center
   if (closestDistance <= hitRadius) {
     // Also check if we're within the vertical bounds of the symbol
@@ -352,7 +361,10 @@ void _handleTapDown(TapDownDetails details) {
         // This is acceptable as it only happens once on tap down.
         setState(() {
           _selectedSymbol = symbol;
+          _isInteracting = true;
         });
+        widget.onInteractionStateChanged?.call(true);
+        widget.onInteractionStateChanged?.call(true);
         
         // Handle Notes and Rests differently
         Rect? highlightRect;
@@ -383,8 +395,17 @@ void _handleTapDown(TapDownDetails details) {
       if (_selectedSymbol != null) {
         setState(() {
           _selectedSymbol = null;
+          _isInteracting = true;
+          print('is interacting');
+        });
+      } else {
+        setState(() {
+          _isInteracting = true;
+          print('is interacting');
         });
       }
+      widget.onInteractionStateChanged?.call(true);
+      widget.onInteractionStateChanged?.call(true);
 
       // Create temporary objects for the dynamic overlay
       final pitch = measureRenderer.getPitchForY(tapPosition.dy, _draggedClef!);
@@ -526,8 +547,10 @@ void _resetInteractionState() {
     _draggedClef = null;
     _selectedSymbol = null;
     _isAddingNewSymbol = false;
+    _isInteracting = false;
     // No need to reset _draggedSymbol or _dragPosition, as they've been removed.
   });
+  widget.onInteractionStateChanged?.call(false);
 }
 
 
@@ -552,19 +575,22 @@ void _resetInteractionState() {
       
       return SingleChildScrollView(
         scrollDirection: Axis.vertical,
-        physics: const BouncingScrollPhysics(
-          parent: AlwaysScrollableScrollPhysics(),
-        ),
+        physics: _isInteracting
+            ? const NeverScrollableScrollPhysics()
+            : const BouncingScrollPhysics(
+                parent: AlwaysScrollableScrollPhysics(),
+              ),
         padding: const EdgeInsets.only(bottom: 200.0),
         child: ScrollConfiguration(
           behavior: ScrollConfiguration.of(context).copyWith(
             scrollbars: false,
             overscroll: false,
-            physics: const ClampingScrollPhysics(),
           ),
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
-            physics: const ClampingScrollPhysics(),
+            physics: _isInteracting
+                ? const NeverScrollableScrollPhysics()
+                : const ClampingScrollPhysics(),
           child: SizedBox(
             width: currentLayout.totalContentWidth / widget.canvasScale,
             height: (currentLayout.totalContentHeight / widget.canvasScale) + currentLayout.upperPaddingOnCanvas,

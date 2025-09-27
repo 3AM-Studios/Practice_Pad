@@ -101,6 +101,7 @@ class SimpleSheetMusicViewer extends StatefulWidget {
   final int bpm;
   final PracticeArea? practiceArea;
   final VoidCallback? onStateChanged;
+  final void Function(bool)? onSheetMusicInteraction;
 
   const SimpleSheetMusicViewer({
     super.key,
@@ -108,6 +109,7 @@ class SimpleSheetMusicViewer extends StatefulWidget {
     this.bpm = 120,
     this.practiceArea,
     this.onStateChanged,
+    this.onSheetMusicInteraction,
   });
 
   @override
@@ -186,6 +188,8 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
   late GlobalKey _drawingKey;
   Color _currentDrawingColor = Colors.black;
   double _currentStrokeWidth = 2.0;
+  bool _isFullscreen = false;
+
 
   @override
   void initState() {
@@ -273,7 +277,7 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
         setState(() {
           if (songChanges.containsKey('canvasScale')) {
             _sheetMusicScale =
-                (songChanges['canvasScale'] as double).clamp(0.4, 0.8);
+                (songChanges['canvasScale'] as double).clamp(0.2, 0.8);
           }
           if (songChanges.containsKey('extensionNumbersRelativeToChords')) {
             _extensionNumbersRelativeToChords =
@@ -1106,24 +1110,22 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
                 children: [
                   Padding(
                     padding: const EdgeInsets.all(16),
-                    child: ValueListenableBuilder<bool>(
-                      valueListenable: _isDrawingModeNotifier,
-                      builder: (context, isDrawingMode, child) {
-                        if (isDrawingMode) {
-                          // In drawing mode: wrap with custom gesture detection
-                          return _DrawingModeScrollWrapper(
-                            child: _buildCachedSheetMusic(),
-                          );
-                        } else {
-                          // Normal mode: allow regular scrolling
-                          return SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            physics: const ClampingScrollPhysics(),
-                            child: _buildCachedSheetMusic(),
-                          );
-                        }
-                      },
-                    ),
+                    child: _isFullscreen
+                        ? const SizedBox.shrink()
+                        : ValueListenableBuilder<bool>(
+                            valueListenable: _isDrawingModeNotifier,
+                            builder: (context, isDrawingMode, child) {
+                              if (isDrawingMode) {
+                                // In drawing mode: wrap with custom gesture detection
+                                return _DrawingModeScrollWrapper(
+                                  child: _buildCachedSheetMusic(),
+                                );
+                              } else {
+                                // Normal mode: user removed the scroll view
+                                return _buildCachedSheetMusic();
+                              }
+                            },
+                          ),
                   ),
                   // Help button in top left
                   Positioned(
@@ -1648,10 +1650,10 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
           onChordSymbolHover: _onChordSymbolHover,
           isChordSelected: _isChordSelected,
           drawingController: _drawingController,
-          isDrawingModeNotifier: _isDrawingModeNotifier,
           onDrawingPointerUp: (details) {
             _saveDrawingData();
           },
+          onInteractionStateChanged: widget.onSheetMusicInteraction,
         ),
       ),
     );
@@ -2025,8 +2027,8 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
               Flexible(
                 child: Text(
                   isTabletOrDesktop 
-                    ? 'Key: $_originalKey ${isMinorKey ? 'Minor' : 'Major'}'
-                    : 'Key: $_originalKey ${isMinorKey ? 'Min' : 'Maj'}',
+                    ? 'Key: ${_originalKey[0]} ${isMinorKey ? 'Minor' : 'Major'}'
+                    : 'Key: ${_originalKey[0]} ${isMinorKey ? 'Min' : 'Maj'}',
                   style: TextStyle(
                     fontSize: isTabletOrDesktop ? 16 : 14,
                     fontWeight: FontWeight.bold,
@@ -2223,13 +2225,13 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
   void _showSheetMusicHelp() {}
   void _zoomIn() {
     setState(() {
-      _sheetMusicScale = (_sheetMusicScale + 0.1).clamp(0.4, 0.8);
+      _sheetMusicScale = (_sheetMusicScale + 0.1).clamp(0.2, 0.8);
       _saveSongViewerSettings();
     });
   }
   void _zoomOut() {
     setState(() {
-      _sheetMusicScale = (_sheetMusicScale - 0.1).clamp(0.4, 0.8);
+      _sheetMusicScale = (_sheetMusicScale - 0.1).clamp(0.2, 0.8);
       _saveSongViewerSettings();
     });
   }
@@ -2322,6 +2324,9 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
   }
 
   void _openFullscreenSheetMusic() {
+    setState(() {
+      _isFullscreen = true;
+    });
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => FullscreenSheetMusicViewer(
@@ -2349,7 +2354,16 @@ class _SimpleSheetMusicViewerState extends State<SimpleSheetMusicViewer>
           },
         ),
       ),
-    );
+    ).then((_) {
+      // Wait for the pop animation to complete before rebuilding the sheet music widget
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (mounted) {
+          setState(() {
+            _isFullscreen = false;
+          });
+        }
+      });
+    });
   }
 
   @override
